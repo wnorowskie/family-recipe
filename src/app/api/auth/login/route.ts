@@ -5,9 +5,19 @@ import { loginSchema } from '@/lib/validation';
 import { signToken } from '@/lib/jwt';
 import { setSessionCookie } from '@/lib/session';
 import { logError, logInfo, logWarn } from '@/lib/logger';
+import { loginLimiter, applyRateLimit } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
   try {
+    // Apply rate limiting (5 per IP per 15 minutes)
+    const rateLimitResult = applyRateLimit(
+      loginLimiter,
+      loginLimiter.getIPKey(request)
+    );
+    if (rateLimitResult) {
+      return rateLimitResult;
+    }
+
     const body = await request.json();
 
     // Validate input
