@@ -1,0 +1,39 @@
+# Ignore build artifacts
+.next/
+out/
+build/
+dist/
+
+# Ignore dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Ignore database files
+prisma/*.db
+prisma/*.db-journal
+
+# Ignore generated files
+*.tsbuildinfo
+next-env.d.ts
+
+# Ignore lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Ignore coverage
+coverage/
+
+# Ignore uploads
+public/uploads/
+
+# Ignore env files
+.env
+.env*.local
+
+# Ignore logs
+*.log
+
+# Ignore cache
+.cache/
