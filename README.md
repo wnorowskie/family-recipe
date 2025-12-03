@@ -42,47 +42,43 @@ This app is intentionally **not** a public social network – it's a cozy, perso
 
 ### 1. Clone the Repository
 
-\`\`\`bash
+```
 git clone https://github.com/wnorowskie/family-recipe.git
 cd family-recipe
-\`\`\`
+```
 
 ### 2. Install Dependencies
 
-\`\`\`bash
+```
 npm install
-\`\`\`
+```
 
 ### 3. Set Up Environment Variables
 
 Copy the example environment file and configure it:
 
-\`\`\`bash
+```
 cp .env.example .env
-\`\`\`
+```
 
-Edit \`.env\` and update the values:
+Edit `.env` and update the values:
 
-\`\`\`env
+```
 DATABASE_URL="file:./dev.db"
 JWT_SECRET="jwt-secret-placeholder"
-\`\`\`
+```
 
 > **Security Note:** Generate a strong random secret for production using:
-> \`\`\`bash
+>
+> ```
 > openssl rand -base64 32
-> \`\`\`
+> ```
 
 ### 4. Set Up the Database
 
-```bash
-# Generate Prisma client
+```
 npm run db:generate
-
-# Push schema to database (creates SQLite database)
 npm run db:push
-
-# Seed the database with initial family space
 npm run db:seed
 ```
 
@@ -90,9 +86,9 @@ npm run db:seed
 
 ### 5. Run the Development Server
 
-\`\`\`bash
+```
 npm run dev
-\`\`\`
+```
 
 Open [http://localhost:3000](http://localhost:3000).
 
@@ -100,7 +96,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Project Structure
 
-\`\`\`
+```
 family-recipe/
 ├── prisma/
 │ ├── schema.prisma # Database schema
@@ -132,22 +128,22 @@ family-recipe/
 ├── public/ # Static assets
 │ └── uploads/ # User-uploaded images
 └── package.json
-\`\`\`
+```
 
 ---
 
 ## Available Scripts
 
-| Script                  | Description                                           |
-| ----------------------- | ----------------------------------------------------- |
-| \`npm run dev\`         | Start development server at \`http://localhost:3000\` |
-| \`npm run build\`       | Build production bundle                               |
-| \`npm start\`           | Start production server                               |
-| \`npm run lint\`        | Run ESLint                                            |
-| \`npm run db:generate\` | Generate Prisma client                                |
-| \`npm run db:push\`     | Push schema changes to database                       |
-| \`npm run db:studio\`   | Open Prisma Studio (database GUI)                     |
-| \`npm run db:seed\`     | Seed database with initial data                       |
+| Script                | Description                                         |
+| --------------------- | --------------------------------------------------- |
+| `npm run dev`         | Start development server at `http://localhost:3000` |
+| `npm run build`       | Build production bundle                             |
+| `npm start`           | Start production server                             |
+| `npm run lint`        | Run ESLint                                          |
+| `npm run db:generate` | Generate Prisma client                              |
+| `npm run db:push`     | Push schema changes to database                     |
+| `npm run db:studio`   | Open Prisma Studio (database GUI)                   |
+| `npm run db:seed`     | Seed database with initial data                     |
 
 ---
 
@@ -169,7 +165,7 @@ The app uses **Prisma ORM** with support for SQLite (local dev) and PostgreSQL (
 - **Favorite** – User's bookmarked posts
 - **Tag** – Recipe tags (e.g., "vegetarian", "quick")
 
-See [\`prisma/schema.prisma\`](prisma/schema.prisma) for the complete schema.
+See [`prisma/schema.prisma`](prisma/schema.prisma) for the complete schema.
 
 ---
 
@@ -185,13 +181,13 @@ See [\`prisma/schema.prisma\`](prisma/schema.prisma) for the complete schema.
 
 ## Documentation
 
-Detailed documentation is available in the [\`docs/\`](docs/) directory:
+Detailed documentation is available in the [`docs/`](docs/) directory:
 
-- [\`PRODUCT_SPEC.md\`](docs/PRODUCT_SPEC.md) – Product requirements and UX flows
-- [\`TECHNICAL_SPEC.md\`](docs/TECHNICAL_SPEC.md) – API design, data models, validation
-- [\`USER_STORIES.md\`](docs/USER_STORIES.md) – User stories and acceptance criteria
-- [\`V1_SUMMARY.md\`](docs/V1_SUMMARY.md) – V1 implementation overview
-- [\`V2_PLAN.md\`](docs/V2_PLAN.md) – Roadmap for production deployment
+- [`PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) – Product requirements and UX flows
+- [`TECHNICAL_SPEC.md`](docs/TECHNICAL_SPEC.md) – API design, data models, validation
+- [`USER_STORIES.md`](docs/USER_STORIES.md) – User stories and acceptance criteria
+- [`V1_SUMMARY.md`](docs/V1_SUMMARY.md) – V1 implementation overview
+- [`V2_PLAN.md`](docs/V2_PLAN.md) – Roadmap for production deployment
 
 ---
 
@@ -230,7 +226,7 @@ Detailed documentation is available in the [\`docs/\`](docs/) directory:
 - [ ] Deployment to Vercel/Render
 - [ ] Observability (logging, monitoring)
 
-See [\`FINAL_REPORT.md\`](FINAL_REPORT.md) for detailed V2 implementation plan.
+See [`FINAL_REPORT.md`](FINAL_REPORT.md) for detailed V2 implementation plan.
 
 ---
 
