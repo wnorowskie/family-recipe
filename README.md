@@ -75,22 +75,18 @@ JWT_SECRET="jwt-secret-placeholder"
 
 ### 4. Set Up the Database
 
-\`\`\`bash
-
+```bash
 # Generate Prisma client
-
 npm run db:generate
 
 # Push schema to database (creates SQLite database)
-
 npm run db:push
 
 # Seed the database with initial family space
-
 npm run db:seed
-\`\`\`
+```
 
-> **Important:** After running \`npm run db:seed\`, the **Family Master Key** will be printed in the console. Save this key – it is needed to create an account!
+> **Important:** After running `npm run db:seed`, the **Family Master Key** will be printed in the console. Save this key – it is needed to create an account!
 
 ### 5. Run the Development Server
 

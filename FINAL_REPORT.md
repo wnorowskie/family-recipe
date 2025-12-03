@@ -64,24 +64,20 @@ I have also created a "V2 Plan" (that includes those class concepts) that I will
 V1 focuses on a tight core of features:
 
 - **Private family space**
-
   - One family “space” with a master key.
   - Each adult has their own account (admin (me) + members).
 
 - **Timeline (Family Feed)**
-
   - A single family-wide feed of activity: new posts/recipes, comments, and “cooked this” check-ins.
   - Designed to replace the group text thread as the main place to share what we’re cooking.
 
 - **Posts & Recipes**
-
   - A post can be:
     - A quick share: title + photo(s) + caption, or
     - A full recipe with ingredients, steps, time, servings, difficulty, course, and tags.
   - Only the original author (or admin) can edit, with optional change notes (e.g., “reduced garlic”).
 
 - **Social Interactions**
-
   - Comments on posts (optionally with photos).
   - Emoji reactions on posts/comments.
   - “Cooked this!” events with optional rating and note.
@@ -100,7 +96,6 @@ V1 is deliberately narrow: there is no meal planning, grocery lists, OCR or URL 
 V1 is implemented as a **modern full-stack web app**, with an emphasis on clarity, maintainability, and being easy to evolve:
 
 - **Architecture**
-
   - A monolithic Next.js application using the App Router: frontend UI and JSON API live in the same codebase.
   - A relational database accessed through Prisma, with a schema aligned to the product spec (users, family space, posts, recipe details, comments, reactions, cooked events, favorites, tags, etc.).
   - Structured, versioned specs:
@@ -109,7 +104,6 @@ V1 is implemented as a **modern full-stack web app**, with an emphasis on clarit
     - `TECHNICAL_SPEC.md` – domain model, API design, validation rules.
 
 - **Development Approach**
-
   - I designed the initial app to be “product-first”: the core user experience, flows, and entities were defined before choosing specific implementations.
   - I used Figma to design a small set of mobile-first screens (auth, timeline, add post, post detail, cooked modal, recipes, profile, family members), which drive the component structure.
 
@@ -141,20 +135,20 @@ The immediate goal is to take this V1 implementation and evolve it into a **prod
 **Goal:** Clean, understandable repo ready for DevSecOps work.
 
 - [ ] Update:
-  - [ ] `.gitignore` (node_modules, .next, local DB, `.env*`, etc.)
-  - [ ] `.editorconfig`
-  - [ ] `README.md` with:
-    - [ ] Product overview
-    - [ ] V1 basic feature summary
-    - [ ] Local run instructions
-  - [ ] `.env.example` with all required env variables (no real secrets)
-- [ ] Create remote repo and push current code (GitHub).
+  - [✓] `.gitignore` (node_modules, .next, local DB, `.env*`, etc.)
+  - [✓] `.editorconfig`
+  - [✓] `README.md` with:
+    - [✓] Product overview
+    - [✓] V1 basic feature summary
+    - [✓] Local run instructions
+  - [✓] `.env.example` with all required env variables (no real secrets)
+- [✓] Create remote repo and push current code (GitHub).
 - [ ] Create branches:
-  - [ ] `main` → production
+  - [✓] `main` → production
   - [ ] `develop` → active development
-- [ ] Ensure ESLint + Prettier are configured for Next.js + TypeScript.
-- [ ] Ensure strict TypeScript (`"strict": true`).
-- [ ] Add pre-commit lint/format.
+- [✓] Ensure ESLint + Prettier are configured for Next.js + TypeScript.
+- [✓] Ensure strict TypeScript (`"strict": true`).
+- [✓] Add pre-commit lint/format.
 
 ### Phase 1 – Security & Testing Foundations (Pre-Deploy)
 
