@@ -143,9 +143,9 @@ The immediate goal is to take this V1 implementation and evolve it into a **prod
     - [✓] Local run instructions
   - [✓] `.env.example` with all required env variables (no real secrets)
 - [✓] Create remote repo and push current code (GitHub).
-- [ ] Create branches:
+- [✓] Create branches:
   - [✓] `main` → production
-  - [ ] `develop` → active development
+  - [✓] `develop` → active development
 - [✓] Ensure ESLint + Prettier are configured for Next.js + TypeScript.
 - [✓] Ensure strict TypeScript (`"strict": true`).
 - [✓] Add pre-commit lint/format.
@@ -158,8 +158,8 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 #### 1.1 Auth & Access Control
 
-- [ ] Confirm password hashing uses a strong algorithm (bcrypt/argon2).
-- [ ] Store the **Family Master Key** as a **hash** in the database.
+- [✓] Confirm password hashing uses a strong algorithm (bcrypt).
+- [✓] Store the **Family Master Key** as a **hash** in the database.
 - [ ] Ensure **all non-auth routes** require authentication.
 - [ ] Implement/verify permission checks:
   - [ ] Only post author or admin can edit/delete a post.
@@ -351,4 +351,97 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 ---
 
+## Implementation Accomplished
+
+### Phase 0 - Repo Setup & Baseline Hygiene ✓
+
+**Goal:** Clean, understandable repo ready for DevSecOps work.
+
+#### What Was Accomplished
+
+1. **Repository Foundation**
+   - Enhanced `.gitignore` with comprehensive exclusions for Node.js, Next.js, IDE files, OS-specific files, databases, secrets, and uploads
+   - Created `.editorconfig` to enforce consistent code style across editors (UTF-8, LF line endings, 2-space indentation, trim trailing whitespace)
+   - Created `.env.example` documenting required environment variables (`DATABASE_URL`, `JWT_SECRET`) with security notes
+
+2. **Code Quality Infrastructure**
+   - Configured Prettier with React/Next.js industry standards (single quotes, semicolons, 80-char width, trailing commas ES5)
+   - Extended ESLint configuration with `eslint-config-prettier` to avoid conflicts
+   - Set up Husky + lint-staged for automated pre-commit hooks that:
+     - Run TypeScript type-checking (`npm run type-check`)
+     - Auto-fix ESLint issues on staged files
+     - Auto-format code with Prettier
+   - Added npm scripts: `lint:fix`, `format`, `format:check`, `type-check`, and `prepare`
+
+3. **TypeScript Strict Mode Cleanup**
+   - Fixed 18 TypeScript strict mode errors across 9 files:
+     - **Variable scope issues (6 files):** Moved user/postId variable declarations outside try blocks so they're accessible in catch block error handlers
+     - **JWT type safety:** Added runtime validation before type casting in `jwt.ts` to ensure payload properties exist and are correct types
+     - **SQLite compatibility:** Removed `mode: 'insensitive'` from Prisma queries (SQLite doesn't support this PostgreSQL feature)
+     - **Enum type assertions:** Fixed Set.has() calls with proper type casting for ingredient units and course values
+     - **Ingredient parsing:** Rewrote `parseRecipeIngredients` to properly handle nullable quantity fields
+   - Excluded `figma/` folder from TypeScript type-checking (prototyping code separate from production app)
+
+4. **Professional Documentation**
+   - Completely rewrote `README.md` with:
+     - Project overview with badges (TypeScript, Next.js, Prisma, License)
+     - Feature summary and project structure
+     - Clear setup instructions (environment setup, database initialization, dev server)
+     - Available scripts reference table
+     - Tech stack documentation
+     - V1/V2 roadmap
+
+5. **Version Control & GitHub**
+   - Initialized git repository
+   - Created initial commit with clean baseline (163 files, 29,204 insertions)
+   - Pushed to GitHub (`wnorowskie/family-recipe`)
+   - Established branch strategy: `main` (protected, production) and `develop` (active development)
+
+---
+
+## Implementation Not Accomplished
+
+---
+
 ## Lessons Learned
+
+### Phase 0 - Repo Setup & Baseline Hygiene
+
+**1. TypeScript Strict Mode Reveals Real Issues**
+
+- Enabling strict mode uncovered actual bugs waiting to happen, particularly variable scope issues in error handlers where user context was being accessed but wasn't guaranteed to be in scope
+- The discipline of fixing these errors before the first commit established a clean baseline for future CI/CD pipelines
+
+**2. Database-Specific Features Need Abstraction Planning**
+
+- SQLite vs PostgreSQL differences (like case-insensitive queries) surfaced early
+- This highlighted the importance of testing against the target production database type, not just local development databases
+- Future consideration: abstract database-specific query patterns into utility functions for easier migration
+
+**3. DevSecOps Foundation Pays Dividends Immediately**
+
+- Setting up pre-commit hooks before any "real work" prevents bad habits from forming
+- Auto-formatting and linting on commit means code review can focus on logic, not style
+- Type-checking as a git hook catches errors before they even reach CI
+
+**4. Comprehensive .gitignore is Non-Negotiable**
+
+- Taking time to properly configure `.gitignore` before first commit prevents secrets and sensitive data from ever entering version control
+- Much easier to exclude patterns proactively than to scrub commit history reactively
+- Validated that no databases, environment files, or upload directories were committed
+
+**5. Documentation as Part of Foundation, Not Afterthought**
+
+- Writing a professional README at the start (rather than "will document later")
+- `.env.example` with comments serves as living documentation for required configuration
+
+**6. Multi-File Replacements Require Precision**
+
+- Using tools like `multi_replace_string_in_file` is efficient but demands exact string matching including all whitespace and formatting
+- Better to read more context and match precisely than to make multiple attempts with approximate matches
+
+**7. Separate Concerns Early (Figma Exclusion)**
+
+- Excluding the Figma prototyping code from production type-checking was the right call
+- Prototyping and design exploration code doesn't need the same rigor as production code
+- Keeping them in the same repo is fine, but tooling should distinguish between them
