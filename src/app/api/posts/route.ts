@@ -1,26 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
 import { createPostSchema } from '@/lib/validation';
 import { savePhotoFile } from '@/lib/uploads';
 import { MAX_PHOTO_COUNT, normalizePostPayload } from '@/lib/postPayload';
 import { logError } from '@/lib/logger';
+import { withAuth } from '@/lib/apiAuth';
+import { postCreationLimiter, applyRateLimit } from '@/lib/rateLimit';
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request, user) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'UNAUTHORIZED',
-            message: 'Not authenticated',
-          },
-        },
-        { status: 401 }
-      );
+    // Apply rate limiting (10 posts per user per hour)
+    const rateLimitResult = applyRateLimit(
+      postCreationLimiter,
+      postCreationLimiter.getUserKey(user.id)
+    );
+    if (rateLimitResult) {
+      return rateLimitResult;
     }
 
     const formData = await request.formData();
@@ -239,4 +235,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
