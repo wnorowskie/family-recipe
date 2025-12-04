@@ -1,22 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/apiAuth';
 import { prisma } from '@/lib/prisma';
 import { changePasswordSchema } from '@/lib/validation';
 import { hashPassword, verifyPassword } from '@/lib/auth';
 import { logError, logWarn } from '@/lib/logger';
 
-export async function POST(request: NextRequest) {
-  let user;
+export const POST = withAuth(async (request, user) => {
   try {
-    user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
     const body = await request.json().catch(() => null);
 
     if (!body) {
@@ -79,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ status: 'updated' }, { status: 200 });
   } catch (error) {
-    logError('profile.password.error', error, { userId: user?.id });
+    logError('profile.password.error', error, { userId: user.id });
     return NextResponse.json(
       {
         error: {
@@ -90,4 +80,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
