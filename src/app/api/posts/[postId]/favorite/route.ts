@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/apiAuth';
 import { prisma } from '@/lib/prisma';
 import { logError } from '@/lib/logger';
+import { notFoundError, internalError } from '@/lib/apiErrors';
 
 interface RouteContext {
   params: {
@@ -52,10 +53,7 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
     return NextResponse.json({ status: 'favorited' }, { status: 200 });
   } catch (error) {
     logError('favorites.add.error', error, { postId: context?.params?.postId });
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Unable to favorite post' } },
-      { status: 500 }
-    );
+    return internalError('Unable to favorite post');
   }
 });
 
@@ -83,9 +81,6 @@ export const DELETE = withAuth(async (request, user, context?: RouteContext) => 
     return NextResponse.json({ status: 'unfavorited' }, { status: 200 });
   } catch (error) {
     logError('favorites.remove.error', error, { postId: context?.params?.postId });
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Unable to remove favorite' } },
-      { status: 500 }
-    );
+    return internalError('Unable to remove favorite');
   }
 });

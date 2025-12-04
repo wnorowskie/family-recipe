@@ -5,6 +5,7 @@ import { getPostCookedEventsPage } from '@/lib/posts';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { cookedEventLimiter, applyRateLimit } from '@/lib/rateLimit';
+import { badRequestError, validationError, notFoundError, internalError } from '@/lib/apiErrors';
 
 interface RouteContext {
   params: {
@@ -36,15 +37,7 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
     const validationResult = cookedEventSchema.safeParse(body ?? {});
 
     if (!validationResult.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: validationResult.error.errors[0]?.message ?? 'Invalid input',
-          },
-        },
-        { status: 400 }
-      );
+      return validationError(validationResult.error.errors[0]?.message ?? 'Invalid input');
     }
 
     const { rating, note } = validationResult.data;
@@ -101,15 +94,7 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
     );
   } catch (error) {
     logError('cooked.create.error', error, { postId });
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError('An unexpected error occurred');
   }
 });
 
@@ -160,14 +145,6 @@ export const GET = withAuth(async (request, user, context?: RouteContext) => {
     });
   } catch (error) {
     logError('cooked.list.error', error, { postId });
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError('An unexpected error occurred');
   }
 });
