@@ -12,6 +12,9 @@
 /coverage
 *.lcov
 .nyc_output
+.jest-cache/
+test.db
+test.db-journal
 
 # Next.js
 /.next/
