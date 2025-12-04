@@ -7,6 +7,7 @@ import { MAX_PHOTO_COUNT, normalizePostPayload } from '@/lib/postPayload';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { postCreationLimiter, applyRateLimit } from '@/lib/rateLimit';
+import { badRequestError, validationError, internalError } from '@/lib/apiErrors';
 
 export const POST = withAuth(async (request, user) => {
   try {
@@ -23,45 +24,21 @@ export const POST = withAuth(async (request, user) => {
     const rawPayload = formData.get('payload');
 
     if (!rawPayload || typeof rawPayload !== 'string') {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_PAYLOAD',
-            message: 'Missing payload',
-          },
-        },
-        { status: 400 }
-      );
+      return badRequestError('Missing payload');
     }
 
     let parsedPayload: unknown;
     try {
       parsedPayload = JSON.parse(rawPayload);
     } catch {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_JSON',
-            message: 'Payload must be valid JSON',
-          },
-        },
-        { status: 400 }
-      );
+      return badRequestError('Payload must be valid JSON');
     }
 
     const normalizedPayload = normalizePostPayload(parsedPayload);
     const validatedPayload = createPostSchema.safeParse(normalizedPayload);
 
     if (!validatedPayload.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: validatedPayload.error.errors[0]?.message || 'Invalid input',
-          },
-        },
-        { status: 400 }
-      );
+      return validationError(validatedPayload.error.errors[0]?.message || 'Invalid input');
     }
 
     const files = formData
@@ -69,15 +46,7 @@ export const POST = withAuth(async (request, user) => {
       .filter((entry): entry is File => entry instanceof File && entry.size > 0);
 
     if (files.length > MAX_PHOTO_COUNT) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'TOO_MANY_PHOTOS',
-            message: `You can upload up to ${MAX_PHOTO_COUNT} photos`,
-          },
-        },
-        { status: 400 }
-      );
+      return badRequestError(`You can upload up to ${MAX_PHOTO_COUNT} photos`);
     }
 
     const savedPhotos = await Promise.all(files.map((file) => savePhotoFile(file)));
@@ -225,14 +194,6 @@ export const POST = withAuth(async (request, user) => {
       }
     }
 
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError();
   }
 });

@@ -172,17 +172,17 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 #### 1.2 Input Validation
 
-- [ ] Introduce schema validation (Zod) at API boundaries.
-- [ ] Validate inputs for:
-  - [ ] Signup/login
-  - [ ] Create/edit post (title required, enums valid, tags valid)
-  - [ ] Comments
-  - [ ] Reactions
-  - [ ] “Cooked this!” events
-  - [ ] Pagination/search query params
-- [ ] Implement a **consistent error response format**
-- [ ] Replace any “minimal validation” with concrete validation rules.
-- [ ] Ensure API endpoints that are “happy-path only” now handle invalid input properly.
+- [✓] Introduce schema validation (Zod) at API boundaries.
+- [✓] Validate inputs for:
+  - [✓] Signup/login
+  - [✓] Create/edit post (title required, enums valid, tags valid)
+  - [✓] Comments
+  - [✓] Reactions
+  - [✓] "Cooked this!" events
+  - [✓] Pagination/search query params
+- [✓] Implement a **consistent error response format**
+- [✓] Replace any "minimal validation" with concrete validation rules.
+- [✓] Ensure API endpoints that are "happy-path only" now handle invalid input properly.
 
 #### 1.3 Testing
 
@@ -345,14 +345,6 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 ## Implementation Accomplished
 
----
-
-## Implementation Not Accomplished
-
----
-
-## Implementation Accomplished
-
 ### Phase 0 - Repo Setup & Baseline Hygiene
 
 **Goal:** Clean, understandable repo ready for DevSecOps work.
@@ -455,6 +447,80 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
    - Used optional context parameters for dynamic routes with non-null assertions
    - Maintained TypeScript strict mode compliance (0 errors)
    - Made 4 incremental commits on feature branch following git flow
+
+### Phase 1.2 - Input Validation
+
+**Goal:** Implement comprehensive schema validation and consistent error handling across all API endpoints.
+
+#### What Was Accomplished
+
+1. **Standardized Error Response System**
+   - Created `src/lib/apiErrors.ts` with consolidated error code enum:
+     - `VALIDATION_ERROR` - Schema validation failures
+     - `BAD_REQUEST` - General bad request errors
+     - `UNAUTHORIZED` - Missing/invalid authentication
+     - `INVALID_CREDENTIALS` - Failed login attempts
+     - `FORBIDDEN` - Insufficient permissions
+     - `NOT_FOUND` - Resource not found
+     - `CONFLICT` - Duplicate resource conflicts
+     - `RATE_LIMIT_EXCEEDED` - Rate limit violations
+     - `INTERNAL_ERROR` - Unexpected server errors
+   - Implemented 8 error helper functions returning consistent `NextResponse` objects
+   - Defined `ApiErrorResponse` TypeScript interface: `{ error: { code, message } }`
+   - All errors now use standard HTTP status codes with consistent JSON structure
+
+2. **Comprehensive Validation Schemas**
+   - Extended `src/lib/validation.ts` with Zod schemas for all API inputs:
+     - **Pagination schema**: limit (1-100, default 20), offset (≥0, default 0) with `.coerce` for automatic type conversion
+     - **Timeline/Comments/Cooked schemas**: Extend pagination for consistent query param handling
+     - **Recipe filters schema**: Complex validation with 13 filter types:
+       - Search query (max 200 chars)
+       - Arrays: course, tags, difficulty, authorId, ingredients (with deduplication)
+       - Number ranges: totalTime (0-720 min), servings (1-50) with cross-field validation (min≤max)
+       - Sort option (recent/alpha)
+     - **Route param schemas**: postId, commentId, userId all validated as CUID format
+   - Preserved existing business rules: MAX_TIME_MINUTES=720, MAX_SERVINGS=50, INGREDIENT_LIMIT=5
+   - Used `.transform()` for array deduplication and `.refine()` for cross-field validation
+
+3. **Validation Helper Utilities**
+   - Created 3 reusable helper functions in `apiErrors.ts`:
+     - `parseQueryParams<T>()`: Handles URLSearchParams including arrays via repeated params (?key=val1&key=val2)
+     - `parseRouteParams<T>()`: Validates dynamic route parameters with proper typing
+     - `parseRequestBody<T>()`: Validates request bodies with schema enforcement
+   - All helpers return discriminated union: `{ success: true, data: T } | { success: false, error: NextResponse }`
+   - Enables clean early-return pattern: `if (!validation.success) return validation.error;`
+
+4. **Route Validation Implementation**
+   - Applied validation to 7 routes missing proper input validation:
+     - `/api/timeline` - pagination query params
+     - `/api/recipes` - replaced ~90 lines of manual parsing with single schema validation
+     - `/api/family/members` - error helper adoption
+     - `/api/me/favorites` - pagination validation
+     - `/api/profile/posts` - pagination validation
+     - `/api/profile/cooked` - pagination validation
+     - `/api/auth/login` - request body validation with error helpers
+   - Eliminated manual parsing code with bounds checking scattered across routes
+   - Standardized error responses replacing 6+ different inline error formats
+
+5. **Technical Decisions & Patterns**
+   - Consolidated VALIDATION_ERROR and INVALID_INPUT into single code per requirements
+   - Used REST-standard repeated parameters for arrays (not query string array notation)
+   - Applied `.optional().default()` pattern with destructuring fallbacks for TypeScript type narrowing
+   - Maintained strict rejection of invalid input (no lenient coercion beyond explicit `.coerce` for numbers)
+
+6. **Complete Error Helper Refactoring (Task 5)**
+   - Systematically refactored all 21 API routes to use standardized error helpers
+   - Route groups refactored across 7 additional commits:
+     - Auth routes (signup, login, logout) - 3 routes
+     - Main posts route - 1 route
+     - Reactions route - 1 route
+     - Comments deletion route - 1 route
+     - Profile routes (update, password) - 2 routes
+     - Family member removal route - 1 route
+     - Posts subroutes (favorite, cooked, comments) - 3 routes
+   - Eliminated all inline error responses: `NextResponse.json({ error: { code, message }}, {status})`
+   - Replaced with error helpers: `notFoundError()`, `forbiddenError()`, `validationError()`, etc.
+   - Consolidated custom param schemas to centralized schemas from validation.ts
 
 ---
 
@@ -572,3 +638,93 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 - Total refactoring time: ~2 hours for 21 routes
 - Lesson: invest time in good patterns early, reap benefits in velocity later
 - Contrast with ad-hoc approach: would be constantly making micro-decisions about how to structure each route
+
+### Phase 1.2 - Input Validation
+
+**1. Schema Validation Eliminates Entire Classes of Bugs**
+
+- Before: manual parsing with `parseInt()`, bounds checking scattered across routes, inconsistent handling of missing/invalid values
+- After: single source of truth in Zod schemas with automatic type coercion, bounds enforcement, and default values
+- Recipes route example: replaced 90+ lines of manual parsing/validation logic with 6-line schema validation
+- Side benefits: TypeScript gets proper types from schema inference, impossible to forget validation rules
+- Future changes to validation rules now happen in one place (schema definition) rather than hunting through route handlers
+
+**2. Discriminated Unions Create Ergonomic Error Handling**
+
+- Validation helpers return `{ success: true, data } | { success: false, error }` pattern
+- Enables clean early-return: `if (!validation.success) return validation.error;`
+- TypeScript narrows types automatically - after success check, `validation.data` is fully typed
+- Pattern eliminates need for try/catch around validation and provides consistent error responses
+- Alternative considered: throwing errors from validators, but discriminated unions are more explicit and type-safe
+
+**3. Zod's `.optional().default()` Has TypeScript Quirks**
+
+- Expected: `.optional().default(value)` would infer type as `T`, not `T | undefined`
+- Reality: Zod's type inference still marks it as potentially undefined
+- Solution: destructuring with fallback defaults (`const { limit = 20 } = data`) for TypeScript narrowing
+- This is a known Zod limitation - `.catch()` has similar issues
+- Trade-off accepted: slight redundancy in destructuring vs. extensive type assertions everywhere
+
+**4. REST Array Parameters vs. JSON Query Strings**
+
+- Decision: use standard REST repeated params (`?course=breakfast&course=lunch`) over array notation (`?course[]=breakfast`)
+- Rationale: more universal support, explicit in URL encoding, matches HTTP standards
+- Implementation: `parseQueryParams()` detects multi-value keys via `URLSearchParams.getAll()`
+- Alternative would have required custom parsing or URL manipulation
+- Lesson: follow standards unless there's compelling reason to deviate
+
+**5. Validation Schemas Should Encode Business Rules**
+
+- Preserved existing constants (MAX_TIME_MINUTES, MAX_SERVINGS) as schema constraints
+- Schemas now serve as living documentation of valid input ranges
+- Cross-field validation (e.g., `minTime <= maxTime`) enforced at schema level with `.refine()`
+- Business logic changes (e.g., "increase max servings to 100") now require schema update, making them explicit
+- Future consideration: extract business rules to separate constants file that schemas reference
+
+**6. Early Validation Enables Better Error Messages**
+
+- Validating at API boundary means immediate, specific feedback to clients
+- Before: vague errors after database queries or business logic execution
+- After: precise errors like "Limit must be between 1 and 100" before any processing
+- Side benefit: prevents invalid data from ever reaching business logic or database layer
+- Improves security by rejecting malformed input before expensive operations
+
+**7. Schema Inference Provides Free Documentation**
+
+- TypeScript types generated from Zod schemas (e.g., `PaginationParams`, `RecipeFiltersParams`)
+- These types can be exported and shared with frontend code for consistency
+- Schema definitions are self-documenting - reading the schema shows all valid inputs and constraints
+- Eliminates drift between validation rules and type definitions
+- Future: could auto-generate OpenAPI/Swagger docs from Zod schemas
+
+**8. Incremental Refactoring Reduces Risk**
+
+- Approached validation in layers: error infrastructure → schemas → helpers → route application
+- Each layer committed separately with type-check verification
+- If validation broke a route, could pinpoint exact commit/change
+- Contrast with "big bang" refactor: would have 200+ line uncommitted changes, hard to debug
+- Pattern: build foundation tools first, then apply them systematically to existing code
+
+**9. Manual Parsing Code is a Maintenance Burden**
+
+- Recipes route had custom functions (`parseIntParam`, `normalizeRange`) used nowhere else
+- Each route implemented slightly different parsing logic with different edge case handling
+- Consolidating to schemas eliminated ~150 lines of duplicate parsing code across routes
+- Lesson: spot repetition early and abstract into reusable patterns before it spreads
+- Future vigilance: resist urge to write "quick" inline validation - always use schemas
+
+**10. Error Response Consistency is User Experience**
+
+- Found 6+ different inline error response formats before standardization
+- Some had `message` only, some had `code`, inconsistent status code usage
+- API clients now get predictable error structure: always `{ error: { code, message } }`
+- Enables frontend to build generic error handling (e.g., map error codes to user-friendly messages)
+- Lesson: establish error contract early before it proliferates across codebase
+
+**11. Centralized Schemas Reduce Duplication**
+
+- Found multiple routes defining custom param schemas (e.g., `postIdParamSchema` defined 3 times)
+- Consolidated to single source in validation.ts, imported where needed
+- Eliminates schema drift - changing CUID validation now happens in one place
+- Side benefit: reduces line count and makes imports explicit about validation dependencies
+- Lesson: as soon as you see a schema defined twice, extract it to shared validation file

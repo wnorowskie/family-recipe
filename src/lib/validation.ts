@@ -165,3 +165,156 @@ export const changePasswordSchema = z.object({
 });
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+/**
+ * Query parameter validation schemas
+ */
+
+// Standard pagination schema (reusable across endpoints)
+export const paginationSchema = z.object({
+  limit: z.coerce
+    .number({ invalid_type_error: 'Limit must be a number' })
+    .int('Limit must be an integer')
+    .min(1, 'Limit must be at least 1')
+    .max(100, 'Limit cannot exceed 100')
+    .optional()
+    .default(20),
+  offset: z.coerce
+    .number({ invalid_type_error: 'Offset must be a number' })
+    .int('Offset must be an integer')
+    .min(0, 'Offset cannot be negative')
+    .optional()
+    .default(0),
+});
+
+export type PaginationParams = z.infer<typeof paginationSchema>;
+
+// Timeline query params
+export const timelineQuerySchema = paginationSchema;
+
+export type TimelineQueryParams = z.infer<typeof timelineQuerySchema>;
+
+// Recipe filters query params (based on /api/recipes implementation)
+const MAX_TIME_MINUTES = 12 * 60; // 12 hours
+const MAX_SERVINGS = 50;
+const INGREDIENT_LIMIT = 5;
+
+export const recipeFiltersSchema = paginationSchema.extend({
+  search: z.string().max(200, 'Search query too long').optional(),
+  course: z
+    .array(courseEnum)
+    .max(courseEnum.options.length, 'Too many courses selected')
+    .optional()
+    .transform((val) => (val ? Array.from(new Set(val)) : undefined)), // Deduplicate
+  tags: z
+    .array(z.string().max(40))
+    .max(10, 'Too many tags')
+    .optional(),
+  difficulty: z
+    .array(difficultyEnum)
+    .max(3, 'Too many difficulty levels')
+    .optional()
+    .transform((val) => (val ? Array.from(new Set(val)) : undefined)), // Deduplicate
+  authorId: z
+    .array(z.string().cuid('Invalid author ID'))
+    .max(20, 'Too many authors')
+    .optional()
+    .transform((val) => (val ? Array.from(new Set(val)) : undefined)), // Deduplicate
+  totalTimeMin: z.coerce
+    .number()
+    .int()
+    .min(0, 'Minimum time cannot be negative')
+    .max(MAX_TIME_MINUTES, `Maximum time is ${MAX_TIME_MINUTES} minutes`)
+    .optional(),
+  totalTimeMax: z.coerce
+    .number()
+    .int()
+    .min(0, 'Maximum time cannot be negative')
+    .max(MAX_TIME_MINUTES, `Maximum time is ${MAX_TIME_MINUTES} minutes`)
+    .optional(),
+  servingsMin: z.coerce
+    .number()
+    .int()
+    .min(1, 'Minimum servings must be at least 1')
+    .max(MAX_SERVINGS, `Maximum servings is ${MAX_SERVINGS}`)
+    .optional(),
+  servingsMax: z.coerce
+    .number()
+    .int()
+    .min(1, 'Maximum servings must be at least 1')
+    .max(MAX_SERVINGS, `Maximum servings is ${MAX_SERVINGS}`)
+    .optional(),
+  ingredients: z
+    .array(z.string().max(120, 'Ingredient name too long'))
+    .max(INGREDIENT_LIMIT, `Maximum ${INGREDIENT_LIMIT} ingredients`)
+    .optional(),
+  sort: z.enum(['recent', 'alpha'], {
+    errorMap: () => ({ message: 'Sort must be either "recent" or "alpha"' }),
+  }).default('recent'),
+}).refine(
+  (data) => {
+    // Ensure min <= max for totalTime
+    if (data.totalTimeMin !== undefined && data.totalTimeMax !== undefined) {
+      return data.totalTimeMin <= data.totalTimeMax;
+    }
+    return true;
+  },
+  {
+    message: 'Minimum total time cannot be greater than maximum',
+    path: ['totalTimeMin'],
+  }
+).refine(
+  (data) => {
+    // Ensure min <= max for servings
+    if (data.servingsMin !== undefined && data.servingsMax !== undefined) {
+      return data.servingsMin <= data.servingsMax;
+    }
+    return true;
+  },
+  {
+    message: 'Minimum servings cannot be greater than maximum',
+    path: ['servingsMin'],
+  }
+);
+
+export type RecipeFiltersParams = z.infer<typeof recipeFiltersSchema>;
+
+// Comments query params (pagination only)
+export const commentsQuerySchema = paginationSchema;
+
+export type CommentsQueryParams = z.infer<typeof commentsQuerySchema>;
+
+// Cooked events query params (pagination only)
+export const cookedQuerySchema = paginationSchema;
+
+export type CookedQueryParams = z.infer<typeof cookedQuerySchema>;
+
+/**
+ * Route parameter validation schemas
+ */
+
+// Generic CUID parameter schema
+export const cuidParamSchema = z.object({
+  id: z.string().cuid('Invalid ID format'),
+});
+
+export type CuidParam = z.infer<typeof cuidParamSchema>;
+
+// Specific route param schemas
+export const postIdParamSchema = z.object({
+  postId: z.string().cuid('Invalid post ID'),
+});
+
+export type PostIdParam = z.infer<typeof postIdParamSchema>;
+
+export const commentIdParamSchema = z.object({
+  commentId: z.string().cuid('Invalid comment ID'),
+});
+
+export type CommentIdParam = z.infer<typeof commentIdParamSchema>;
+
+export const userIdParamSchema = z.object({
+  userId: z.string().cuid('Invalid user ID'),
+});
+
+export type UserIdParam = z.infer<typeof userIdParamSchema>;

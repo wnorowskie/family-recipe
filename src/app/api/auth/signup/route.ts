@@ -6,6 +6,7 @@ import { signToken } from '@/lib/jwt';
 import { setSessionCookie } from '@/lib/session';
 import { logError, logInfo, logWarn } from '@/lib/logger';
 import { signupLimiter, applyRateLimit } from '@/lib/rateLimit';
+import { parseRequestBody, badRequestError, internalError } from '@/lib/apiErrors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,24 +19,16 @@ export async function POST(request: NextRequest) {
       return rateLimitResult;
     }
 
-    const body = await request.json();
-
     // Validate input
-    const validationResult = signupSchema.safeParse(body);
-    if (!validationResult.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: validationResult.error.errors[0].message,
-          },
-        },
-        { status: 400 }
-      );
+    const body = await request.json();
+    const bodyValidation = parseRequestBody(body, signupSchema);
+    
+    if (!bodyValidation.success) {
+      return bodyValidation.error;
     }
 
     const { name, emailOrUsername, password, familyMasterKey, rememberMe } =
-      validationResult.data;
+      bodyValidation.data;
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -44,30 +37,14 @@ export async function POST(request: NextRequest) {
 
     if (existingUser) {
       logWarn('auth.signup.user_exists', { emailOrUsername });
-      return NextResponse.json(
-        {
-          error: {
-            code: 'USER_EXISTS',
-            message: 'A user with this email or username already exists',
-          },
-        },
-        { status: 400 }
-      );
+      return badRequestError('A user with this email or username already exists');
     }
 
     // Get the family space (V1: assume single family space)
     const familySpace = await prisma.familySpace.findFirst();
 
     if (!familySpace) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'NO_FAMILY_SPACE',
-            message: 'No family space found. Please contact the administrator.',
-          },
-        },
-        { status: 500 }
-      );
+      return internalError('No family space found. Please contact the administrator.');
     }
 
     // Verify the family master key
@@ -78,15 +55,7 @@ export async function POST(request: NextRequest) {
 
     if (!isValidKey) {
       logWarn('auth.signup.invalid_master_key', { emailOrUsername });
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_MASTER_KEY',
-            message: 'Invalid Family Master Key',
-          },
-        },
-        { status: 400 }
-      );
+      return badRequestError('Invalid Family Master Key');
     }
 
     // Hash the password
@@ -157,14 +126,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     logError('auth.signup.error', error);
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError();
   }
 }

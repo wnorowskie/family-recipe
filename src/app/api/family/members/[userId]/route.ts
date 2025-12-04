@@ -1,34 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { removeFamilyMember } from '@/lib/family';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { canRemoveMember } from '@/lib/permissions';
-
-const paramsSchema = z.object({
-  userId: z.string().min(1, 'User ID is required'),
-});
+import { parseRouteParams, notFoundError, forbiddenError, internalError } from '@/lib/apiErrors';
+import { userIdParamSchema } from '@/lib/validation';
 
 export const DELETE = withAuth(async (request, user, context?: { params: { userId: string } }) => {
   try {
     const { params } = context!;
-
-    const parsed = paramsSchema.safeParse(params);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_PARAMS',
-            message: parsed.error.errors[0]?.message ?? 'Invalid user ID',
-          },
-        },
-        { status: 400 }
-      );
-    }
-
-    const targetUserId = parsed.data.userId;
+    const validation = parseRouteParams(params, userIdParamSchema);
+    if (!validation.success) return validation.error;
+    const targetUserId = validation.data.userId;
 
     // Fetch target user to check permissions
     const targetMembership = await prisma.familyMembership.findFirst({
@@ -44,10 +28,7 @@ export const DELETE = withAuth(async (request, user, context?: { params: { userI
     });
 
     if (!targetMembership) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'Member not found' } },
-        { status: 404 }
-      );
+      return notFoundError('Member not found');
     }
 
     // Check permissions using helper
@@ -62,47 +43,25 @@ export const DELETE = withAuth(async (request, user, context?: { params: { userI
         CANNOT_REMOVE_SELF: 'You cannot remove yourself',
         CANNOT_REMOVE_OWNER: 'Cannot remove the owner',
       };
-      return NextResponse.json(
-        {
-          error: {
-            code: 'FORBIDDEN',
-            message: messages[permissionCheck.reason!],
-          },
-        },
-        { status: 403 }
-      );
+      return forbiddenError(messages[permissionCheck.reason!]);
     }
 
     try {
       const result = await removeFamilyMember(user.familySpaceId, targetUserId);
 
       if (!result.removed) {
-        return NextResponse.json(
-          { error: { code: 'NOT_FOUND', message: 'Member not found' } },
-          { status: 404 }
-        );
+        return notFoundError('Member not found');
       }
 
       return NextResponse.json({ status: 'removed' }, { status: 200 });
     } catch (error) {
       if (error instanceof Error && error.message === 'CANNOT_REMOVE_OWNER') {
-        return NextResponse.json(
-          { error: { code: 'FORBIDDEN', message: 'Cannot remove the owner' } },
-          { status: 403 }
-        );
+        return forbiddenError('Cannot remove the owner');
       }
       throw error;
     }
   } catch (error) {
     logError('family.members.remove.error', error, { targetUserId: context?.params?.userId });
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'Unable to remove member',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError('Unable to remove member');
   }
 });

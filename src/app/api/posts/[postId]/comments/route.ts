@@ -1,35 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { createCommentSchema } from '@/lib/validation';
+import { createCommentSchema, postIdParamSchema } from '@/lib/validation';
 import { savePhotoFile } from '@/lib/uploads';
 import { getPostCommentsPage } from '@/lib/posts';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { commentLimiter, applyRateLimit } from '@/lib/rateLimit';
-
-const paramsSchema = z.object({
-  postId: z.string().min(1, 'Post ID is required'),
-});
+import { parseRouteParams, badRequestError, validationError, notFoundError, internalError } from '@/lib/apiErrors';
 
 export const GET = withAuth(async (request, user, context?: { params: { postId: string } }) => {
   try {
     const { params } = context!;
-    const parseResult = paramsSchema.safeParse(params);
-
-    if (!parseResult.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_PARAMS',
-            message: parseResult.error.errors[0]?.message ?? 'Invalid post ID',
-          },
-        },
-        { status: 400 }
-      );
-    }
-
-    const { postId } = parseResult.data;
+    const validation = parseRouteParams(params, postIdParamSchema);
+    if (!validation.success) return validation.error;
+    const { postId } = validation.data;
 
     const post = await prisma.post.findFirst({
       where: {
@@ -73,15 +57,7 @@ export const GET = withAuth(async (request, user, context?: { params: { postId: 
     });
   } catch (error) {
     logError('comments.list.error', error, { postId: context?.params?.postId });
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError('An unexpected error occurred');
   }
 });
 
@@ -97,22 +73,9 @@ export const POST = withAuth(async (request, user, context?: { params: { postId:
     }
 
     const { params } = context!;
-
-    const parseResult = paramsSchema.safeParse(params);
-
-    if (!parseResult.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_PARAMS',
-            message: parseResult.error.errors[0]?.message ?? 'Invalid post ID',
-          },
-        },
-        { status: 400 }
-      );
-    }
-
-    const { postId } = parseResult.data;
+    const validation = parseRouteParams(params, postIdParamSchema);
+    if (!validation.success) return validation.error;
+    const { postId } = validation.data;
 
     const post = await prisma.post.findFirst({
       where: {
@@ -123,44 +86,20 @@ export const POST = withAuth(async (request, user, context?: { params: { postId:
     });
 
     if (!post) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Post not found',
-          },
-        },
-        { status: 404 }
-      );
+      return notFoundError('Post not found');
     }
 
     const formData = await request.formData();
     const rawPayload = formData.get('payload');
 
     if (!rawPayload || typeof rawPayload !== 'string') {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_PAYLOAD',
-            message: 'Missing payload',
-          },
-        },
-        { status: 400 }
-      );
+      return badRequestError('Missing payload');
     }
 
     const payloadResult = createCommentSchema.safeParse(JSON.parse(rawPayload));
 
     if (!payloadResult.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: payloadResult.error.errors[0]?.message ?? 'Invalid comment',
-          },
-        },
-        { status: 400 }
-      );
+      return validationError(payloadResult.error.errors[0]?.message ?? 'Invalid comment');
     }
 
     const photoFile = formData.get('photo');
@@ -204,14 +143,6 @@ export const POST = withAuth(async (request, user, context?: { params: { postId:
     );
   } catch (error) {
     logError('comments.create.error', error, { postId: context?.params?.postId });
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError('An unexpected error occurred');
   }
 });
