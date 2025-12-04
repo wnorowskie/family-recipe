@@ -1,30 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
 import { createCommentSchema } from '@/lib/validation';
 import { savePhotoFile } from '@/lib/uploads';
 import { getPostCommentsPage } from '@/lib/posts';
 import { logError } from '@/lib/logger';
+import { withAuth } from '@/lib/apiAuth';
+import { commentLimiter, applyRateLimit } from '@/lib/rateLimit';
 
 const paramsSchema = z.object({
   postId: z.string().min(1, 'Post ID is required'),
 });
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { postId: string } }
-) {
+export const GET = withAuth(async (request, user, context?: { params: { postId: string } }) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
+    const { params } = context!;
     const parseResult = paramsSchema.safeParse(params);
 
     if (!parseResult.success) {
@@ -82,7 +72,7 @@ export async function GET(
       nextOffset: commentPage.nextOffset,
     });
   } catch (error) {
-    logError('comments.list.error', error, { postId: params?.postId });
+    logError('comments.list.error', error, { postId: context?.params?.postId });
     return NextResponse.json(
       {
         error: {
@@ -93,21 +83,20 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { postId: string } }
-) {
+export const POST = withAuth(async (request, user, context?: { params: { postId: string } }) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
+    // Apply rate limiting (10 comments per user per minute)
+    const rateLimitResult = applyRateLimit(
+      commentLimiter,
+      commentLimiter.getUserKey(user.id)
+    );
+    if (rateLimitResult) {
+      return rateLimitResult;
     }
+
+    const { params } = context!;
 
     const parseResult = paramsSchema.safeParse(params);
 
@@ -214,7 +203,7 @@ export async function POST(
       { status: 201 }
     );
   } catch (error) {
-    logError('comments.create.error', error, { postId: params?.postId });
+    logError('comments.create.error', error, { postId: context?.params?.postId });
     return NextResponse.json(
       {
         error: {
@@ -225,4 +214,4 @@ export async function POST(
       { status: 500 }
     );
   }
-}
+});

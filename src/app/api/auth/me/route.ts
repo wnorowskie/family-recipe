@@ -1,20 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/apiAuth';
 
-export async function GET(request: NextRequest) {
-  const user = await getCurrentUser(request);
-
-  if (!user) {
-    return NextResponse.json(
-      {
-        error: {
-          code: 'UNAUTHORIZED',
-          message: 'Not authenticated',
-        },
-      },
-      { status: 401 }
-    );
-  }
-
+export const GET = withAuth(async (request, user) => {
   return NextResponse.json({ user }, { status: 200 });
-}
+});

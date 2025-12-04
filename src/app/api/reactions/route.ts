@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
 import { reactionSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
+import { withAuth } from '@/lib/apiAuth';
+import { reactionLimiter, applyRateLimit } from '@/lib/rateLimit';
 
 type TargetType = 'post' | 'comment';
 
@@ -46,15 +47,15 @@ async function buildReactionSummary(targetType: TargetType, targetId: string) {
   return Array.from(summaryMap.values());
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request, user) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
+    // Apply rate limiting (30 reactions per user per minute)
+    const rateLimitResult = applyRateLimit(
+      reactionLimiter,
+      reactionLimiter.getUserKey(user.id)
+    );
+    if (rateLimitResult) {
+      return rateLimitResult;
     }
 
     const body = await request.json().catch(() => null);
@@ -146,4 +147,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

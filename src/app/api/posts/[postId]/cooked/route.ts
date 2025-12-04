@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
 import { cookedEventSchema } from '@/lib/validation';
 import { getPostCookedEventsPage } from '@/lib/posts';
 import { logError } from '@/lib/logger';
+import { withAuth } from '@/lib/apiAuth';
+import { cookedEventLimiter, applyRateLimit } from '@/lib/rateLimit';
 
 interface RouteContext {
   params: {
@@ -11,16 +12,16 @@ interface RouteContext {
   };
 }
 
-export async function POST(request: NextRequest, context: RouteContext) {
-  const { postId } = context.params;
+export const POST = withAuth(async (request, user, context?: RouteContext) => {
+  const { postId } = context!.params;
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
+    // Apply rate limiting (10 cooked events per user per minute)
+    const rateLimitResult = applyRateLimit(
+      cookedEventLimiter,
+      cookedEventLimiter.getUserKey(user.id)
+    );
+    if (rateLimitResult) {
+      return rateLimitResult;
     }
 
     if (!postId) {
@@ -110,19 +111,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
       { status: 500 }
     );
   }
-}
+});
 
-export async function GET(request: NextRequest, context: RouteContext) {
-  const { postId } = context.params;
+export const GET = withAuth(async (request, user, context?: RouteContext) => {
+  const { postId } = context!.params;
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
 
     if (!postId) {
       return NextResponse.json(
@@ -177,4 +170,4 @@ export async function GET(request: NextRequest, context: RouteContext) {
       { status: 500 }
     );
   }
-}
+});

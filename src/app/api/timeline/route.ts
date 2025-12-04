@@ -1,25 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { withAuth } from '@/lib/apiAuth';
 import { getTimelineFeed } from '@/lib/timeline-data';
 import { logError } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request, user) => {
   try {
-    // Verify user is authenticated
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'UNAUTHORIZED',
-            message: 'Not authenticated',
-          },
-        },
-        { status: 401 }
-      );
-    }
-
     // Get pagination parameters
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
@@ -44,4 +29,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

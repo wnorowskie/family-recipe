@@ -1,19 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/apiAuth';
 import { getFamilyMembers } from '@/lib/family';
 import { logError } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request, user) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
     const members = await getFamilyMembers(user.familySpaceId);
 
     return NextResponse.json({ members }, { status: 200 });
@@ -29,4 +20,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
