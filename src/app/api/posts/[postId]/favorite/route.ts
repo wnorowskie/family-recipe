@@ -30,10 +30,7 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
     const canAccess = await ensurePostAccess(postId, user.familySpaceId);
 
     if (!canAccess) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'Post not found' } },
-        { status: 404 }
-      );
+      return notFoundError('Post not found');
     }
 
     await prisma.favorite.upsert({
@@ -65,10 +62,7 @@ export const DELETE = withAuth(async (request, user, context?: RouteContext) => 
     const canAccess = await ensurePostAccess(postId, user.familySpaceId);
 
     if (!canAccess) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'Post not found' } },
-        { status: 404 }
-      );
+      return notFoundError('Post not found');
     }
 
     await prisma.favorite.deleteMany({
