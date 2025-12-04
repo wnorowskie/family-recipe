@@ -178,6 +178,7 @@ describe('PUT /api/posts/[postId]', () => {
 
   describe('Permissions', () => {
     it('allows author to edit their own post', async () => {
+      // Author is authenticated (already set in beforeEach)
       const existingPost = {
         ...createMockPost({
           id: 'post_123',
@@ -205,6 +206,9 @@ describe('PUT /api/posts/[postId]', () => {
     });
 
     it('allows owner to edit any post', async () => {
+      // Set owner as authenticated user
+      mockGetCurrentUser.mockResolvedValue(mockOwner);
+
       const existingPost = {
         ...createMockPost({
           id: 'post_123',
@@ -232,6 +236,9 @@ describe('PUT /api/posts/[postId]', () => {
     });
 
     it('prevents non-author member from editing post', async () => {
+      // Set other member as authenticated user
+      mockGetCurrentUser.mockResolvedValue(mockOtherMember);
+
       const existingPost = {
         ...createMockPost({
           id: 'post_123',
@@ -365,6 +372,12 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
+      
+      // Mock transaction
+      prismaMock.$transaction.mockImplementation(async (callback: any) => {
+        return await callback(prismaMock);
+      });
+      
       prismaMock.post.update.mockResolvedValue({ ...existingPost, title: 'Updated Title' });
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
 
@@ -409,6 +422,11 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
+      
+      prismaMock.$transaction.mockImplementation(async (callback: any) => {
+        return await callback(prismaMock);
+      });
+      
       prismaMock.post.update.mockResolvedValue(existingPost);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
       mockGetPostDetail.mockResolvedValue(existingPost as any);
@@ -441,6 +459,11 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
+      
+      prismaMock.$transaction.mockImplementation(async (callback: any) => {
+        return await callback(prismaMock);
+      });
+      
       prismaMock.post.update.mockResolvedValue(existingPost);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
       mockGetPostDetail.mockResolvedValue(existingPost as any);
@@ -473,6 +496,11 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
+      
+      prismaMock.$transaction.mockImplementation(async (callback: any) => {
+        return await callback(prismaMock);
+      });
+      
       prismaMock.post.update.mockResolvedValue(existingPost);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
       mockGetPostDetail.mockResolvedValue(existingPost as any);
@@ -514,6 +542,11 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
+      
+      prismaMock.$transaction.mockImplementation(async (callback: any) => {
+        return await callback(prismaMock);
+      });
+      
       prismaMock.post.update.mockResolvedValue(existingPost);
       prismaMock.recipeDetails.update.mockResolvedValue(existingPost.recipeDetails);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
@@ -560,6 +593,11 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
+      
+      prismaMock.$transaction.mockImplementation(async (callback: any) => {
+        return await callback(prismaMock);
+      });
+      
       prismaMock.post.update.mockResolvedValue({ ...existingPost, hasRecipeDetails: true });
       prismaMock.recipeDetails.create.mockResolvedValue({} as any);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
@@ -609,6 +647,11 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
+      
+      prismaMock.$transaction.mockImplementation(async (callback: any) => {
+        return await callback(prismaMock);
+      });
+      
       prismaMock.post.update.mockResolvedValue({ ...existingPost, hasRecipeDetails: false });
       prismaMock.recipeDetails.delete.mockResolvedValue({} as any);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
@@ -648,6 +691,11 @@ describe('PUT /api/posts/[postId]', () => {
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
       prismaMock.tag.findMany.mockResolvedValue(mockTags);
+      
+      prismaMock.$transaction.mockImplementation(async (callback: any) => {
+        return await callback(prismaMock);
+      });
+      
       prismaMock.post.update.mockResolvedValue(existingPost);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
       prismaMock.postTag.createMany.mockResolvedValue({ count: 2 });
@@ -785,7 +833,8 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
-      prismaMock.post.update.mockRejectedValue(new Error('Database connection failed'));
+      
+      prismaMock.$transaction.mockRejectedValue(new Error('Database connection failed'));
 
       const request = createFormDataRequest({
         title: 'Updated Title',
