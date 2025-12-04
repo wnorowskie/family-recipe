@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { withAuth } from '@/lib/apiAuth';
 import { getRecipes } from '@/lib/recipes';
 import { courseEnum } from '@/lib/validation';
 import { logError } from '@/lib/logger';
@@ -44,17 +44,8 @@ function normalizeRange(
   return { min, max };
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request, user) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const rawLimit = Number(searchParams.get('limit')) || DEFAULT_LIMIT;
     const limit = Math.min(Math.max(rawLimit, 1), MAX_LIMIT);
@@ -129,4 +120,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

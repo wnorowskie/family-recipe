@@ -1,23 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { withAuth } from '@/lib/apiAuth';
 import { getUserCookedHistory } from '@/lib/profile';
 import { logError } from '@/lib/logger';
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
 
-export async function GET(request: NextRequest) {
-  let user;
+export const GET = withAuth(async (request, user) => {
   try {
-    user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const parsedLimit = Number(searchParams.get('limit'));
     const parsedOffset = Number(searchParams.get('offset'));
@@ -33,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    logError('profile.cooked.list.error', error, { userId: user?.id });
+    logError('profile.cooked.list.error', error, { userId: user.id });
     return NextResponse.json(
       {
         error: {
@@ -44,4 +34,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

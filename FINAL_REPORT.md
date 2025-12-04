@@ -160,15 +160,15 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 - [✓] Confirm password hashing uses a strong algorithm (bcrypt).
 - [✓] Store the **Family Master Key** as a **hash** in the database.
-- [ ] Ensure **all non-auth routes** require authentication.
-- [ ] Implement/verify permission checks:
-  - [ ] Only post author or admin can edit/delete a post.
-  - [ ] Only comment author or admin can delete a comment.
-  - [ ] Only owner can remove family members.
-- [ ] Add basic rate limiting to:
-  - [ ] Signup
-  - [ ] Login
-  - [ ] Any high-write endpoints identified as hot spots in V1 (e.g., comments, “Cooked this”).
+- [✓] Ensure **all non-auth routes** require authentication.
+- [✓] Implement/verify permission checks:
+  - [✓] Only post author or admin can edit/delete a post.
+  - [✓] Only comment author or admin can delete a comment.
+  - [✓] Only owner can remove family members.
+- [✓] Add basic rate limiting to:
+  - [✓] Signup
+  - [✓] Login
+  - [✓] Any high-write endpoints identified as hot spots in V1 (e.g., comments, “Cooked this”).
 
 #### 1.2 Input Validation
 
