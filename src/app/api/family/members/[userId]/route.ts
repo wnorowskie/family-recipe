@@ -1,37 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getCurrentUser } from '@/lib/session';
+import { prisma } from '@/lib/prisma';
 import { removeFamilyMember } from '@/lib/family';
 import { logError } from '@/lib/logger';
+import { withAuth } from '@/lib/apiAuth';
+import { canRemoveMember } from '@/lib/permissions';
 
 const paramsSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
 });
 
-function assertAdmin(role: string): boolean {
-  return role === 'owner' || role === 'admin';
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+export const DELETE = withAuth(async (request, user, context?: { params: { userId: string } }) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
-    if (!assertAdmin(user.role)) {
-      return NextResponse.json(
-        { error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } },
-        { status: 403 }
-      );
-    }
+    const { params } = context!;
 
     const parsed = paramsSchema.safeParse(params);
 
@@ -47,12 +28,45 @@ export async function DELETE(
       );
     }
 
-    if (parsed.data.userId === user.id) {
+    const targetUserId = parsed.data.userId;
+
+    // Fetch target user to check permissions
+    const targetMembership = await prisma.familyMembership.findFirst({
+      where: {
+        familySpaceId: user.familySpaceId,
+        userId: targetUserId,
+      },
+      include: {
+        user: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!targetMembership) {
+      return NextResponse.json(
+        { error: { code: 'NOT_FOUND', message: 'Member not found' } },
+        { status: 404 }
+      );
+    }
+
+    // Check permissions using helper
+    const permissionCheck = canRemoveMember(user, {
+      id: targetUserId,
+      role: targetMembership.role,
+    });
+
+    if (!permissionCheck.allowed) {
+      const messages = {
+        NOT_ADMIN: 'Insufficient permissions',
+        CANNOT_REMOVE_SELF: 'You cannot remove yourself',
+        CANNOT_REMOVE_OWNER: 'Cannot remove the owner',
+      };
       return NextResponse.json(
         {
           error: {
             code: 'FORBIDDEN',
-            message: 'You cannot remove yourself',
+            message: messages[permissionCheck.reason!],
           },
         },
         { status: 403 }
@@ -60,7 +74,7 @@ export async function DELETE(
     }
 
     try {
-      const result = await removeFamilyMember(user.familySpaceId, parsed.data.userId);
+      const result = await removeFamilyMember(user.familySpaceId, targetUserId);
 
       if (!result.removed) {
         return NextResponse.json(
@@ -80,7 +94,7 @@ export async function DELETE(
       throw error;
     }
   } catch (error) {
-    logError('family.members.remove.error', error, { targetUserId: params?.userId });
+    logError('family.members.remove.error', error, { targetUserId: context?.params?.userId });
     return NextResponse.json(
       {
         error: {
@@ -91,4 +105,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+});

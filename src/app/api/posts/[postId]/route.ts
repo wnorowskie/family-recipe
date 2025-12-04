@@ -4,12 +4,13 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
 import { getPostDetail } from '@/lib/posts';
 import { savePhotoFile } from '@/lib/uploads';
 import { createPostSchema } from '@/lib/validation';
 import { MAX_PHOTO_COUNT, normalizePostPayload } from '@/lib/postPayload';
 import { logError, logWarn } from '@/lib/logger';
+import { withAuth } from '@/lib/apiAuth';
+import { canEditPost, canDeletePost } from '@/lib/permissions';
 
 const paramsSchema = z.object({
   postId: z.string().min(1, 'Post ID is required'),
@@ -88,24 +89,9 @@ function extractChangeNote(value: unknown): { changeNote?: string; error?: strin
   return { changeNote: trimmed };
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { postId: string } }
-) {
+export const GET = withAuth(async (request, user, context?: { params: { postId: string } }) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'UNAUTHORIZED',
-            message: 'Not authenticated',
-          },
-        },
-        { status: 401 }
-      );
-    }
+    const { params } = context!;
 
     const parseResult = paramsSchema.safeParse(params);
 
@@ -168,15 +154,14 @@ export async function GET(
       );
     }
 
-    const canEdit =
-      post.author.id === user.id || user.role === 'owner' || user.role === 'admin';
+    const canEdit = canEditPost(user, { authorId: post.author.id });
 
     return NextResponse.json({
       post,
       canEdit,
     });
   } catch (error) {
-    logError('posts.detail.error', error, { postId: params?.postId });
+    logError('posts.detail.error', error, { postId: context?.params?.postId });
     return NextResponse.json(
       {
         error: {
@@ -187,45 +172,13 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { postId: string } }
-) {
-  let user: Awaited<ReturnType<typeof getCurrentUser>>;
-  let postId: string = params.postId; // Extract immediately for error handler access
+export const PUT = withAuth(async (request, user, context?: { params: { postId: string } }) => {
+  const { params } = context!;
+  const postId = params.postId;
   
   try {
-    user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'UNAUTHORIZED',
-            message: 'Not authenticated',
-          },
-        },
-        { status: 401 }
-      );
-    }
-
-    const parseResult = paramsSchema.safeParse(params);
-
-    if (!parseResult.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_PARAMS',
-            message: parseResult.error.errors[0]?.message ?? 'Invalid post ID',
-          },
-        },
-        { status: 400 }
-      );
-    }
-
-    postId = parseResult.data.postId;
 
     const existingPost = await prisma.post.findFirst({
       where: {
@@ -252,10 +205,7 @@ export async function PUT(
       );
     }
 
-    const canEdit =
-      existingPost.authorId === user.id || user.role === 'owner' || user.role === 'admin';
-
-    if (!canEdit) {
+    if (!canEditPost(user, existingPost)) {
       return NextResponse.json(
         {
           error: {
@@ -675,26 +625,11 @@ export async function PUT(
       { status: 500 }
     );
   }
-}
+});
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { postId: string } }
-) {
+export const DELETE = withAuth(async (request, user, context?: { params: { postId: string } }) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'UNAUTHORIZED',
-            message: 'Not authenticated',
-          },
-        },
-        { status: 401 }
-      );
-    }
+    const { params } = context!;
 
     const parseResult = paramsSchema.safeParse(params);
 
@@ -745,10 +680,7 @@ export async function DELETE(
       );
     }
 
-    const canDelete =
-      existingPost.authorId === user.id || user.role === 'owner' || user.role === 'admin';
-
-    if (!canDelete) {
+    if (!canDeletePost(user, existingPost)) {
       return NextResponse.json(
         {
           error: {
@@ -777,7 +709,7 @@ export async function DELETE(
 
     return NextResponse.json({ status: 'deleted' }, { status: 200 });
   } catch (error) {
-    logError('posts.delete.error', error, { postId: params?.postId });
+    logError('posts.delete.error', error, { postId: context?.params?.postId });
     return NextResponse.json(
       {
         error: {
@@ -788,4 +720,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+});

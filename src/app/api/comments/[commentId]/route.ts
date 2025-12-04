@@ -1,26 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
 import { logError } from '@/lib/logger';
+import { withAuth } from '@/lib/apiAuth';
+import { canDeleteComment } from '@/lib/permissions';
 
 const paramsSchema = z.object({
   commentId: z.string().min(1, 'Comment ID is required'),
 });
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { commentId: string } }
-) {
+export const DELETE = withAuth(async (request, user, context?: { params: { commentId: string } }) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
+    const { params } = context!;
 
     const parseResult = paramsSchema.safeParse(params);
     if (!parseResult.success) {
@@ -55,10 +46,7 @@ export async function DELETE(
       );
     }
 
-    const isOwner = user.role === 'owner' || user.role === 'admin';
-    const isAuthor = comment.authorId === user.id;
-
-    if (!isOwner && !isAuthor) {
+    if (!canDeleteComment(user, comment)) {
       return NextResponse.json(
         { error: { code: 'FORBIDDEN', message: 'Not allowed to delete comment' } },
         { status: 403 }
@@ -69,7 +57,7 @@ export async function DELETE(
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    logError('comments.delete.error', error, { commentId: params?.commentId });
+    logError('comments.delete.error', error, { commentId: context?.params?.commentId });
     return NextResponse.json(
       {
         error: {
@@ -80,4 +68,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+});

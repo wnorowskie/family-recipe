@@ -143,9 +143,9 @@ The immediate goal is to take this V1 implementation and evolve it into a **prod
     - [✓] Local run instructions
   - [✓] `.env.example` with all required env variables (no real secrets)
 - [✓] Create remote repo and push current code (GitHub).
-- [ ] Create branches:
+- [✓] Create branches:
   - [✓] `main` → production
-  - [ ] `develop` → active development
+  - [✓] `develop` → active development
 - [✓] Ensure ESLint + Prettier are configured for Next.js + TypeScript.
 - [✓] Ensure strict TypeScript (`"strict": true`).
 - [✓] Add pre-commit lint/format.
@@ -158,21 +158,21 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 #### 1.1 Auth & Access Control
 
-- [ ] Confirm password hashing uses a strong algorithm (bcrypt/argon2).
-- [ ] Store the **Family Master Key** as a **hash** in the database.
-- [ ] Ensure **all non-auth routes** require authentication.
-- [ ] Implement/verify permission checks:
-  - [ ] Only post author or admin can edit/delete a post.
-  - [ ] Only comment author or admin can delete a comment.
-  - [ ] Only owner can remove family members.
-- [ ] Add basic rate limiting to:
-  - [ ] Signup
-  - [ ] Login
-  - [ ] Any high-write endpoints identified as hot spots in V1 (e.g., comments, “Cooked this”).
+- [✓] Confirm password hashing uses a strong algorithm (bcrypt).
+- [✓] Store the **Family Master Key** as a **hash** in the database.
+- [✓] Ensure **all non-auth routes** require authentication.
+- [✓] Implement/verify permission checks:
+  - [✓] Only post author or admin can edit/delete a post.
+  - [✓] Only comment author or admin can delete a comment.
+  - [✓] Only owner can remove family members.
+- [✓] Add basic rate limiting to:
+  - [✓] Signup
+  - [✓] Login
+  - [✓] Any high-write endpoints identified as hot spots in V1 (e.g., comments, “Cooked this”).
 
 #### 1.2 Input Validation
 
-- [ ] Introduce schema validation (e.g., Zod) at API boundaries.
+- [ ] Introduce schema validation (Zod) at API boundaries.
 - [ ] Validate inputs for:
   - [ ] Signup/login
   - [ ] Create/edit post (title required, enums valid, tags valid)
@@ -351,4 +351,224 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 ---
 
+## Implementation Accomplished
+
+### Phase 0 - Repo Setup & Baseline Hygiene
+
+**Goal:** Clean, understandable repo ready for DevSecOps work.
+
+#### What Was Accomplished
+
+1. **Repository Foundation**
+   - Enhanced `.gitignore` with comprehensive exclusions for Node.js, Next.js, IDE files, OS-specific files, databases, secrets, and uploads
+   - Created `.editorconfig` to enforce consistent code style across editors (UTF-8, LF line endings, 2-space indentation, trim trailing whitespace)
+   - Created `.env.example` documenting required environment variables (`DATABASE_URL`, `JWT_SECRET`) with security notes
+
+2. **Code Quality Infrastructure**
+   - Configured Prettier with React/Next.js industry standards (single quotes, semicolons, 80-char width, trailing commas ES5)
+   - Extended ESLint configuration with `eslint-config-prettier` to avoid conflicts
+   - Set up Husky + lint-staged for automated pre-commit hooks that:
+     - Run TypeScript type-checking (`npm run type-check`)
+     - Auto-fix ESLint issues on staged files
+     - Auto-format code with Prettier
+   - Added npm scripts: `lint:fix`, `format`, `format:check`, `type-check`, and `prepare`
+
+3. **TypeScript Strict Mode Cleanup**
+   - Fixed 18 TypeScript strict mode errors across 9 files:
+     - **Variable scope issues (6 files):** Moved user/postId variable declarations outside try blocks so they're accessible in catch block error handlers
+     - **JWT type safety:** Added runtime validation before type casting in `jwt.ts` to ensure payload properties exist and are correct types
+     - **SQLite compatibility:** Removed `mode: 'insensitive'` from Prisma queries (SQLite doesn't support this PostgreSQL feature)
+     - **Enum type assertions:** Fixed Set.has() calls with proper type casting for ingredient units and course values
+     - **Ingredient parsing:** Rewrote `parseRecipeIngredients` to properly handle nullable quantity fields
+   - Excluded `figma/` folder from TypeScript type-checking (prototyping code separate from production app)
+
+4. **Professional Documentation**
+   - Completely rewrote `README.md` with:
+     - Project overview with badges (TypeScript, Next.js, Prisma, License)
+     - Feature summary and project structure
+     - Clear setup instructions (environment setup, database initialization, dev server)
+     - Available scripts reference table
+     - Tech stack documentation
+     - V1/V2 roadmap
+
+5. **Version Control & GitHub**
+   - Initialized git repository
+   - Created initial commit with clean baseline (163 files, 29,204 insertions)
+   - Pushed to GitHub (`wnorowskie/family-recipe`)
+   - Established branch strategy: `main` (protected, production) and `develop` (active development)
+
+### Phase 1.1 - Auth & Access Control
+
+**Goal:** Harden authentication, authorization, and add rate limiting before deployment.
+
+#### What Was Accomplished
+
+1. **Password Security Verification**
+   - Confirmed bcrypt implementation in `src/lib/auth.ts` with 10 salt rounds
+   - Verified `hashPassword()` and `verifyPassword()` functions properly implemented
+   - Family Master Key stored as bcrypt hash in database, verified in signup flow
+
+2. **Authentication Middleware Infrastructure**
+   - Created `src/lib/apiAuth.ts` with `withAuth()` and `withRole()` wrapper functions
+   - Implemented `AuthenticatedUser` TypeScript interface for type safety
+   - Refactored all 21 API routes to use consistent authentication pattern:
+     - 2 auth routes (signup/login) remain unauthenticated
+     - 19 protected routes converted to `withAuth()` pattern
+   - Pattern guarantees authenticated user context in all handlers
+
+3. **Permission System**
+   - Created `src/lib/permissions.ts` with 5 centralized permission helpers:
+     - `isOwnerOrAdmin()` - checks elevated privileges
+     - `canEditPost()` - author or owner/admin can edit posts
+     - `canDeletePost()` - author or owner/admin can delete posts
+     - `canDeleteComment()` - author or owner/admin can delete comments
+     - `canRemoveMember()` - only owner/admin, with additional constraints (cannot remove self or owner)
+   - Integrated permission helpers into 5 routes:
+     - `/api/posts/[postId]` (PUT/DELETE handlers)
+     - `/api/comments/[commentId]` (DELETE handler)
+     - `/api/family/members/[userId]` (DELETE handler)
+
+4. **Rate Limiting Implementation**
+   - Installed `lru-cache` 7.18.3 for in-memory rate limiting (Vercel-compatible, single-instance safe)
+   - Created `src/lib/rateLimit.ts` with `RateLimiter` class supporting:
+     - LRU cache with configurable size (500 entries per limiter)
+     - TTL-based expiration
+     - IP detection following DevSecOps best practices (X-Forwarded-For → X-Real-IP → request.ip)
+     - Standard HTTP 429 responses with Retry-After header in seconds
+   - Configured 6 pre-configured rate limiters:
+     - **Signup:** 3 attempts per IP per hour
+     - **Login:** 5 attempts per IP per 15 minutes
+     - **Post Creation:** 10 per user per hour
+     - **Comments:** 10 per user per minute
+     - **"Cooked This" Events:** 10 per user per minute
+     - **Reactions:** 30 per user per minute
+   - Applied rate limiting to all critical write endpoints
+
+5. **Code Organization & Patterns**
+   - Established consistent route handler pattern:
+     ```typescript
+     export const METHOD = withAuth(async (request, user, context?) => {
+       // Rate limiting if needed
+       // Handler logic with permission helpers
+     });
+     ```
+   - Used optional context parameters for dynamic routes with non-null assertions
+   - Maintained TypeScript strict mode compliance (0 errors)
+   - Made 4 incremental commits on feature branch following git flow
+
+---
+
+## Implementation Not Accomplished
+
+---
+
 ## Lessons Learned
+
+### Phase 0 - Repo Setup & Baseline Hygiene
+
+**1. TypeScript Strict Mode Reveals Real Issues**
+
+- Enabling strict mode uncovered actual bugs waiting to happen, particularly variable scope issues in error handlers where user context was being accessed but wasn't guaranteed to be in scope
+- The discipline of fixing these errors before the first commit established a clean baseline for future CI/CD pipelines
+
+**2. Database-Specific Features Need Abstraction Planning**
+
+- SQLite vs PostgreSQL differences (like case-insensitive queries) surfaced early
+- This highlighted the importance of testing against the target production database type, not just local development databases
+- Future consideration: abstract database-specific query patterns into utility functions for easier migration
+
+**3. DevSecOps Foundation Pays Dividends Immediately**
+
+- Setting up pre-commit hooks before any "real work" prevents bad habits from forming
+- Auto-formatting and linting on commit means code review can focus on logic, not style
+- Type-checking as a git hook catches errors before they even reach CI
+
+**4. Comprehensive .gitignore is Non-Negotiable**
+
+- Taking time to properly configure `.gitignore` before first commit prevents secrets and sensitive data from ever entering version control
+- Much easier to exclude patterns proactively than to scrub commit history reactively
+- Validated that no databases, environment files, or upload directories were committed
+
+**5. Documentation as Part of Foundation, Not Afterthought**
+
+- Writing a professional README at the start (rather than "will document later")
+- `.env.example` with comments serves as living documentation for required configuration
+
+**6. Multi-File Replacements Require Precision**
+
+- Using tools like `multi_replace_string_in_file` is efficient but demands exact string matching including all whitespace and formatting
+- Better to read more context and match precisely than to make multiple attempts with approximate matches
+
+**7. Separate Concerns Early (Figma Exclusion)**
+
+- Excluding the Figma prototyping code from production type-checking was the right call
+- Prototyping and design exploration code doesn't need the same rigor as production code
+- Keeping them in the same repo is fine, but tooling should distinguish between them
+
+### Phase 1.1 - Auth & Access Control
+
+**1. Middleware Abstractions Eliminate Repetitive Code**
+
+- The `withAuth()` wrapper pattern eliminated 19 instances of duplicate authentication checks
+- Before: every route had manual `getCurrentUser()` + null check + 401 response
+- After: authentication guaranteed by type system, user context always available
+- Side benefit: impossible to forget authentication on new routes when following established pattern
+- Future refactors (like changing JWT implementation) now touch only 1 file instead of 21
+
+**2. Centralized Permission Logic is Essential for Consistency**
+
+- Permission helpers in `permissions.ts` created single source of truth for authorization rules
+- Without helpers: permission logic scattered across routes, easy to miss edge cases or make inconsistent decisions
+- With helpers: changing "who can delete a post" requires updating one function, not hunting through multiple files
+- Detailed return types (with reason codes) enable better error messages without duplicating logic
+
+**3. Rate Limiting Requires Careful Dependency Selection**
+
+- Initial consideration of Redis for rate limiting would add infrastructure complexity for V1
+- LRU cache solution: simpler, works in serverless, no external dependencies, good enough for single-instance deployment (like I plan to do via Vercel to start)
+- Trade-off: resets on deploy, but acceptable for a 10 user (my family) app
+- Future consideration: when scaling beyond single instance, Redis or similar would be necessary
+- Key learning: "production-ready" doesn't have to mean "enterprise-scale ready"
+
+**4. TypeScript Context Parameters in Next.js App Router Need Care**
+
+- Dynamic route handlers receive context as second parameter after request
+- With `withAuth()` wrapper, context becomes third parameter and may be undefined
+- Solution: optional context type (`context?: { params: ... }`) with non-null assertion (`context!`) when needed
+- Pattern: extract params at function start so they're in scope for error handlers
+- Alternative considered: making context required, but that would break routes without params
+
+**5. Incremental Commits Create Safety Net**
+
+- Committing infrastructure separately from application (rate limiting → middleware → refactoring) made progress trackable
+- Each commit was independently verifiable with `npm run type-check`
+- When refactoring went wrong, could easily revert specific commit rather than losing all work
+- Pre-commit hooks caught issues before they entered version control
+- Lesson: even when working solo, commit discipline pays off
+
+**6. IP-Based Rate Limiting Has Security Implications**
+
+- Implemented best-practice IP detection: check `X-Forwarded-For` first (respecting proxies/load balancers)
+- Behind proxy: all requests appear from proxy IP without header forwarding
+- Must trust proxy headers (vulnerability if proxy not properly configured)
+- For authentication endpoints: IP-based limiting appropriate (no user context yet)
+- For authenticated endpoints: user ID-based limiting more accurate and fair
+- Future consideration: combine both (rate limit per user AND per IP) for defense in depth
+
+**7. Rate Limiting Windows Must Balance Security and UX**
+
+- Too strict: legitimate users get blocked (e.g., 3 comments per minute would frustrate active users)
+- Too loose: doesn't prevent abuse
+- Solution: different limits for different risk levels:
+  - Auth endpoints: very strict (3-5 attempts per window)
+  - High-frequency actions (reactions): loose (30 per minute)
+  - Moderate actions (comments, cooked events): balanced (10 per minute)
+- Testing needed: these limits are educated guesses, may need tuning based on real family usage
+
+**8. Pattern Consistency Accelerates Development**
+
+- After establishing `withAuth()` pattern on first 3 routes, remaining 18 routes were mechanical
+- Consistency meant: read existing route → identify auth check → apply pattern → verify with type-check
+- Total refactoring time: ~2 hours for 21 routes
+- Lesson: invest time in good patterns early, reap benefits in velocity later
+- Contrast with ad-hoc approach: would be constantly making micro-decisions about how to structure each route

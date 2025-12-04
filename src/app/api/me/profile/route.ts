@@ -1,22 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
-import { getCurrentUser } from '@/lib/session';
+import { withAuth } from '@/lib/apiAuth';
 import { prisma } from '@/lib/prisma';
 import { savePhotoFile } from '@/lib/uploads';
 import { updateProfileSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = withAuth(async (request, user) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
     const formData = await request.formData();
     const rawPayload = {
       name: formData.get('name'),
@@ -104,4 +95,4 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
