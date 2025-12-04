@@ -5,6 +5,7 @@ import { getPostCookedEventsPage } from '@/lib/posts';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { cookedEventLimiter, applyRateLimit } from '@/lib/rateLimit';
+import { badRequestError, validationError, notFoundError, internalError } from '@/lib/apiErrors';
 
 interface RouteContext {
   params: {
@@ -25,10 +26,7 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
     }
 
     if (!postId) {
-      return NextResponse.json(
-        { error: { code: 'BAD_REQUEST', message: 'Post ID is required' } },
-        { status: 400 }
-      );
+      return badRequestError('Post ID is required');
     }
 
     const body = (await request.json().catch(() => ({}))) as unknown;
@@ -36,15 +34,7 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
     const validationResult = cookedEventSchema.safeParse(body ?? {});
 
     if (!validationResult.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: validationResult.error.errors[0]?.message ?? 'Invalid input',
-          },
-        },
-        { status: 400 }
-      );
+      return validationError(validationResult.error.errors[0]?.message ?? 'Invalid input');
     }
 
     const { rating, note } = validationResult.data;
@@ -58,10 +48,7 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
     });
 
     if (!post) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'Post not found' } },
-        { status: 404 }
-      );
+      return notFoundError('Post not found');
     }
 
     await prisma.cookedEvent.create({
@@ -101,15 +88,7 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
     );
   } catch (error) {
     logError('cooked.create.error', error, { postId });
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError('An unexpected error occurred');
   }
 });
 
@@ -118,10 +97,7 @@ export const GET = withAuth(async (request, user, context?: RouteContext) => {
   try {
 
     if (!postId) {
-      return NextResponse.json(
-        { error: { code: 'BAD_REQUEST', message: 'Post ID is required' } },
-        { status: 400 }
-      );
+      return badRequestError('Post ID is required');
     }
 
     const post = await prisma.post.findFirst({
@@ -133,10 +109,7 @@ export const GET = withAuth(async (request, user, context?: RouteContext) => {
     });
 
     if (!post) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'Post not found' } },
-        { status: 404 }
-      );
+      return notFoundError('Post not found');
     }
 
     const searchParams = request.nextUrl?.searchParams;
@@ -160,14 +133,6 @@ export const GET = withAuth(async (request, user, context?: RouteContext) => {
     });
   } catch (error) {
     logError('cooked.list.error', error, { postId });
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError('An unexpected error occurred');
   }
 });

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { savePhotoFile } from '@/lib/uploads';
 import { updateProfileSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
+import { validationError, conflictError, internalError } from '@/lib/apiErrors';
 
 export const PATCH = withAuth(async (request, user) => {
   try {
@@ -17,15 +18,7 @@ export const PATCH = withAuth(async (request, user) => {
     const parsed = updateProfileSchema.safeParse(rawPayload);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_INPUT',
-            message: parsed.error.errors[0]?.message ?? 'Invalid input',
-          },
-        },
-        { status: 400 }
-      );
+      return validationError(parsed.error.errors[0]?.message ?? 'Invalid input');
     }
 
     let avatarUpdate: string | null | undefined;
@@ -73,26 +66,10 @@ export const PATCH = withAuth(async (request, user) => {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2002'
     ) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'CONFLICT',
-            message: 'That email or username is already in use',
-          },
-        },
-        { status: 409 }
-      );
+      return conflictError('That email or username is already in use');
     }
 
     logError('profile.update.error', error);
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'Unable to update profile',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError('Unable to update profile');
   }
 });
