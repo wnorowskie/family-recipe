@@ -177,11 +177,13 @@ export const paginationSchema = z.object({
     .int('Limit must be an integer')
     .min(1, 'Limit must be at least 1')
     .max(100, 'Limit cannot exceed 100')
+    .optional()
     .default(20),
   offset: z.coerce
     .number({ invalid_type_error: 'Offset must be a number' })
     .int('Offset must be an integer')
     .min(0, 'Offset cannot be negative')
+    .optional()
     .default(0),
 });
 
