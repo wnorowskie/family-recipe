@@ -26,10 +26,7 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
     }
 
     if (!postId) {
-      return NextResponse.json(
-        { error: { code: 'BAD_REQUEST', message: 'Post ID is required' } },
-        { status: 400 }
-      );
+      return badRequestError('Post ID is required');
     }
 
     const body = (await request.json().catch(() => ({}))) as unknown;
@@ -51,10 +48,7 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
     });
 
     if (!post) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'Post not found' } },
-        { status: 404 }
-      );
+      return notFoundError('Post not found');
     }
 
     await prisma.cookedEvent.create({
@@ -103,10 +97,7 @@ export const GET = withAuth(async (request, user, context?: RouteContext) => {
   try {
 
     if (!postId) {
-      return NextResponse.json(
-        { error: { code: 'BAD_REQUEST', message: 'Post ID is required' } },
-        { status: 400 }
-      );
+      return badRequestError('Post ID is required');
     }
 
     const post = await prisma.post.findFirst({
@@ -118,10 +109,7 @@ export const GET = withAuth(async (request, user, context?: RouteContext) => {
     });
 
     if (!post) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'Post not found' } },
-        { status: 404 }
-      );
+      return notFoundError('Post not found');
     }
 
     const searchParams = request.nextUrl?.searchParams;
