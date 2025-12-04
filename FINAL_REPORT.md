@@ -172,17 +172,17 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 #### 1.2 Input Validation
 
-- [ ] Introduce schema validation (Zod) at API boundaries.
-- [ ] Validate inputs for:
-  - [ ] Signup/login
-  - [ ] Create/edit post (title required, enums valid, tags valid)
-  - [ ] Comments
-  - [ ] Reactions
-  - [ ] “Cooked this!” events
-  - [ ] Pagination/search query params
-- [ ] Implement a **consistent error response format**
-- [ ] Replace any “minimal validation” with concrete validation rules.
-- [ ] Ensure API endpoints that are “happy-path only” now handle invalid input properly.
+- [✓] Introduce schema validation (Zod) at API boundaries.
+- [✓] Validate inputs for:
+  - [✓] Signup/login
+  - [✓] Create/edit post (title required, enums valid, tags valid)
+  - [✓] Comments
+  - [✓] Reactions
+  - [✓] "Cooked this!" events
+  - [✓] Pagination/search query params
+- [✓] Implement a **consistent error response format**
+- [✓] Replace any "minimal validation" with concrete validation rules.
+- [✓] Ensure API endpoints that are "happy-path only" now handle invalid input properly.
 
 #### 1.3 Testing
 
@@ -507,19 +507,20 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
    - Used REST-standard repeated parameters for arrays (not query string array notation)
    - Applied `.optional().default()` pattern with destructuring fallbacks for TypeScript type narrowing
    - Maintained strict rejection of invalid input (no lenient coercion beyond explicit `.coerce` for numbers)
-   - Made 5 incremental commits on feature branch with verification between each
-   - Maintained TypeScript strict mode compliance (0 errors)
 
-#### What Remains (In Progress)
-
-- **Task 5 - Error Helper Refactoring**: ~19 routes still use inline error responses
-  - Auth routes: signup (4 error types)
-  - Post routes: main + comments handlers (8+ error sites)
-  - Reactions route (3 error types)
-  - Family members (individual) route (4 error types)
-  - Profile password route (2 error types)
-  - Pattern: replace inline `NextResponse.json({ error: { code, message }}, {status})` with helper functions
-  - Goal: 100% consistent error responses across all 21+ API routes
+6. **Complete Error Helper Refactoring (Task 5)**
+   - Systematically refactored all 21 API routes to use standardized error helpers
+   - Route groups refactored across 7 additional commits:
+     - Auth routes (signup, login, logout) - 3 routes
+     - Main posts route - 1 route
+     - Reactions route - 1 route
+     - Comments deletion route - 1 route
+     - Profile routes (update, password) - 2 routes
+     - Family member removal route - 1 route
+     - Posts subroutes (favorite, cooked, comments) - 3 routes
+   - Eliminated all inline error responses: `NextResponse.json({ error: { code, message }}, {status})`
+   - Replaced with error helpers: `notFoundError()`, `forbiddenError()`, `validationError()`, etc.
+   - Consolidated custom param schemas to centralized schemas from validation.ts
 
 ---
 
@@ -719,3 +720,11 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 - API clients now get predictable error structure: always `{ error: { code, message } }`
 - Enables frontend to build generic error handling (e.g., map error codes to user-friendly messages)
 - Lesson: establish error contract early before it proliferates across codebase
+
+**11. Centralized Schemas Reduce Duplication**
+
+- Found multiple routes defining custom param schemas (e.g., `postIdParamSchema` defined 3 times)
+- Consolidated to single source in validation.ts, imported where needed
+- Eliminates schema drift - changing CUID validation now happens in one place
+- Side benefit: reduces line count and makes imports explicit about validation dependencies
+- Lesson: as soon as you see a schema defined twice, extract it to shared validation file
