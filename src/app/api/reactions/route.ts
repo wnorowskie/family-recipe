@@ -4,6 +4,7 @@ import { reactionSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { reactionLimiter, applyRateLimit } from '@/lib/rateLimit';
+import { parseRequestBody, notFoundError, internalError } from '@/lib/apiErrors';
 
 type TargetType = 'post' | 'comment';
 
@@ -59,22 +60,13 @@ export const POST = withAuth(async (request, user) => {
     }
 
     const body = await request.json().catch(() => null);
+    const bodyValidation = parseRequestBody(body, reactionSchema);
 
-    const validationResult = reactionSchema.safeParse(body);
-
-    if (!validationResult.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: validationResult.error.errors[0]?.message ?? 'Invalid input',
-          },
-        },
-        { status: 400 }
-      );
+    if (!bodyValidation.success) {
+      return bodyValidation.error;
     }
 
-    const { targetType, targetId, emoji } = validationResult.data;
+    const { targetType, targetId, emoji } = bodyValidation.data;
 
     if (targetType === 'post') {
       const post = await prisma.post.findFirst({
@@ -86,10 +78,7 @@ export const POST = withAuth(async (request, user) => {
       });
 
       if (!post) {
-        return NextResponse.json(
-          { error: { code: 'NOT_FOUND', message: 'Post not found' } },
-          { status: 404 }
-        );
+        return notFoundError('Post not found');
       }
     } else {
       const comment = await prisma.comment.findFirst({
@@ -101,10 +90,7 @@ export const POST = withAuth(async (request, user) => {
       });
 
       if (!comment) {
-        return NextResponse.json(
-          { error: { code: 'NOT_FOUND', message: 'Comment not found' } },
-          { status: 404 }
-        );
+        return notFoundError('Comment not found');
       }
     }
 
@@ -137,14 +123,6 @@ export const POST = withAuth(async (request, user) => {
     });
   } catch (error) {
     logError('reactions.toggle.error', error);
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError();
   }
 });
