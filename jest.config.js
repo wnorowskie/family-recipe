@@ -35,7 +35,7 @@ const customJestConfig = {
     '!**/node_modules/**', // Dependencies
   ],
 
-  coverageThresholds: {
+  coverageThreshold: {
     global: {
       branches: 75,
       functions: 75,
