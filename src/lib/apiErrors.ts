@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 
 /**
  * Standardized API error codes.
@@ -111,4 +112,92 @@ export function internalError(
   message: string = 'An unexpected error occurred'
 ): NextResponse<ApiErrorResponse> {
   return createErrorResponse(API_ERROR_CODES.INTERNAL_ERROR, message, 500);
+}
+
+/**
+ * Validation helper utilities
+ */
+
+/**
+ * Parse and validate query parameters from URLSearchParams
+ * Handles array parameters using repeated param pattern (?key=val1&key=val2)
+ */
+export function parseQueryParams<T>(
+  searchParams: URLSearchParams,
+  schema: z.ZodSchema<T>
+): { success: true; data: T } | { success: false; error: NextResponse<ApiErrorResponse> } {
+  // Build params object from URLSearchParams
+  const params: Record<string, string | string[]> = {};
+  
+  // Track which keys have multiple values
+  const multiValueKeys = new Set<string>();
+  searchParams.forEach((_, key) => {
+    if (searchParams.getAll(key).length > 1) {
+      multiValueKeys.add(key);
+    }
+  });
+  
+  // Populate params object
+  searchParams.forEach((value, key) => {
+    if (multiValueKeys.has(key)) {
+      params[key] = searchParams.getAll(key);
+    } else {
+      params[key] = value;
+    }
+  });
+  
+  const result = schema.safeParse(params);
+  
+  if (!result.success) {
+    return {
+      success: false,
+      error: validationError(
+        result.error.errors[0]?.message ?? 'Invalid query parameters'
+      ),
+    };
+  }
+  
+  return { success: true, data: result.data };
+}
+
+/**
+ * Validate route parameters (e.g., { postId: '...' })
+ */
+export function parseRouteParams<T>(
+  params: unknown,
+  schema: z.ZodSchema<T>
+): { success: true; data: T } | { success: false; error: NextResponse<ApiErrorResponse> } {
+  const result = schema.safeParse(params);
+  
+  if (!result.success) {
+    return {
+      success: false,
+      error: validationError(
+        result.error.errors[0]?.message ?? 'Invalid route parameters'
+      ),
+    };
+  }
+  
+  return { success: true, data: result.data };
+}
+
+/**
+ * Validate request body
+ */
+export function parseRequestBody<T>(
+  body: unknown,
+  schema: z.ZodSchema<T>
+): { success: true; data: T } | { success: false; error: NextResponse<ApiErrorResponse> } {
+  const result = schema.safeParse(body);
+  
+  if (!result.success) {
+    return {
+      success: false,
+      error: validationError(
+        result.error.errors[0]?.message ?? 'Invalid request body'
+      ),
+    };
+  }
+  
+  return { success: true, data: result.data };
 }
