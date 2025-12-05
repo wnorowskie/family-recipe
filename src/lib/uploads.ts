@@ -16,14 +16,30 @@ export interface SavedUpload {
   filePath: string;
 }
 
+type FileLike = {
+  name?: string;
+  type?: string;
+  size: number;
+  arrayBuffer: () => Promise<ArrayBuffer>;
+};
+
+export function isFileLike(value: unknown): value is FileLike {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as any).arrayBuffer === 'function' &&
+    typeof (value as any).size === 'number'
+  );
+}
+
 async function ensureUploadDir(): Promise<void> {
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
 }
 
-function getFileExtension(file: File): string {
-  const fromName = path.extname(file.name);
-  if (fromName) {
-    return fromName;
+function getFileExtension(file: FileLike): string {
+  const nameExt = file.name ? path.extname(file.name) : '';
+  if (nameExt) {
+    return nameExt;
   }
 
   switch (file.type) {
@@ -38,8 +54,8 @@ function getFileExtension(file: File): string {
   }
 }
 
-export async function savePhotoFile(file: File): Promise<SavedUpload> {
-  if (!ALLOWED_MIME_TYPES.has(file.type)) {
+export async function savePhotoFile(file: FileLike): Promise<SavedUpload> {
+  if (!ALLOWED_MIME_TYPES.has(file.type ?? 'image/jpeg')) {
     throw new Error('UNSUPPORTED_FILE_TYPE');
   }
 
