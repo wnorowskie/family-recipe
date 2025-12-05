@@ -49,7 +49,7 @@ describe('Uploads Utilities', () => {
     jest.clearAllMocks();
     mockMkdir.mockResolvedValue(undefined as any);
     mockWriteFile.mockResolvedValue(undefined as any);
-    mockRandomUUID.mockReturnValue('uuid-123');
+    mockRandomUUID.mockReturnValue('12345678-1234-1234-1234-123456789abc' as any);
   });
 
   afterEach(() => {
@@ -112,7 +112,7 @@ describe('Uploads Utilities', () => {
   ])('derives extension from mime type when name lacks ext: $type', async ({ type, expectedExt }) => {
     const { file } = createMockFile({ name: 'upload', type });
     jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
-    mockRandomUUID.mockReturnValue('fixed');
+    mockRandomUUID.mockReturnValue('ffffffff-ffff-ffff-ffff-ffffffffffff' as any);
 
     const result = await savePhotoFile(file);
 
