@@ -202,24 +202,37 @@ const INGREDIENT_LIMIT = 5;
 export const recipeFiltersSchema = paginationSchema.extend({
   search: z.string().max(200, 'Search query too long').optional(),
   course: z
-    .array(courseEnum)
-    .max(courseEnum.options.length, 'Too many courses selected')
+    .union([courseEnum, z.array(courseEnum)])
     .optional()
-    .transform((val) => (val ? Array.from(new Set(val)) : undefined)), // Deduplicate
+    .transform((val): string[] | undefined => {
+      if (!val) return undefined;
+      const arr = Array.isArray(val) ? val : [val];
+      return arr.length > 0 ? Array.from(new Set(arr)) : undefined;
+    }),
   tags: z
-    .array(z.string().max(40))
-    .max(10, 'Too many tags')
-    .optional(),
+    .union([z.string().max(40), z.array(z.string().max(40)).max(10, 'Too many tags')])
+    .optional()
+    .transform((val): string[] | undefined => {
+      if (!val) return undefined;
+      const arr = Array.isArray(val) ? val : [val];
+      return arr.length > 0 ? arr : undefined;
+    }),
   difficulty: z
-    .array(difficultyEnum)
-    .max(3, 'Too many difficulty levels')
+    .union([difficultyEnum, z.array(difficultyEnum)])
     .optional()
-    .transform((val) => (val ? Array.from(new Set(val)) : undefined)), // Deduplicate
+    .transform((val): string[] | undefined => {
+      if (!val) return undefined;
+      const arr = Array.isArray(val) ? val : [val];
+      return arr.length > 0 ? Array.from(new Set(arr)) : undefined;
+    }),
   authorId: z
-    .array(z.string().cuid('Invalid author ID'))
-    .max(20, 'Too many authors')
+    .union([z.string().cuid('Invalid author ID'), z.array(z.string().cuid('Invalid author ID')).max(20, 'Too many authors')])
     .optional()
-    .transform((val) => (val ? Array.from(new Set(val)) : undefined)), // Deduplicate
+    .transform((val): string[] | undefined => {
+      if (!val) return undefined;
+      const arr = Array.isArray(val) ? val : [val];
+      return arr.length > 0 ? Array.from(new Set(arr)) : undefined;
+    }),
   totalTimeMin: z.coerce
     .number()
     .int()
@@ -245,12 +258,19 @@ export const recipeFiltersSchema = paginationSchema.extend({
     .max(MAX_SERVINGS, `Maximum servings is ${MAX_SERVINGS}`)
     .optional(),
   ingredients: z
-    .array(z.string().max(120, 'Ingredient name too long'))
-    .max(INGREDIENT_LIMIT, `Maximum ${INGREDIENT_LIMIT} ingredients`)
-    .optional(),
-  sort: z.enum(['recent', 'alpha'], {
-    errorMap: () => ({ message: 'Sort must be either "recent" or "alpha"' }),
-  }).default('recent'),
+    .union([z.string().max(120, 'Ingredient name too long'), z.array(z.string().max(120, 'Ingredient name too long')).max(INGREDIENT_LIMIT, `Maximum ${INGREDIENT_LIMIT} ingredients`)])
+    .optional()
+    .transform((val): string[] | undefined => {
+      if (!val) return undefined;
+      const arr = Array.isArray(val) ? val : [val];
+      return arr.length > 0 ? arr : undefined;
+    }),
+  sort: z
+    .enum(['recent', 'alpha'], {
+      errorMap: () => ({ message: 'Sort must be either "recent" or "alpha"' }),
+    })
+    .optional()
+    .transform((val) => val ?? 'recent'),
 }).refine(
   (data) => {
     // Ensure min <= max for totalTime

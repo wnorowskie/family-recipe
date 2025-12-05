@@ -122,10 +122,10 @@ export function internalError(
  * Parse and validate query parameters from URLSearchParams
  * Handles array parameters using repeated param pattern (?key=val1&key=val2)
  */
-export function parseQueryParams<T>(
+export function parseQueryParams<T extends z.ZodTypeAny>(
   searchParams: URLSearchParams,
-  schema: z.ZodSchema<T>
-): { success: true; data: T } | { success: false; error: NextResponse<ApiErrorResponse> } {
+  schema: T
+): { success: true; data: z.infer<T> } | { success: false; error: NextResponse<ApiErrorResponse> } {
   // Build params object from URLSearchParams
   const params: Record<string, string | string[]> = {};
   
