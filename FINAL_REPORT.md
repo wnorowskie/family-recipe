@@ -208,21 +208,21 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 **Goal:** Make the app easy to run as a containerized monolith locally, ready for future splitting.
 
-- [ ] Keep Next.js as a monolith (frontend + API) for now.
-- [ ] Create a `Dockerfile` for the app:
-  - [ ] Install dependencies.
-  - [ ] Build the app.
-  - [ ] Run `next start`.
-- [ ] Add a `docker-compose.yml` with:
-  - [ ] `app` service (Next.js container).
-  - [ ] `db` service (Postgres official image).
-  - [ ] Shared network and volume for Postgres data.
-- [ ] Ensure migrations run in containers:
-  - [ ] Command/steps to run `prisma migrate deploy` inside the app container.
-- [ ] Verify local dev can run:
-  - [ ] Directly via `npm run dev` (SQLite or local Postgres).
-  - [ ] Via `docker-compose up` using Postgres.
-- [ ] Address any local environment quirks (e.g., assumptions about file paths, local-only image storage) so they work inside containers.
+- [✓] Keep Next.js as a monolith (frontend + API) for now.
+- [✓] Create a `Dockerfile` for the app:
+  - [✓] Install dependencies.
+  - [✓] Build the app.
+  - [✓] Run `next start`.
+- [✓] Add a `docker-compose.yml` with:
+  - [✓] `app` service (Next.js container).
+  - [✓] `db` service (Postgres official image).
+  - [✓] Shared network and volume for Postgres data.
+- [✓] Ensure migrations run in containers:
+  - [✓] Command/steps to run `prisma migrate deploy` inside the app container.
+- [✓] Verify local dev can run:
+  - [✓] Directly via `npm run dev` (SQLite or local Postgres).
+  - [✓] Via `docker-compose up` using Postgres.
+- [✓] Address any local environment quirks (e.g., assumptions about file paths, local-only image storage) so they work inside containers.
 
 ### Phase 3 – External Database & Data Discipline
 
@@ -615,6 +615,28 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
    - Type safety - TypeScript ensures test mocks match actual implementations
    - Descriptive test names - each test name describes exact scenario and expected outcome
 
+### Phase 2 – Local Environment Parity & Dockerization
+
+**Goal:** Make the monolith easy to run locally in containers with Postgres while retaining simple local dev options.
+
+#### What Was Accomplished
+
+1. **Containerized Monolith**
+   - Added multi-stage `Dockerfile` (deps → builder → runner) with OpenSSL installed for Prisma engines; runs `prisma generate` against the Postgres schema and `next build`, then serves via `next start`.
+   - Created `.dockerignore` to keep host `node_modules`, `.next`, local DBs, and secrets out of the build context.
+
+2. **Compose Stack with Postgres**
+   - Added `docker-compose.yml` with `app` + `db` (Postgres 16), healthchecks, persistent volume for Postgres data, and bind-mount for `public/uploads` so photos survive restarts.
+   - App container runs `prisma migrate deploy --schema prisma/schema.postgres.prisma` on start to ensure migrations apply automatically.
+
+3. **Postgres Schema & Environment Defaults**
+   - Introduced `prisma/schema.postgres.prisma` plus updated migration lock for Postgres workflows; documented `PRISMA_SCHEMA` usage and kept SQLite as default for local dev.
+   - Updated `.env.example` with optional `FAMILY_NAME`/`FAMILY_MASTER_KEY` for seeding and commented Postgres settings to avoid clobbering SQLite defaults.
+
+4. **Seed & Upload Parity**
+   - Seed script now generates a secure master key when none is provided and skips creating a family if one already exists, making it safe to run in Docker or locally.
+   - Hardened upload handling to accept file-like objects across environments, preserving photo uploads in Docker (backed by the uploads bind-mount).
+
 ---
 
 ## Implementation Not Accomplished
@@ -937,3 +959,31 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 - Diminishing returns: last 2% would take as long as first 98%
 - Documented remaining gaps rather than writing tests for framework-level errors
 - Lesson: know when to stop - perfect is the enemy of good enough
+
+### Phase 2 – Local Environment Parity & Dockerization
+
+**1. Container Builds Must Be Self-Contained**
+
+- Prisma engines need system OpenSSL libraries; installing them explicitly in the Dockerfile avoids build-time failures on slim images
+- Multi-stage builds can stay slim at runtime while still carrying dev deps in build stages for Prisma/Next compilation
+
+**2. Keep Host Artifacts Out of Images**
+
+- Copying host `node_modules` caused invalid ELF errors (bcrypt) in Linux containers; `.dockerignore` is mandatory to prevent platform-specific binaries from leaking into images
+
+**3. Database Targeting Needs Explicitness**
+
+- SQLite vs Postgres differences justified a dedicated `schema.postgres.prisma` and updated migration lock; always set `PRISMA_SCHEMA` with the matching `DATABASE_URL`
+
+**4. File Handling Differs Across Runtimes**
+
+- `instanceof File` checks can fail across environments; accepting "file-like" objects is more robust for uploads in Docker and Node
+- Binding `public/uploads` as a volume preserves photos across container restarts; without it, uploads disappear on rebuild
+
+**5. Idempotent Seeding Prevents Surprises**
+
+- Seed script now no-ops if a family exists and can auto-generate or accept `FAMILY_MASTER_KEY`; safe to re-run in Docker without overwriting existing keys
+
+**6. Compose Health + Migrations Reduce Drift**
+
+- Postgres healthchecks plus `prisma migrate deploy` on start keep the app from racing the DB and ensure schema is current in local containers

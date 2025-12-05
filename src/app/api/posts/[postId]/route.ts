@@ -5,7 +5,7 @@ import path from 'path';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getPostDetail } from '@/lib/posts';
-import { savePhotoFile } from '@/lib/uploads';
+import { isFileLike, savePhotoFile } from '@/lib/uploads';
 import { createPostSchema } from '@/lib/validation';
 import { MAX_PHOTO_COUNT, normalizePostPayload } from '@/lib/postPayload';
 import { logError, logWarn } from '@/lib/logger';
@@ -297,7 +297,7 @@ export const PUT = withAuth(async (request, user, context?: { params: { postId: 
 
     const files = formData
       .getAll('photos')
-      .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+      .filter((entry): entry is File => isFileLike(entry) && entry.size > 0);
 
     if (files.length > MAX_PHOTO_COUNT) {
       return NextResponse.json(

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { createPostSchema } from '@/lib/validation';
-import { savePhotoFile } from '@/lib/uploads';
+import { isFileLike, savePhotoFile } from '@/lib/uploads';
 import { MAX_PHOTO_COUNT, normalizePostPayload } from '@/lib/postPayload';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
@@ -43,7 +43,7 @@ export const POST = withAuth(async (request, user) => {
 
     const files = formData
       .getAll('photos')
-      .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+      .filter((entry): entry is File => isFileLike(entry) && entry.size > 0);
 
     if (files.length > MAX_PHOTO_COUNT) {
       return badRequestError(`You can upload up to ${MAX_PHOTO_COUNT} photos`);

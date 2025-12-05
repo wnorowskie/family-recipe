@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { withAuth } from '@/lib/apiAuth';
 import { prisma } from '@/lib/prisma';
-import { savePhotoFile } from '@/lib/uploads';
+import { isFileLike, savePhotoFile } from '@/lib/uploads';
 import { updateProfileSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
 import { validationError, conflictError, internalError } from '@/lib/apiErrors';
@@ -25,7 +25,7 @@ export const PATCH = withAuth(async (request, user) => {
     const removeAvatar = formData.get('removeAvatar') === 'true';
     const avatarFile = formData.get('avatar');
 
-    if (avatarFile instanceof File && avatarFile.size > 0) {
+    if (isFileLike(avatarFile) && avatarFile.size > 0) {
       try {
         const saved = await savePhotoFile(avatarFile);
         avatarUpdate = saved.url;

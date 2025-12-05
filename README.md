@@ -92,6 +92,46 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Running with Docker (Postgres)
+
+To run the monolith + Postgres in containers:
+
+1) Build and start:
+
+```
+docker compose up --build
+```
+
+- App: <http://localhost:3000>
+- Postgres data persists in the `postgres-data` volume.
+- Uploaded images persist via the bind mount `./public/uploads:/app/public/uploads`.
+- Migrations run on container start via `prisma migrate deploy --schema prisma/schema.postgres.prisma`.
+
+2) Re-run migrations manually (if needed):
+
+```
+docker compose run --rm app npx prisma migrate deploy --schema prisma/schema.postgres.prisma
+```
+
+3) Seed data (optional):
+
+```
+docker compose exec app npm run db:seed
+```
+
+### Local Development Options
+
+- **SQLite (default):** Use the `.env` defaults and `npm run dev`.
+- **Local Postgres without Docker:** Set `DATABASE_URL` to your Postgres URL and `PRISMA_SCHEMA=prisma/schema.postgres.prisma`, then run:
+
+```
+npx prisma generate --schema prisma/schema.postgres.prisma
+npx prisma db push --schema prisma/schema.postgres.prisma
+npm run dev
+```
+
+Prisma migrations are generated for Postgres; stick to `prisma db push` for SQLite workflows.
+
 ---
 
 ## Project Structure

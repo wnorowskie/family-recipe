@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createCommentSchema, postIdParamSchema } from '@/lib/validation';
-import { savePhotoFile } from '@/lib/uploads';
+import { isFileLike, savePhotoFile } from '@/lib/uploads';
 import { getPostCommentsPage } from '@/lib/posts';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
@@ -105,7 +105,7 @@ export const POST = withAuth(async (request, user, context?: { params: { postId:
     const photoFile = formData.get('photo');
     let photoUrl: string | null = null;
 
-    if (photoFile instanceof File && photoFile.size > 0) {
+    if (isFileLike(photoFile) && photoFile.size > 0) {
       const saved = await savePhotoFile(photoFile);
       photoUrl = saved.url;
     }
