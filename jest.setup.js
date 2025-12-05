@@ -50,11 +50,11 @@ jest.mock('./src/lib/rateLimit', () => ({
   applyRateLimit: jest.fn().mockReturnValue(null), // null means rate limit not exceeded
 }));
 
-// Suppress console logs in tests (uncomment if needed)
-// global.console = {
-//   ...console,
-//   log: jest.fn(),
-//   debug: jest.fn(),
-//   info: jest.fn(),
-//   warn: jest.fn(),
-// };
+// Suppress console noise in tests by default; set ALLOW_TEST_LOGS=true to see logs
+if (process.env.ALLOW_TEST_LOGS !== 'true') {
+  jest.spyOn(console, 'log').mockImplementation(() => {});
+  jest.spyOn(console, 'info').mockImplementation(() => {});
+  jest.spyOn(console, 'debug').mockImplementation(() => {});
+  jest.spyOn(console, 'warn').mockImplementation(() => {});
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+}
