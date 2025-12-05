@@ -60,6 +60,7 @@ model FamilyMembership {
 
   @@unique([familySpaceId, userId])
   @@map("family_memberships")
+  @@index([familySpaceId])
 }
 
 // Post represents both quick posts and full recipe posts
@@ -90,6 +91,8 @@ model Post {
   favorites         Favorite[]
 
   @@map("posts")
+  @@index([familySpaceId, createdAt])
+  @@index([authorId])
 }
 
 // PostPhoto stores additional photos attached to a post
@@ -104,6 +107,7 @@ model PostPhoto {
   post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@map("post_photos")
+  @@index([postId])
 }
 
 // RecipeDetails stores optional recipe-specific information
@@ -152,6 +156,8 @@ model PostTag {
 
   @@unique([postId, tagId])
   @@map("post_tags")
+  @@index([postId])
+  @@index([tagId])
 }
 
 // Comment represents flat comments on posts
@@ -171,6 +177,7 @@ model Comment {
   reactions Reaction[] @relation("CommentReactions")
 
   @@map("comments")
+  @@index([postId, createdAt])
 }
 
 // Reaction represents emoji-based reactions on posts and comments
@@ -191,6 +198,9 @@ model Reaction {
 
   @@unique([targetType, targetId, userId, emoji])
   @@map("reactions")
+  @@index([targetType, targetId])
+  @@index([postId])
+  @@index([commentId])
 }
 
 // CookedEvent represents "Cooked this!" check-ins
@@ -207,6 +217,8 @@ model CookedEvent {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("cooked_events")
+  @@index([postId])
+  @@index([userId])
 }
 
 // Favorite represents user's private bookmarks
@@ -222,4 +234,6 @@ model Favorite {
 
   @@unique([userId, postId])
   @@map("favorites")
+  @@index([userId])
+  @@index([postId])
 }
