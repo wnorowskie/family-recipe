@@ -25,22 +25,29 @@ jest.mock('./src/lib/prisma', () => ({
 jest.mock('./src/lib/rateLimit', () => ({
   signupLimiter: {
     check: jest.fn().mockResolvedValue({ allowed: true }),
+    getIPKey: jest.fn().mockReturnValue('test-ip'),
   },
   loginLimiter: {
     check: jest.fn().mockResolvedValue({ allowed: true }),
+    getIPKey: jest.fn().mockReturnValue('test-ip'),
   },
   postCreationLimiter: {
     check: jest.fn().mockResolvedValue({ allowed: true }),
+    getIPKey: jest.fn().mockReturnValue('test-ip'),
   },
   commentLimiter: {
     check: jest.fn().mockResolvedValue({ allowed: true }),
+    getIPKey: jest.fn().mockReturnValue('test-ip'),
   },
   cookedEventLimiter: {
     check: jest.fn().mockResolvedValue({ allowed: true }),
+    getIPKey: jest.fn().mockReturnValue('test-ip'),
   },
   reactionLimiter: {
     check: jest.fn().mockResolvedValue({ allowed: true }),
+    getIPKey: jest.fn().mockReturnValue('test-ip'),
   },
+  applyRateLimit: jest.fn().mockReturnValue(null), // null means rate limit not exceeded
 }));
 
 // Suppress console logs in tests (uncomment if needed)
