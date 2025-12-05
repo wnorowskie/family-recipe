@@ -1,0 +1,42 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: family_recipe
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  app:
+    build:
+      context: .
+      args:
+        PRISMA_SCHEMA: prisma/schema.postgres.prisma
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/family_recipe
+      JWT_SECRET: dev-jwt-secret-change-me
+      PRISMA_SCHEMA: prisma/schema.postgres.prisma
+      NEXT_TELEMETRY_DISABLED: 1
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./public/uploads:/app/public/uploads
+    command: >
+      sh -c "npx prisma migrate deploy --schema ${PRISMA_SCHEMA:-prisma/schema.postgres.prisma} &&
+      npm run start"
+
+volumes:
+  postgres-data:
