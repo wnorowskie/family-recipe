@@ -14,6 +14,17 @@ jest.mock('@/lib/prisma', () => ({
   prisma: require('../../integration/helpers/mock-prisma').prismaMock,
 }));
 
+const mockPostFindMany = prismaMock.post.findMany as jest.MockedFunction<typeof prismaMock.post.findMany>;
+const mockCookedGroupBy = prismaMock.cookedEvent.groupBy as jest.MockedFunction<typeof prismaMock.cookedEvent.groupBy>;
+
+const latestPostArgs = () => {
+  const args = mockPostFindMany.mock.calls.at(-1)?.[0];
+  if (!args) {
+    throw new Error('Expected prisma.post.findMany to be called');
+  }
+  return args;
+};
+
 describe('Recipe Utilities', () => {
   const baseInput = {
     familySpaceId: 'family_1',
@@ -23,15 +34,15 @@ describe('Recipe Utilities', () => {
 
   beforeEach(() => {
     resetPrismaMock();
-    prismaMock.post.findMany.mockResolvedValue([] as any);
-    prismaMock.cookedEvent.groupBy.mockResolvedValue([] as any);
+    mockPostFindMany.mockResolvedValue([] as any);
+    mockCookedGroupBy.mockResolvedValue([] as any);
   });
 
   describe('getRecipes - query building', () => {
     it('uses default recent sorting and pagination', async () => {
       await getRecipes({ ...baseInput });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.orderBy).toEqual([{ createdAt: 'desc' }]);
       expect(args.take).toBe(baseInput.limit + 1);
       expect(args.skip).toBe(baseInput.offset);
@@ -49,7 +60,7 @@ describe('Recipe Utilities', () => {
     it('applies alpha sorting with title then createdAt', async () => {
       await getRecipes({ ...baseInput, sort: 'alpha' });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.orderBy).toEqual([
         { title: 'asc' },
         { createdAt: 'desc' },
@@ -59,8 +70,8 @@ describe('Recipe Utilities', () => {
     it('adds trimmed search filter when search provided', async () => {
       await getRecipes({ ...baseInput, search: '  cake  ' });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
-      expect(args.where?.AND).toContainEqual({
+      const args = latestPostArgs();
+      expect(args?.where?.AND).toContainEqual({
         title: { contains: 'cake' },
       });
     });
@@ -68,7 +79,7 @@ describe('Recipe Utilities', () => {
     it('ignores empty search and leaves AND undefined', async () => {
       await getRecipes({ ...baseInput, search: '   ' });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.where?.AND).toBeUndefined();
     });
 
@@ -78,7 +89,7 @@ describe('Recipe Utilities', () => {
         authorIds: ['user_1', ' user_2 ', '', 'user_1', 123 as any],
       });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.where?.AND).toEqual([
         {
           authorId: { in: ['user_1', 'user_2'] },
@@ -92,7 +103,7 @@ describe('Recipe Utilities', () => {
         courses: ['breakfast', 'invalid', 'dinner', 'breakfast', 10 as any],
       });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.where?.AND).toEqual([
         {
           OR: [
@@ -128,7 +139,7 @@ describe('Recipe Utilities', () => {
     it('adds tag filters for each tag', async () => {
       await getRecipes({ ...baseInput, tags: ['vegan', 'quick'] });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.where?.AND).toEqual([
         { tags: { some: { tag: { name: 'vegan' } } } },
         { tags: { some: { tag: { name: 'quick' } } } },
@@ -141,7 +152,7 @@ describe('Recipe Utilities', () => {
         difficulties: ['easy', 'hard', 'impossible', 'easy'],
       });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.where?.AND).toEqual([
         {
           recipeDetails: {
@@ -158,7 +169,7 @@ describe('Recipe Utilities', () => {
     it('applies total time filters when provided', async () => {
       await getRecipes({ ...baseInput, minTotalMinutes: 15, maxTotalMinutes: 60 });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.where?.AND).toEqual([
         {
           recipeDetails: {
@@ -176,7 +187,7 @@ describe('Recipe Utilities', () => {
     it('applies servings range filters', async () => {
       await getRecipes({ ...baseInput, minServings: 2, maxServings: 6 });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.where?.AND).toEqual([
         {
           recipeDetails: {
@@ -194,7 +205,7 @@ describe('Recipe Utilities', () => {
     it('adds ingredient contains filters for each keyword', async () => {
       await getRecipes({ ...baseInput, ingredients: ['chocolate', 'milk'] });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.where?.AND).toEqual([
         {
           recipeDetails: {
@@ -220,14 +231,14 @@ describe('Recipe Utilities', () => {
     it('skips course filter when no valid values provided', async () => {
       await getRecipes({ ...baseInput, courses: ['invalid', 123 as any] });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.where?.AND).toBeUndefined();
     });
 
     it('skips author filter when no valid IDs remain after normalization', async () => {
       await getRecipes({ ...baseInput, authorIds: ['   ', 123 as any] });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.where?.AND).toBeUndefined();
     });
 
@@ -246,7 +257,7 @@ describe('Recipe Utilities', () => {
         ingredients: ['tomato'],
       });
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.where?.AND).toEqual([
         { title: { contains: 'pasta' } },
         { authorId: { in: ['auth_1'] } },
@@ -422,7 +433,7 @@ describe('Recipe Utilities', () => {
       expect(result.items).toEqual([]);
       expect(result.hasMore).toBe(false);
       expect(result.nextOffset).toBe(baseInput.offset + baseInput.limit);
-      expect(prismaMock.cookedEvent.groupBy).not.toHaveBeenCalled();
+      expect(mockCookedGroupBy).not.toHaveBeenCalled();
     });
 
     it('aggregates cooked stats for returned posts', async () => {
@@ -457,7 +468,7 @@ describe('Recipe Utilities', () => {
         },
       ] as any);
 
-      prismaMock.cookedEvent.groupBy.mockResolvedValue([
+      mockCookedGroupBy.mockResolvedValue([
         {
           postId: 'post_1',
           _count: { _all: 3 },
@@ -497,7 +508,7 @@ describe('Recipe Utilities', () => {
         },
       ] as any);
 
-      prismaMock.cookedEvent.groupBy.mockResolvedValue([
+      mockCookedGroupBy.mockResolvedValue([
         {
           postId: 'post_1',
           _count: { _all: 2 },
@@ -533,7 +544,7 @@ describe('Recipe Utilities', () => {
 
       await getRecipes({ ...baseInput, limit: 1 });
 
-      expect(prismaMock.cookedEvent.groupBy).toHaveBeenCalledWith({
+      expect(mockCookedGroupBy).toHaveBeenCalledWith({
         where: { postId: { in: ['post_1'] } },
         by: ['postId'],
         _count: { _all: true },
@@ -570,7 +581,7 @@ describe('Recipe Utilities', () => {
         },
       ] as any);
 
-      prismaMock.cookedEvent.groupBy.mockResolvedValue([] as any);
+      mockCookedGroupBy.mockResolvedValue([] as any);
 
       const result = await getRecipes({ ...baseInput, limit, offset: 5 });
 
@@ -579,7 +590,7 @@ describe('Recipe Utilities', () => {
       expect(result.items.map((item) => item.id)).toEqual(['post_1', 'post_2']);
       expect(result.nextOffset).toBe(5 + limit);
 
-      const args = prismaMock.post.findMany.mock.calls[0][0];
+      const args = latestPostArgs();
       expect(args.take).toBe(limit + 1);
       expect(args.skip).toBe(5);
     });

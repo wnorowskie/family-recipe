@@ -97,9 +97,9 @@ describe('Posts Utilities', () => {
       ];
       prismaMock.cookedEvent.findMany.mockResolvedValue(cookedRecords as any);
 
-      prismaMock.reaction.findMany.mockImplementation(async (args: any) => {
+      prismaMock.reaction.findMany.mockImplementation((args: any) => {
         if (args.where?.targetType === 'comment') {
-          return [
+          return Promise.resolve([
             {
               targetId: 'comment_1',
               emoji: '👍',
@@ -110,7 +110,7 @@ describe('Posts Utilities', () => {
               emoji: '👍',
               user: { id: 'user_8', name: 'Henry', avatarUrl: '/henry.png' },
             },
-          ] as any;
+          ]) as any;
         }
         return [
           {
