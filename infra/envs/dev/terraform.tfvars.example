@@ -1,0 +1,20 @@
+# Example values for dev environment. Do NOT commit real secrets.
+
+project_id              = "family-recipe-dev"
+region                  = "us-east1"
+state_bucket_name       = "family-recipe-tf-state-dev"
+terraform_admin_sa_id   = "terraform-admin"
+app_sql_client_sa_id    = "app-sql-client"
+db_instance_name        = "family-recipe-dev"
+db_name                 = "family_recipe_dev"
+db_user                 = "family_app"
+db_password             = "REPLACE_ME" # store real value outside git; consider using Secret Manager and adding versions manually
+db_password_secret_id   = "family-recipe-dev-db-password"
+tier                    = "db-custom-1-3840"
+disk_size_gb            = 20
+backup_retention_days   = 7
+maintenance_window_day  = 7  # Sunday (GCP expects 1-7; Sunday=7)
+maintenance_window_hour = 5  # 05:00 UTC
+pitr_enabled            = false
+create_db_password_secret = true
+grant_secret_accessor_to_app = false
