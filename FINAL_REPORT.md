@@ -244,6 +244,8 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 - [✓] Ensure any **schema changes** (e.g., additional indexes, enum refinements) are captured in migrations.
 - [✓] Identify any data fields currently unused in V1 and decide whether to keep, remove, or fully wire them.
 
+**Open follow-up:** Dev currently allows Cloud SQL public IP with TLS; plan to move to private IP + TLS-only and tighten authorized networks when VPC/private service access is in place (phase 7).
+
 ### Phase 4 – CI Pipeline (DevSecOps Core)
 
 **Goal:** Every change is gated by tests, checks, and scans.

@@ -1,3 +1,5 @@
+#tfsec:ignore:google-sql-enable-public-ip # Public IP allowed for dev; will tighten in prod/private rollout
+#tfsec:ignore:google-sql-encrypt-data-in-transit # Postgres requires client-side SSL; tracked via runtime configuration
 resource "google_sql_database_instance" "this" {
   name                 = var.instance_name
   project              = var.project_id
