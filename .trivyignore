@@ -1,0 +1,4 @@
+# IaC dev allowances: public IP + TLS not enforced by resource attribute
+# Dev DB currently keeps a public IP for proxy-less access; plan documented to move to private IP + TLS-only.
+AVD-GCP-0015
+AVD-GCP-0017
