@@ -1,11 +1,8 @@
-FROM node:20-bookworm-slim AS base
+FROM node:20-alpine AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-# Install security updates and OpenSSL so Prisma can detect and link against libssl
-RUN apt-get update \
-    && apt-get upgrade -y \
-    && apt-get install -y openssl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# Install OpenSSL so Prisma can detect and link against libssl
+RUN apk add --no-cache openssl
 
 FROM base AS deps
 ENV NODE_ENV=development
