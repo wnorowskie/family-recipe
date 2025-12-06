@@ -248,21 +248,21 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 **Goal:** Every change is gated by tests, checks, and scans.
 
-- [ ] Set up CI using GitHub Actions.
-- [ ] CI workflow for PRs and pushes to `develop`/`main` should:
-  - [ ] Checkout code.
-  - [ ] Install dependencies.
-  - [ ] Run **typecheck** (TS).
-  - [ ] Run **lint**.
-  - [ ] Run **tests** (unit + integration).
-  - [ ] Run **build**.
-  - [ ] Run **dependency scan** (e.g., `npm audit` or similar).
-  - [ ] Run **secrets scan** (e.g., `gitleaks` / `detect-secrets`).
-  - [ ] Run **SAST** (GitHub CodeQL, semgrep, etc.).
-- [ ] Configure **branch protections**:
-  - [ ] Require CI to pass before merging into `develop`.
-  - [ ] Require CI to pass before merging into `main`.
-  - [ ] Disallow direct pushes to `main` and `develop`.
+- [✓] Set up CI using GitHub Actions.
+- [✓] CI workflow for PRs and pushes to `develop`/`main` should:
+  - [✓] Checkout code.
+  - [✓] Install dependencies.
+  - [✓] Run **typecheck** (TS).
+  - [✓] Run **lint**.
+  - [✓] Run **tests** (unit + integration).
+  - [✓] Run **build**.
+  - [✓] Run **dependency scan** (e.g., `npm audit` or similar).
+  - [✓] Run **secrets scan** (e.g., `gitleaks` / `detect-secrets`).
+  - [✓] Run **SAST** (GitHub CodeQL).
+- [✓] Configure **branch protections**:
+  - [✓] Require CI to pass before merging into `develop`.
+  - [✓] Require CI to pass before merging into `main`.
+  - [✓] Disallow direct pushes to `main` and `develop`.
 - [ ] Add any additional checks that make sense given the current implementation (e.g., run Prisma migrations in CI using a temp DB to verify they apply cleanly).
 
 ### Phase 5 – First “Dev” Deploy of the Monolith
