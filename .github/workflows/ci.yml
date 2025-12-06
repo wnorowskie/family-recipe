@@ -51,8 +51,10 @@ jobs:
       - name: Docker build (production image)
         run: |
           docker build \
-            --file Dockerfile \
-            --tag family-recipe:ci .
+           --pull \
+           --no-cache \
+           --file Dockerfile \
+           --tag family-recipe:ci .
       - name: Save image artifact
         run: docker save family-recipe:ci -o family-recipe.tar
       - name: Upload image artifact
@@ -136,7 +138,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: IaC scan (tfsec)
-        uses: aquasecurity/tfsec-action@v2
+        uses: aquasecurity/tfsec-action@v1
         with:
           working_directory: infra
 
