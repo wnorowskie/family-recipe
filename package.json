@@ -21,18 +21,15 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --maxWorkers=2",
-    "test:unit": "jest __tests__/unit",
-    "test:integration": "jest __tests__/integration"
+    "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.11.0",
     "bcrypt": "^5.1.1",
+    "cross-spawn": "^7.0.6",
     "date-fns": "^4.1.0",
+    "esbuild": "^0.24.0",
+    "glob": "^10.5.0",
     "jose": "^6.1.2",
     "jsonwebtoken": "^9.0.3",
     "lru-cache": "^11.2.4",

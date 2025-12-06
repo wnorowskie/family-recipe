@@ -1,8 +1,11 @@
 FROM node:20-slim AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-# Install OpenSSL so Prisma can detect and link against libssl (openss3 on bookworm)
-RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install security updates and OpenSSL so Prisma can detect and link against libssl
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
 ENV NODE_ENV=development
