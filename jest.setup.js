@@ -1,6 +1,10 @@
 // Mock environment variables
 process.env.DATABASE_URL = 'file:./test.db';
-process.env.JWT_SECRET = 'test-jwt-secret-placeholder';
+// Use env value if provided; otherwise generate a throwaway test secret to avoid hardcoding
+if (!process.env.JWT_SECRET) {
+  const { randomBytes } = require('crypto');
+  process.env.JWT_SECRET = randomBytes(32).toString('hex');
+}
 process.env.NODE_ENV = 'test';
 
 // Mock Prisma Client globally

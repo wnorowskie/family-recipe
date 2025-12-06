@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { createPostSchema } from '@/lib/validation';
-import { isFileLike, savePhotoFile } from '@/lib/uploads';
+import { savePhotoFile } from '@/lib/uploads';
 import { MAX_PHOTO_COUNT, normalizePostPayload } from '@/lib/postPayload';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { postCreationLimiter, applyRateLimit } from '@/lib/rateLimit';
-import { badRequestError, validationError, internalError } from '@/lib/apiErrors';
+import {
+  badRequestError,
+  validationError,
+  internalError,
+} from '@/lib/apiErrors';
 
 export const POST = withAuth(async (request, user) => {
   try {
@@ -38,18 +42,34 @@ export const POST = withAuth(async (request, user) => {
     const validatedPayload = createPostSchema.safeParse(normalizedPayload);
 
     if (!validatedPayload.success) {
-      return validationError(validatedPayload.error.errors[0]?.message || 'Invalid input');
+      return validationError(
+        validatedPayload.error.errors[0]?.message || 'Invalid input'
+      );
     }
+
+    const isFormDataFile = (entry: unknown): entry is File => {
+      if (typeof File !== 'undefined' && entry instanceof File)
+        return entry.size > 0;
+      if (!entry || typeof entry !== 'object') return false;
+      const maybe = entry as any;
+      return (
+        typeof maybe.size === 'number' &&
+        typeof maybe.arrayBuffer === 'function' &&
+        maybe.size > 0
+      );
+    };
 
     const files = formData
       .getAll('photos')
-      .filter((entry): entry is File => isFileLike(entry) && entry.size > 0);
+      .filter((entry): entry is File => isFormDataFile(entry));
 
     if (files.length > MAX_PHOTO_COUNT) {
       return badRequestError(`You can upload up to ${MAX_PHOTO_COUNT} photos`);
     }
 
-    const savedPhotos = await Promise.all(files.map((file) => savePhotoFile(file)));
+    const savedPhotos = await Promise.all(
+      files.map((file) => savePhotoFile(file))
+    );
 
     const payload = validatedPayload.data;
     const recipeInput = payload.recipe;
@@ -58,8 +78,8 @@ export const POST = withAuth(async (request, user) => {
       recipeInput?.courses && recipeInput.courses.length > 0
         ? recipeInput.courses
         : recipeInput?.course
-        ? [recipeInput.course]
-        : [];
+          ? [recipeInput.course]
+          : [];
 
     let tags: { id: string }[] = [];
 
@@ -106,7 +126,7 @@ export const POST = withAuth(async (request, user) => {
             }
           : undefined,
         recipeDetails: recipeInput
-          ? {
+          ? ({
               create: {
                 origin: recipeInput.origin ?? null,
                 ingredients: JSON.stringify(
@@ -136,7 +156,7 @@ export const POST = withAuth(async (request, user) => {
                   : null,
                 difficulty: recipeInput.difficulty ?? null,
               },
-            } as any
+            } as any)
           : undefined,
         tags: tags.length
           ? {

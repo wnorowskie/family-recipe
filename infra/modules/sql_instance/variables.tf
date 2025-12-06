@@ -71,3 +71,27 @@ variable "pitr_enabled" {
   type        = bool
   default     = false
 }
+
+variable "enable_public_ip" {
+  description = "Whether to allocate a public IPv4 address for the instance"
+  type        = bool
+  default     = false
+}
+
+variable "require_ssl" {
+  description = "Require SSL/TLS for all incoming connections (deprecated, use ssl_mode instead)"
+  type        = bool
+  default     = true
+}
+
+variable "authorized_networks" {
+  description = "Optional list of authorized networks for public access (CIDR strings)"
+  type        = list(string)
+  default     = []
+}
+
+variable "ssl_mode" {
+  description = "SSL mode for Cloud SQL (e.g., ENCRYPTED_ONLY, ALLOW_UNENCRYPTED_AND_ENCRYPTED)"
+  type        = string
+  default     = "ENCRYPTED_ONLY"
+}

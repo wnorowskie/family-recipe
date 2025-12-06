@@ -53,9 +53,15 @@ import { getCurrentUser } from '@/lib/session';
 import { savePhotoFile } from '@/lib/uploads';
 import { revalidatePath } from 'next/cache';
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
-const mockSavePhotoFile = savePhotoFile as jest.MockedFunction<typeof savePhotoFile>;
-const mockRevalidatePath = revalidatePath as jest.MockedFunction<typeof revalidatePath>;
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
+>;
+const mockSavePhotoFile = savePhotoFile as jest.MockedFunction<
+  typeof savePhotoFile
+>;
+const mockRevalidatePath = revalidatePath as jest.MockedFunction<
+  typeof revalidatePath
+>;
 
 describe('POST /api/posts', () => {
   // Mock authenticated user (shape returned by getCurrentUser)
@@ -170,8 +176,9 @@ describe('POST /api/posts', () => {
     });
 
     it('rejects more than 10 photos', async () => {
-      const photos = Array.from({ length: 11 }, (_, i) =>
-        new File(['photo'], `photo${i}.jpg`, { type: 'image/jpeg' })
+      const photos = Array.from(
+        { length: 11 },
+        (_, i) => new File(['photo'], `photo${i}.jpg`, { type: 'image/jpeg' })
       );
 
       const request = createFormDataRequest(
@@ -215,7 +222,7 @@ describe('POST /api/posts', () => {
 
       const createCall = prismaMock.post.create.mock.calls[0][0];
       const recipeDetails = (createCall.data.recipeDetails as any)?.create;
-      
+
       // Invalid course should be filtered out (null or undefined)
       expect(recipeDetails?.course).toBeNull();
     });
@@ -304,8 +311,18 @@ describe('POST /api/posts', () => {
           mainPhotoUrl: '/uploads/photo1.jpg',
         }),
         photos: [
-          { id: 'photo_1', postId: 'post_123', url: '/uploads/photo1.jpg', sortOrder: 0 },
-          { id: 'photo_2', postId: 'post_123', url: '/uploads/photo2.jpg', sortOrder: 1 },
+          {
+            id: 'photo_1',
+            postId: 'post_123',
+            url: '/uploads/photo1.jpg',
+            sortOrder: 0,
+          },
+          {
+            id: 'photo_2',
+            postId: 'post_123',
+            url: '/uploads/photo2.jpg',
+            sortOrder: 1,
+          },
         ],
       } as any;
 
@@ -498,7 +515,8 @@ describe('POST /api/posts', () => {
       await POST(request, mockUser);
 
       const createCall = prismaMock.post.create.mock.calls[0][0];
-      const ingredientsJson = (createCall.data.recipeDetails as any)?.create.ingredients;
+      const ingredientsJson = (createCall.data.recipeDetails as any)?.create
+        .ingredients;
       const ingredients = JSON.parse(ingredientsJson);
 
       expect(ingredients).toEqual([
@@ -564,11 +582,21 @@ describe('POST /api/posts', () => {
       const recipeDetails = (createCall.data.recipeDetails as any)?.create;
 
       expect(recipeDetails?.course).toBe('breakfast'); // First course
-      expect(JSON.parse(recipeDetails?.courses || '[]')).toEqual(['breakfast', 'lunch']);
+      expect(JSON.parse(recipeDetails?.courses || '[]')).toEqual([
+        'breakfast',
+        'lunch',
+      ]);
     });
 
     it('accepts valid course values', async () => {
-      const validCourses = ['breakfast', 'lunch', 'dinner', 'dessert', 'snack', 'other'];
+      const validCourses = [
+        'breakfast',
+        'lunch',
+        'dinner',
+        'dessert',
+        'snack',
+        'other',
+      ];
 
       for (const course of validCourses) {
         jest.clearAllMocks();
@@ -627,7 +655,10 @@ describe('POST /api/posts', () => {
   describe('Tag Handling', () => {
     it('associates valid tags with post', async () => {
       const mockTags = [
-        { ...createMockTag({ id: 'tag_1', name: 'vegetarian' }), type: 'dietary' },
+        {
+          ...createMockTag({ id: 'tag_1', name: 'vegetarian' }),
+          type: 'dietary',
+        },
         { ...createMockTag({ id: 'tag_2', name: 'quick' }), type: null },
       ] as any;
 
@@ -699,7 +730,10 @@ describe('POST /api/posts', () => {
     it('rejects invalid tags', async () => {
       // Only return 1 tag when 2 were requested
       prismaMock.tag.findMany.mockResolvedValue([
-        { ...createMockTag({ id: 'tag_1', name: 'vegetarian' }), type: null } as any,
+        {
+          ...createMockTag({ id: 'tag_1', name: 'vegetarian' }),
+          type: null,
+        } as any,
       ]);
 
       const request = createFormDataRequest({
@@ -771,7 +805,11 @@ describe('POST /api/posts', () => {
     it('handles file too large', async () => {
       mockSavePhotoFile.mockRejectedValue(new Error('FILE_TOO_LARGE'));
 
-      const photos = [new File(['x'.repeat(9 * 1024 * 1024)], 'large.jpg', { type: 'image/jpeg' })];
+      const photos = [
+        new File(['x'.repeat(9 * 1024 * 1024)], 'large.jpg', {
+          type: 'image/jpeg',
+        }),
+      ];
 
       const request = createFormDataRequest(
         {
@@ -789,7 +827,9 @@ describe('POST /api/posts', () => {
     });
 
     it('handles database errors', async () => {
-      prismaMock.post.create.mockRejectedValue(new Error('Database connection failed'));
+      prismaMock.post.create.mockRejectedValue(
+        new Error('Database connection failed')
+      );
 
       const request = createFormDataRequest({
         title: 'Test Post',

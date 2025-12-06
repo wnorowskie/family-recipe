@@ -18,7 +18,9 @@ export const PATCH = withAuth(async (request, user) => {
     const parsed = updateProfileSchema.safeParse(rawPayload);
 
     if (!parsed.success) {
-      return validationError(parsed.error.errors[0]?.message ?? 'Invalid input');
+      return validationError(
+        parsed.error.errors[0]?.message ?? 'Invalid input'
+      );
     }
 
     let avatarUpdate: string | null | undefined;
@@ -40,7 +42,11 @@ export const PATCH = withAuth(async (request, user) => {
       avatarUpdate = null;
     }
 
-    const data: { name: string; emailOrUsername: string; avatarUrl?: string | null } = {
+    const data: {
+      name: string;
+      emailOrUsername: string;
+      avatarUrl?: string | null;
+    } = {
       name: parsed.data.name,
       emailOrUsername: parsed.data.emailOrUsername,
     };
