@@ -104,3 +104,27 @@ variable "grant_secret_accessor_to_app" {
   type        = bool
   default     = false
 }
+
+variable "enable_public_ip" {
+  description = "Whether to allocate a public IPv4 address for the instance (dev can set true, prod should set false)"
+  type        = bool
+  default     = true
+}
+
+variable "require_ssl" {
+  description = "Require SSL/TLS for all incoming connections to Cloud SQL"
+  type        = bool
+  default     = true
+}
+
+variable "authorized_networks" {
+  description = "Optional list of authorized CIDR blocks for public access"
+  type        = list(string)
+  default     = []
+}
+
+variable "ssl_mode" {
+  description = "SSL mode for Cloud SQL (e.g., ENCRYPTED_ONLY, ALLOW_UNENCRYPTED_AND_ENCRYPTED)"
+  type        = string
+  default     = "ENCRYPTED_ONLY"
+}

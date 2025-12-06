@@ -12,7 +12,16 @@ resource "google_sql_database_instance" "this" {
     availability_type = "ZONAL"
 
     ip_configuration {
-      ipv4_enabled = true
+      ipv4_enabled = var.enable_public_ip
+      ssl_mode     = var.ssl_mode
+
+      dynamic "authorized_networks" {
+        for_each = toset(var.authorized_networks)
+        content {
+          name  = "allowed-${replace(authorized_networks.value, "/", "-")}"
+          value = authorized_networks.value
+        }
+      }
     }
 
     backup_configuration {
