@@ -228,22 +228,21 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 **Goal:** Use a real managed Postgres instance with proper migrations and backups.
 
-- [ ] Choose a managed Postgres provider for v2 (Supabase or GCP Cloud SQL).
-- [ ] Create:
-  - [ ] Dev database.
-  - [ ] Prod database (can be empty for now).
-- [ ] Configure `DATABASE_URL` values for:
-  - [ ] Local dev
-  - [ ] Dev environment
-  - [ ] Prod environment
-- [ ] Run Prisma migrations against the **dev database** (`prisma migrate deploy`).
-- [ ] Add a **seed script**:
-  - [ ] Create initial `FamilySpace`.
-  - [ ] Store hashed family master key.
-  - [ ] Create owner user or a way to bootstrap one.
-- [ ] Enable **automatic backups** for the prod database with a reasonable retention period.
-- [ ] Ensure any **schema changes** (e.g., additional indexes, enum refinements) are captured in migrations.
-- [ ] Identify any data fields currently unused in V1 and decide whether to keep, remove, or fully wire them.
+- [✓] Choose a managed Postgres provider for v2 (GCP Cloud SQL).
+- [✓] Create:
+  - [✓] Dev database (Cloud SQL Postgres).
+  - [ ] (Prod database moved to Phase 7).
+- [✓] Configure `DATABASE_URL` values for:
+  - [✓] Local dev (Cloud SQL via proxy).
+  - [✓] Dev environment.
+  - [ ] (Prod environment moved to Phase 7).
+- [✓] Run Prisma migrations against the **dev database** (`prisma migrate deploy`).
+- [✓] Add a **seed script** (or reuse existing) to:
+  - [✓] Create initial `FamilySpace`.
+  - [✓] Store hashed family master key.
+  - [✓] Create owner user or a way to bootstrap one.
+- [✓] Ensure any **schema changes** (e.g., additional indexes, enum refinements) are captured in migrations.
+- [✓] Identify any data fields currently unused in V1 and decide whether to keep, remove, or fully wire them.
 
 ### Phase 4 – CI Pipeline (DevSecOps Core)
 
@@ -307,6 +306,7 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 **Goal:** Bring up a monitored, safe prod environment my family can actually use.
 
+- [ ] Provision **prod database** (Cloud SQL Postgres) with backups/PITR and wire secrets.
 - [ ] Configure **prod environment** on hosting platform:
   - [ ] Point to prod `DATABASE_URL`.
   - [ ] Set all required secrets (auth, master key related, etc.).
@@ -636,6 +636,31 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 4. **Seed & Upload Parity**
    - Seed script now generates a secure master key when none is provided and skips creating a family if one already exists, making it safe to run in Docker or locally.
    - Hardened upload handling to accept file-like objects across environments, preserving photo uploads in Docker (backed by the uploads bind-mount).
+
+### Phase 3 – External Database & Data Discipline (Dev)
+
+**Goal:** Use a real managed Postgres instance with proper migrations and backups.
+
+#### What Was Accomplished
+
+1. **Cloud SQL Dev Provisioning (GCP)**
+   - Terraformized Cloud SQL Postgres dev instance (`family-recipe-dev`) with public IP, backups (7-day retention), maintenance window Sun 05:00 UTC, deletion protection on.
+   - Created least-privilege service accounts (`terraform-admin`, `app-sql-client`) and IAM bindings; state stored in GCS remote backend.
+
+2. **Secure Secret Handling**
+   - Database user password stored in Secret Manager; Terraform state no longer holds the real password (user password ignored, rotated, and secret version managed manually).
+
+3. **Migrations & Seeding on Cloud SQL**
+   - Connected via Cloud SQL Auth Proxy and ran `prisma migrate deploy` using the Postgres schema.
+   - Seeded dev DB with family space + master key + canonical tags.
+
+4. **Schema Performance Indexes**
+   - Added targeted indexes (posts timeline/author, comments by post/created, reactions by target/post/comment, favorites by user/post, cooked events by post/user, photo/tag lookups, family memberships).
+   - Captured in a Prisma migration (`20251205094500_add_core_indexes`).
+
+5. **Developer Guidance**
+   - Updated `.env.example`, app README, and infra README with Cloud SQL proxy connection strings, Postgres `PRISMA_SCHEMA`, and migrate/seed commands.
+   - Documented dev-only Cloud SQL flow; prod DB deferred to Phase 7.
 
 ---
 
@@ -987,3 +1012,26 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 **6. Compose Health + Migrations Reduce Drift**
 
 - Postgres healthchecks plus `prisma migrate deploy` on start keep the app from racing the DB and ensure schema is current in local containers
+
+### Phase 3 – External Database & Data Discipline (Dev)
+
+**1. Cloud Resources Belong in Code**
+
+- Terraforming Cloud SQL, SAs, and IAM avoided console drift and made least-privilege explicit; only the bootstrap credential was manual.
+- Remote state and role bindings keep infra changes reviewable.
+
+**2. Keep Secrets Out of State**
+
+- Passing DB passwords via TF vars leaks into state; better to create the secret shell via Terraform, add versions manually, and ignore DB user password changes in TF to keep state clean.
+
+**3. Proxy-First Connectivity Simplifies Dev**
+
+- Using the Cloud SQL Auth Proxy for dev (public IP) lets local and Vercel hit the same DB without early VPC complexity; private IP/VPC connector can come later for Cloud Run.
+
+**4. Targeted Indexes Matter**
+
+- Adding indexes for common queries (timeline, comments, reactions, favorites, cooked events, tags/photos) is a safer first optimization step than schema changes.
+
+**5. Align Prisma Schema per Backend**
+
+- Keeping SQLite schema for local fallback and a Postgres schema for Cloud SQL prevents provider mismatch; migrations capture the Postgres-specific changes.
