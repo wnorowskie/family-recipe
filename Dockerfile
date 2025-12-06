@@ -1,4 +1,4 @@
-FROM node:20-slim AS base
+FROM node:20-bookworm-slim AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 # Install security updates and OpenSSL so Prisma can detect and link against libssl

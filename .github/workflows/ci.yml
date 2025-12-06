@@ -137,10 +137,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: IaC scan (tfsec)
-        uses: aquasecurity/tfsec-action@v1
+      - name: IaC scan (Trivy)
+        uses: aquasecurity/trivy-action@0.24.0
         with:
-          working_directory: infra
+          scan-type: 'config'
+          scan-ref: 'infra'
+          format: 'table'
+          exit-code: '1'
+          severity: 'HIGH,CRITICAL'
 
   secrets-scan:
     runs-on: ubuntu-latest
