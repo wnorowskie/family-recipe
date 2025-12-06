@@ -23,7 +23,7 @@ RUN npm run build
 FROM base AS production-deps
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 
 FROM base AS runner
 ENV NODE_ENV=production
