@@ -271,20 +271,20 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 **Goal:** Deploy the app to a real dev environment with proper env vars and checks.
 
-- [ ] Choose hosting platform for v2:
-  - [ ] GCP Cloud Run (monolith Next.js app), private (auth required; no public unauthenticated access).
-- [ ] Connect repo to GCP for builds/deploys:
-  - [ ] Artifact Registry for images.
-  - [ ] Workload Identity Federation for GitHub Actions to push and deploy.
-- [ ] Configure **dev environment** (Cloud Run + Cloud SQL):
-  - [ ] `DATABASE_URL` via Cloud SQL connector socket + Secret Manager (uses dev DB password already in GSM).
-  - [ ] Auth/crypto secrets: `JWT_SECRET` (Secret Manager), optional seeded `FAMILY_MASTER_KEY` if needed for bootstrap.
-  - [ ] Prisma schema set to Postgres (`PRISMA_SCHEMA=prisma/schema.postgres.prisma`).
-- [ ] GCS-backed uploads:
-  - [ ] Create private bucket for uploads; enforce signed URL access; set `UPLOADS_BUCKET` and `UPLOADS_BASE_URL`.
-  - [ ] Update upload helpers to write/delete in GCS and return signed URLs for reads.
-- [ ] Deployments to dev:
-  - [ ] Manual (`workflow_dispatch`) after CI green on `develop`; deploy Cloud Run service with Cloud SQL + secrets wired.
+- [x] Choose hosting platform for v2:
+  - [x] GCP Cloud Run (monolith Next.js app), private (auth required; no public unauthenticated access).
+- [x] Connect repo to GCP for builds/deploys:
+  - [x] Artifact Registry for images.
+  - [x] Workload Identity Federation for GitHub Actions to push and deploy.
+- [x] Configure **dev environment** (Cloud Run + Cloud SQL):
+  - [x] `DATABASE_URL` via Cloud SQL connector socket + Secret Manager (uses dev DB password already in GSM).
+  - [x] Auth/crypto secrets: `JWT_SECRET` (Secret Manager), optional seeded `FAMILY_MASTER_KEY` if needed for bootstrap.
+  - [x] Prisma schema set to Postgres (`PRISMA_SCHEMA=prisma/schema.postgres.prisma`).
+- [x] GCS-backed uploads:
+  - [x] Create private bucket for uploads; enforce signed URL access; set `UPLOADS_BUCKET` and `UPLOADS_BASE_URL`.
+  - [x] Update upload helpers to write/delete in GCS and return signed URLs for reads.
+- [x] Deployments to dev:
+  - [x] Auto-deploy on `develop` (and manual `workflow_dispatch`); Cloud Run service provisioned with Cloud SQL + secrets wired.
 - [ ] Post-deploy verification:
   - [ ] Dev URL reachable (with auth); basic flows work (signup, login, create post, “Cooked this”, comments, favorites, profile, recipes browse/search).
   - [ ] Validate signed URL image behavior and any known limitations (e.g., search quirks) behave predictably in dev.
@@ -706,6 +706,21 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
      - Different libc (musl vs glibc) avoids entire class of Debian-specific CVEs
    - **npm bundled dependency fix**: Upgraded npm itself in Dockerfile (`npm install -g npm@latest`) to resolve CVEs in npm's bundled dependencies that ship with Node.js base image
    - **Multi-stage build optimization**: Created separate `production-deps` stage with `npm ci --omit=dev --ignore-scripts` to exclude devDependencies (Jest, ESLint, etc.) from final runtime image, preventing dev-only vulnerabilities from appearing in container scans
+
+### Phase 5 – Dev Deploy Foundations
+
+**Goal:** Stand up dev on GCP with secure delivery and GCS-backed uploads.
+
+1. **Cloud Run + Artifact Registry**
+   - Provisioned baseline Cloud Run service (`family-recipe-dev`) with private ingress (internal/LB), runtime SA, and hello-world image; Artifact Registry repo created in `us-east1`.
+   - Added deploy workflow (`deploy-dev.yml`) to auto-deploy on `develop` (and manual) via WIF to the deployer SA; uses Cloud SQL connector, secrets, and uploads envs.
+2. **Secrets & Connectivity**
+   - Secret Manager shells for `DATABASE_URL`, `JWT_SECRET`, optional `FAMILY_MASTER_KEY`; versions added manually; `INSTANCE_CONNECTION_NAME` wired for Cloud SQL socket.
+3. **GCS Uploads**
+   - Created private uploads bucket with public access prevention; upload helper now stores to GCS with V4 signed URLs (fallback to local for local dev), delete supports GCS/local.
+   - Documented uploads env vars in `.env.example` (`UPLOADS_BUCKET`, `UPLOADS_SIGNED_URL_TTL_SECONDS`).
+4. **Infra CI**
+   - Added infra workflow for Trivy IaC scan + Terraform fmt/validate (plan kept manual to avoid backend auth); manual apply workflow via WIF remains for stateful changes.
 
 ---
 
@@ -1165,3 +1180,30 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 - Included comments explaining why risks are accepted and plans for future mitigation
 - Better than disabling scans or letting noise hide real issues
 - Lesson: suppression files are living documentation of security decisions, not just scanner config
+
+### Phase 5 – Dev Deploy Foundations
+
+**1. Private Dev Ingress Simplifies Early Hardening**
+
+- Keeping dev Cloud Run private (internal/LB only) avoided rushing public exposure before auth/infra were ready
+- Access via `gcloud run services proxy` is acceptable for single-user dev; prod will open ingress with app-level auth
+
+**2. WIF + Artifact Registry Keeps CI Stateless**
+
+- Workload Identity Federation for deploy jobs removed the need for long-lived JSON keys
+- Deploy pipeline pushes to Artifact Registry and deploys to Cloud Run without storing credentials in the repo
+
+**3. Signed URLs Need SA Token Creator**
+
+- Generating V4 signed URLs in Cloud Run requires `iam.serviceAccountTokenCreator` on the runtime SA
+- Without it, signed URL generation fails even if storage access is present
+
+**4. Cloud Run Metadata Simplifies GCS Access**
+
+- Using metadata server tokens for uploads avoids bundling keyfiles; local dev falls back to disk when metadata is absent
+- Upload helper now supports both GCS (signed URLs) and local disk without separate codepaths
+
+**5. IaC Plan in CI Requires Real Backend**
+
+- Attempting offline `terraform plan` with `backend=false` conflicted with the configured GCS backend
+- Resolution: keep CI to fmt/validate + scans; run plan/apply with real backend via WIF in a dedicated workflow
