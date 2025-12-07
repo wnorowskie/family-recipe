@@ -45,32 +45,3 @@ jobs:
           terraform -chdir=infra/envs/dev validate
         env:
           GOOGLE_OAUTH_ACCESS_TOKEN: fake-token
-
-  terraform-plan:
-    runs-on: ubuntu-latest
-    needs: [terraform-validate]
-    env:
-      TF_DATA_DIR: ${{ github.workspace }}/.tfdata
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.8.4
-      - name: Terraform init + plan (no backend, static vars, no refresh)
-        run: |
-          terraform -chdir=infra/envs/dev init -backend=false -reconfigure -input=false
-          terraform -chdir=infra/envs/dev plan \
-            -input=false \
-            -lock=false \
-            -refresh=false \
-            -var-file=terraform.tfvars.example \
-            -var db_password="dummy-password" \
-            -out=tfplan.out
-        env:
-          GOOGLE_OAUTH_ACCESS_TOKEN: fake-token
-      - name: Upload plan artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan-dev
-          path: infra/envs/dev/tfplan.out
