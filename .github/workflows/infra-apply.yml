@@ -1,0 +1,51 @@
+name: Infra Apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Environment to apply (default: dev)'
+        required: false
+        default: 'dev'
+
+jobs:
+  terraform-apply:
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.4
+      - name: Authenticate to GCP (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SA }}
+          token_format: access_token
+      - name: Terraform init (GCS backend)
+        run: |
+          terraform -chdir=infra/envs/dev init \
+            -backend-config="bucket=family-recipe-tf-state-dev" \
+            -backend-config="prefix=envs/dev/state" \
+            -input=false
+      - name: Terraform plan (dev)
+        run: |
+          terraform -chdir=infra/envs/dev plan \
+            -input=false \
+            -out=tfplan.out
+        env:
+          TF_VAR_project_id: family-recipe-dev
+          TF_VAR_region: us-east1
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+      - name: Terraform apply (manual)
+        if: github.event.inputs.target_env == 'dev'
+        run: terraform -chdir=infra/envs/dev apply -input=false tfplan.out
+        env:
+          TF_VAR_project_id: family-recipe-dev
+          TF_VAR_region: us-east1
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}

@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getPostDetail } from '@/lib/posts';
-import { savePhotoFile } from '@/lib/uploads';
+import { deleteUploadedFiles, savePhotoFile } from '@/lib/uploads';
 import { createPostSchema } from '@/lib/validation';
 import { MAX_PHOTO_COUNT, normalizePostPayload } from '@/lib/postPayload';
-import { logError, logWarn } from '@/lib/logger';
+import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { canEditPost, canDeletePost } from '@/lib/permissions';
 
@@ -40,36 +38,6 @@ type PhotoOrderEntry = z.infer<typeof photoOrderEntrySchema>;
 type ResolvedPhotoEntry =
   | { type: 'existing'; id: string; url: string }
   | { type: 'new'; fileIndex: number; url: string };
-
-async function deleteUploadFiles(urls: Array<string | null | undefined>) {
-  if (!urls.length) {
-    return;
-  }
-
-  const publicDir = path.join(process.cwd(), 'public');
-
-  await Promise.all(
-    urls.map(async (url) => {
-      if (!url || !url.startsWith('/uploads/')) {
-        return;
-      }
-
-      const relativePath = url.replace(/^\/+/, '');
-      const absolutePath = path.join(publicDir, relativePath);
-
-      try {
-        await fs.unlink(absolutePath);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          logWarn('uploads.delete.failed', {
-            path: absolutePath,
-            error: (error as Error)?.message ?? String(error),
-          });
-        }
-      }
-    })
-  );
-}
 
 function extractChangeNote(value: unknown): {
   changeNote?: string;
@@ -770,7 +738,7 @@ export const DELETE = withAuth(
         .map((comment) => comment.photoUrl)
         .filter((url): url is string => Boolean(url));
 
-      await deleteUploadFiles([...photoUrls, ...commentPhotoUrls]);
+      await deleteUploadedFiles([...photoUrls, ...commentPhotoUrls]);
 
       revalidatePath('/timeline');
       revalidatePath('/recipes');

@@ -1,11 +1,11 @@
 #tfsec:ignore:google-sql-enable-public-ip # Public IP allowed for dev; will tighten in prod/private rollout
 #tfsec:ignore:google-sql-encrypt-data-in-transit # Postgres requires client-side SSL; tracked via runtime configuration
 resource "google_sql_database_instance" "this" {
-  name                 = var.instance_name
-  project              = var.project_id
-  database_version     = "POSTGRES_15"
-  region               = var.region
-  deletion_protection  = true
+  name                = var.instance_name
+  project             = var.project_id
+  database_version    = "POSTGRES_15"
+  region              = var.region
+  deletion_protection = true
 
   settings {
     tier              = var.tier
@@ -57,8 +57,8 @@ resource "google_sql_user" "app" {
 }
 
 resource "google_secret_manager_secret" "db_password" {
-  count    = var.create_db_password_secret ? 1 : 0
-  project  = var.project_id
+  count     = var.create_db_password_secret ? 1 : 0
+  project   = var.project_id
   secret_id = var.db_password_secret_id
 
   replication {

@@ -128,3 +128,75 @@ variable "ssl_mode" {
   type        = string
   default     = "ENCRYPTED_ONLY"
 }
+
+variable "runtime_sa_id" {
+  description = "Service account ID for Cloud Run runtime"
+  type        = string
+  default     = "family-recipe-runner"
+}
+
+variable "deployer_sa_id" {
+  description = "Service account ID for GitHub Actions deployer"
+  type        = string
+  default     = "family-recipe-deployer"
+}
+
+variable "artifact_registry_repo_id" {
+  description = "Artifact Registry repository ID for app images"
+  type        = string
+  default     = "family-recipe-dev"
+}
+
+variable "cloud_run_service_name" {
+  description = "Cloud Run service name"
+  type        = string
+  default     = "family-recipe-dev"
+}
+
+variable "uploads_bucket_name" {
+  description = "GCS bucket for uploads"
+  type        = string
+  default     = "family-recipe-dev-uploads"
+}
+
+variable "database_url_secret_id" {
+  description = "Secret Manager secret ID for DATABASE_URL"
+  type        = string
+  default     = "family-recipe-dev-database-url"
+}
+
+variable "jwt_secret_id" {
+  description = "Secret Manager secret ID for JWT secret"
+  type        = string
+  default     = "family-recipe-dev-jwt-secret"
+}
+
+variable "family_master_key_secret_id" {
+  description = "Secret Manager secret ID for FAMILY_MASTER_KEY"
+  type        = string
+  default     = "family-recipe-dev-family-master-key"
+}
+
+variable "wif_pool_id" {
+  description = "Workload Identity Pool ID"
+  type        = string
+  default     = "github-pool"
+}
+
+variable "wif_provider_id" {
+  description = "Workload Identity Pool Provider ID"
+  type        = string
+  default     = "github-provider"
+}
+
+variable "github_repository" {
+  description = "GitHub repository (owner/repo) allowed for WIF"
+  type        = string
+  default     = "wnorowskie/family-recipe"
+}
+
+variable "github_ref" {
+  description = "Git ref allowed for WIF (e.g., refs/heads/develop)"
+  type        = string
+  default     = "refs/heads/develop"
+}

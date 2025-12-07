@@ -18,10 +18,10 @@ provider "google" {
 module "iam" {
   source = "../../modules/iam"
 
-  project_id                 = var.project_id
-  state_bucket_name          = var.state_bucket_name
-  terraform_admin_sa_id      = var.terraform_admin_sa_id
-  app_sql_client_sa_id       = var.app_sql_client_sa_id
+  project_id                   = var.project_id
+  state_bucket_name            = var.state_bucket_name
+  terraform_admin_sa_id        = var.terraform_admin_sa_id
+  app_sql_client_sa_id         = var.app_sql_client_sa_id
   grant_secret_accessor_to_app = var.grant_secret_accessor_to_app
   secret_ids_for_app           = [var.db_password_secret_id]
 }
@@ -29,23 +29,42 @@ module "iam" {
 module "sql_instance" {
   source = "../../modules/sql_instance"
 
-  project_id                  = var.project_id
-  region                      = var.region
-  instance_name               = var.db_instance_name
-  db_name                     = var.db_name
-  db_user                     = var.db_user
-  db_password                 = var.db_password
-  tier                        = var.tier
-  disk_size_gb                = var.disk_size_gb
-  backup_retention_days       = var.backup_retention_days
-  maintenance_window_day      = var.maintenance_window_day
-  maintenance_window_hour     = var.maintenance_window_hour
-  pitr_enabled                = var.pitr_enabled
-  enable_public_ip            = var.enable_public_ip
-  ssl_mode                    = var.ssl_mode
-  authorized_networks         = var.authorized_networks
-  create_db_password_secret   = var.create_db_password_secret
-  db_password_secret_id       = var.db_password_secret_id
+  project_id                = var.project_id
+  region                    = var.region
+  instance_name             = var.db_instance_name
+  db_name                   = var.db_name
+  db_user                   = var.db_user
+  db_password               = var.db_password
+  tier                      = var.tier
+  disk_size_gb              = var.disk_size_gb
+  backup_retention_days     = var.backup_retention_days
+  maintenance_window_day    = var.maintenance_window_day
+  maintenance_window_hour   = var.maintenance_window_hour
+  pitr_enabled              = var.pitr_enabled
+  enable_public_ip          = var.enable_public_ip
+  ssl_mode                  = var.ssl_mode
+  authorized_networks       = var.authorized_networks
+  create_db_password_secret = var.create_db_password_secret
+  db_password_secret_id     = var.db_password_secret_id
 
   depends_on = [module.iam]
+}
+
+module "cloud_run_infra" {
+  source = "../../modules/cloud_run_infra"
+
+  project_id                  = var.project_id
+  region                      = var.region
+  runtime_sa_id               = var.runtime_sa_id
+  deployer_sa_id              = var.deployer_sa_id
+  artifact_registry_repo_id   = var.artifact_registry_repo_id
+  cloud_run_service_name      = var.cloud_run_service_name
+  uploads_bucket_name         = var.uploads_bucket_name
+  database_url_secret_id      = var.database_url_secret_id
+  jwt_secret_id               = var.jwt_secret_id
+  family_master_key_secret_id = var.family_master_key_secret_id
+  wif_pool_id                 = var.wif_pool_id
+  wif_provider_id             = var.wif_provider_id
+  github_repository           = var.github_repository
+  github_ref                  = var.github_ref
 }
