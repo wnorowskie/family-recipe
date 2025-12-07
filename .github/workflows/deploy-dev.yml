@@ -1,0 +1,68 @@
+name: Deploy Dev (Cloud Run)
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT_ID: ${{ secrets.DEV_GCP_PROJECT }}
+      REGION: ${{ secrets.DEV_GCP_REGION }}
+      CLOUD_RUN_SERVICE: ${{ secrets.DEV_CLOUD_RUN_SERVICE }}
+      ARTIFACT_REGISTRY_REPO: ${{ secrets.DEV_ARTIFACT_REGISTRY_REPO }}
+      INSTANCE_CONNECTION_NAME: ${{ secrets.DEV_INSTANCE_CONNECTION_NAME }}
+      RUNTIME_SERVICE_ACCOUNT: family-recipe-runner@family-recipe-dev.iam.gserviceaccount.com
+      DATABASE_URL_SECRET: family-recipe-dev-database-url
+      JWT_SECRET_NAME: family-recipe-dev-jwt-secret
+      FAMILY_MASTER_KEY_SECRET_NAME: family-recipe-dev-family-master-key
+      UPLOADS_BUCKET: family-recipe-dev-uploads
+      UPLOADS_BASE_URL: https://storage.googleapis.com/family-recipe-dev-uploads
+      PRISMA_SCHEMA: prisma/schema.postgres.prisma
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.DEV_GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.DEV_GCP_DEPLOYER_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
+
+      - name: Build image
+        run: |
+          IMAGE="${{ env.ARTIFACT_REGISTRY_REPO }}:${{ github.sha }}"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          docker build -t "$IMAGE" -f Dockerfile .
+
+      - name: Push image
+        run: docker push "$IMAGE"
+
+      - name: Deploy to Cloud Run (dev)
+        run: |
+          gcloud run deploy "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --image "$IMAGE" \
+            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
+            --platform managed \
+            --port 3000 \
+            --quiet \
+            --add-cloudsql-instances "$INSTANCE_CONNECTION_NAME" \
+            --set-secrets DATABASE_URL=${DATABASE_URL_SECRET}:latest,JWT_SECRET=${JWT_SECRET_NAME}:latest,FAMILY_MASTER_KEY=${FAMILY_MASTER_KEY_SECRET_NAME}:latest \
+            --set-env-vars PRISMA_SCHEMA=${PRISMA_SCHEMA},UPLOADS_BUCKET=${UPLOADS_BUCKET},UPLOADS_BASE_URL=${UPLOADS_BASE_URL} \
+            --ingress internal-and-cloud-load-balancing \
+            --no-allow-unauthenticated
