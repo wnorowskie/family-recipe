@@ -145,7 +145,7 @@ resource "google_cloud_run_v2_service" "app" {
   location = var.region
   project  = var.project_id
   # Private ingress via internal load balancer only.
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
 
   template {
     service_account = google_service_account.runtime.email
