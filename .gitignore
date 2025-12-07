@@ -45,6 +45,15 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 
+# Terraform
+**/.terraform/*
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/*.tfvars
+**/*.tfvars.json
+tfplan.bin
+
 # Vercel
 .vercel
 

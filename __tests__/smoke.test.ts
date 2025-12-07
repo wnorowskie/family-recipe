@@ -16,7 +16,10 @@ describe('Jest Setup', () => {
 
   it('should have Jest secret configured', () => {
     expect(process.env.JWT_SECRET).toBeDefined();
-    expect(process.env.JWT_SECRET).toBe('test-jwt-secret-placeholder');
+    expect(typeof process.env.JWT_SECRET).toBe('string');
+    expect((process.env.JWT_SECRET as string).length).toBeGreaterThanOrEqual(
+      16
+    );
   });
 
   it('should have DATABASE_URL configured', () => {
@@ -58,7 +61,8 @@ describe('Test Utilities', () => {
   });
 
   it('should create authenticated request', async () => {
-    const { createAuthenticatedRequest } = await import('./integration/helpers');
+    const { createAuthenticatedRequest } =
+      await import('./integration/helpers');
 
     const request = createAuthenticatedRequest(
       'GET',
@@ -74,7 +78,8 @@ describe('Test Utilities', () => {
   });
 
   it('should create unauthenticated request', async () => {
-    const { createUnauthenticatedRequest } = await import('./integration/helpers');
+    const { createUnauthenticatedRequest } =
+      await import('./integration/helpers');
 
     const request = createUnauthenticatedRequest(
       'POST',

@@ -41,6 +41,9 @@ module "sql_instance" {
   maintenance_window_day      = var.maintenance_window_day
   maintenance_window_hour     = var.maintenance_window_hour
   pitr_enabled                = var.pitr_enabled
+  enable_public_ip            = var.enable_public_ip
+  ssl_mode                    = var.ssl_mode
+  authorized_networks         = var.authorized_networks
   create_db_password_secret   = var.create_db_password_secret
   db_password_secret_id       = var.db_password_secret_id
 

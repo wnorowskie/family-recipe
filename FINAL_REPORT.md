@@ -244,25 +244,27 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 - [✓] Ensure any **schema changes** (e.g., additional indexes, enum refinements) are captured in migrations.
 - [✓] Identify any data fields currently unused in V1 and decide whether to keep, remove, or fully wire them.
 
+**Open follow-up:** Dev currently allows Cloud SQL public IP with TLS; plan to move to private IP + TLS-only and tighten authorized networks when VPC/private service access is in place (phase 7).
+
 ### Phase 4 – CI Pipeline (DevSecOps Core)
 
 **Goal:** Every change is gated by tests, checks, and scans.
 
-- [ ] Set up CI using GitHub Actions.
-- [ ] CI workflow for PRs and pushes to `develop`/`main` should:
-  - [ ] Checkout code.
-  - [ ] Install dependencies.
-  - [ ] Run **typecheck** (TS).
-  - [ ] Run **lint**.
-  - [ ] Run **tests** (unit + integration).
-  - [ ] Run **build**.
-  - [ ] Run **dependency scan** (e.g., `npm audit` or similar).
-  - [ ] Run **secrets scan** (e.g., `gitleaks` / `detect-secrets`).
-  - [ ] Run **SAST** (GitHub CodeQL, semgrep, etc.).
-- [ ] Configure **branch protections**:
-  - [ ] Require CI to pass before merging into `develop`.
-  - [ ] Require CI to pass before merging into `main`.
-  - [ ] Disallow direct pushes to `main` and `develop`.
+- [✓] Set up CI using GitHub Actions.
+- [✓] CI workflow for PRs and pushes to `develop`/`main` should:
+  - [✓] Checkout code.
+  - [✓] Install dependencies.
+  - [✓] Run **typecheck** (TS).
+  - [✓] Run **lint**.
+  - [✓] Run **tests** (unit + integration).
+  - [✓] Run **build**.
+  - [✓] Run **dependency scan** (e.g., `npm audit` or similar).
+  - [✓] Run **secrets scan** (e.g., `gitleaks` / `detect-secrets`).
+  - [✓] Run **SAST** (GitHub CodeQL).
+- [✓] Configure **branch protections**:
+  - [✓] Require CI to pass before merging into `develop`.
+  - [✓] Require CI to pass before merging into `main`.
+  - [✓] Disallow direct pushes to `main` and `develop`.
 - [ ] Add any additional checks that make sense given the current implementation (e.g., run Prisma migrations in CI using a temp DB to verify they apply cleanly).
 
 ### Phase 5 – First “Dev” Deploy of the Monolith
@@ -662,6 +664,46 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
    - Updated `.env.example`, app README, and infra README with Cloud SQL proxy connection strings, Postgres `PRISMA_SCHEMA`, and migrate/seed commands.
    - Documented dev-only Cloud SQL flow; prod DB deferred to Phase 7.
 
+### Phase 4 – CI Pipeline (DevSecOps Core)
+
+**Goal:** Every change is gated by tests, checks, scans, and containerized builds.
+
+#### What Was Accomplished
+
+1. **GitHub Actions CI Jobs (Fan-out by Stage)**
+   - Jobs: `typecheck`, `lint`, `test`, `build` (Docker Buildx), `prisma-validate` (Postgres schema), `dependency-scan` (`npm audit --production --audit-level=high`).
+   - Build job now produces a Docker image matching deployment and hands it off via artifact for downstream scanning.
+
+2. **Secrets & SAST Coverage**
+   - Secrets scan with gitleaks (full history checkout) using a local install to avoid action input issues; fails on findings.
+   - Semgrep SAST job (config `p/ci`) running on full history checkout.
+
+3. **Dependency Risk Gate**
+   - Dependency Review action on pull requests to block new vulnerable packages.
+
+4. **IaC and Container Scanning**
+   - IaC scan migrated from deprecated tfsec action to Trivy config scanner against `infra/` to detect Terraform misconfigs.
+   - Container scan with Trivy against the built image (fail on HIGH/CRITICAL) using the artifact-loaded image to avoid rebuilds.
+   - Achieved zero HIGH/CRITICAL vulnerabilities in final container image.
+
+5. **Operational Hardening**
+   - Prisma schema validation in CI with a dummy `DATABASE_URL` to ensure migrations/schemas remain valid.
+   - CI Docker builds include `--pull` behavior in Dockerfile to pick up base image security patches.
+
+6. **Vulnerability Remediation (Iterative Process)**
+   - **Initial scan findings**: 5 Debian CVEs (libpam, zlib), 3 Node.js package CVEs (glob, cross-spawn, esbuild Go binaries).
+   - **Node.js dependency fixes**:
+     - Updated `glob` from `10.3.10` → `11.1.0` (fixed CVE-2025-64756)
+     - Updated `cross-spawn` to `7.0.6` (fixed CVE-2024-21538)
+     - Removed `esbuild` from production dependencies (eliminated Go stdlib CVEs)
+     - Added npm `overrides` to force nested dependencies to use patched versions
+   - **Base image migration**: Decide to use `node:20-alpine` (Alpine Linux 3.23) instead of `node:20-bookworm-slim` (Debian)
+     - Eliminated all OS-level vulnerabilities (libpam, zlib issues specific to Debian/glibc)
+     - Smaller image size and attack surface
+     - Different libc (musl vs glibc) avoids entire class of Debian-specific CVEs
+   - **npm bundled dependency fix**: Upgraded npm itself in Dockerfile (`npm install -g npm@latest`) to resolve CVEs in npm's bundled dependencies that ship with Node.js base image
+   - **Multi-stage build optimization**: Created separate `production-deps` stage with `npm ci --omit=dev --ignore-scripts` to exclude devDependencies (Jest, ESLint, etc.) from final runtime image, preventing dev-only vulnerabilities from appearing in container scans
+
 ---
 
 ## Implementation Not Accomplished
@@ -1035,3 +1077,88 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 **5. Align Prisma Schema per Backend**
 
 - Keeping SQLite schema for local fallback and a Postgres schema for Cloud SQL prevents provider mismatch; migrations capture the Postgres-specific changes.
+
+### Phase 4 – CI Pipeline (DevSecOps Core)
+
+**1. Small, Focused Jobs Improve Signal**
+
+- Breaking CI into discrete jobs (typecheck, lint, test, build, prisma validate, scans) makes failures obvious and faster to triage versus a monolithic pipeline.
+
+**2. Container-First CI Catches Drift Early**
+
+- Building the Docker image in CI (with Buildx and `--pull`) mirrors production and surfaces base image CVEs and platform issues that `npm run build` alone would miss.
+
+**3. Security Scans Need Real Inputs**
+
+- Prisma validation failed without a dummy `DATABASE_URL`; gitleaks needed full history and a token; Trivy needed the actual image artifact to avoid rebuild differences. Feeding scanners realistic inputs reduces false positives and setup failures.
+
+**4. Supply Chain Checks Must Be Actionable**
+
+- Dependency Review blocked outdated esbuild; fixing the lockfile was the right move. Automated gates are only useful if the team commits to patching or explicitly documenting exceptions.
+
+**5. IaC Scans Require Context**
+
+- Public-IP/TLS findings on Cloud SQL were dev-specific; adding planned remediation (move to private IP + TLS-only) and, if necessary, scoped ignores kept the pipeline green while documenting risk.
+
+**6. Artifact Handoff Simplifies Downstream Scans**
+
+- Saving the built image as an artifact allowed Trivy to scan exactly what was built, avoiding redundant rebuilds and keeping results consistent across jobs.
+
+**7. Vulnerability Remediation is Detective Work**
+
+- Container scans showed old dependency versions despite local updates - traced to nested dependencies in devDependencies
+- Trivy was detecting npm's bundled dependencies in `/usr/local/lib/node_modules/npm/`, not application code
+- Required investigating JSON output (`--format json`) to see exact paths: `usr/local/lib/node_modules/npm/node_modules/glob/package.json`
+- Lesson: don't assume scanner findings are always about code - they might be about the toolchain
+
+**8. Base Image Selection Has Security Implications**
+
+- Switching from Debian to Alpine eliminated 5 CVEs without any code changes
+- Different OS families have different vulnerability profiles and patch cycles
+- Alpine's smaller package set means fewer potential vulnerabilities
+- Trade-off: Alpine uses musl libc vs glibc, can cause compatibility issues with some binaries.
+- Lesson: base image choice is a security decision, not just a size optimization
+
+**9. npm Overrides Force Consistency Across Dependency Tree**
+
+- Adding `overrides` in package.json forced all nested dependencies to use patched versions
+- Without overrides, transitive dependencies can stay vulnerable even after updating direct dependencies
+- Reduced `npm ls glob` output from 3 different versions to single patched version
+- Eliminated 19 separate package copies using old vulnerable glob versions
+- Lesson: `overrides` is essential for ensuring deep dependency tree is fully patched
+
+**10. Multi-Stage Builds Reduce Attack Surface**
+
+- Initial Dockerfile copied all node_modules (including devDependencies) to runtime image
+- Trivy flagged vulnerabilities in Jest, ESLint, and other dev-only tools that shouldn't be in production
+- Created separate `production-deps` stage with `--omit=dev` flag
+- Runtime image now only contains production dependencies, reducing scan findings and image size
+- Lesson: what you build with shouldn't be what you ship
+
+**11. npm Lifecycle Scripts Can Break CI**
+
+- `npm ci --omit=dev` failed because `prepare` script tried to run husky (a devDependency)
+- Solution: `--ignore-scripts` flag skips lifecycle hooks during production dependency install
+- Trade-off: can't rely on postinstall scripts for production dependencies
+- Lesson: production dependency installation should be deterministic and not require dev tools
+
+**12. Upgrading Tooling Can Fix Unfixable CVEs**
+
+- npm's bundled dependencies are part of Node.js distribution, not controllable via package.json
+- Adding `RUN npm install -g npm@latest` in Dockerfile upgraded npm and its dependencies
+- Fixed vulnerabilities that were considered "not fixable by application" initially
+- Lesson: sometimes the fix isn't updating your code, it's updating the tools that run your code
+
+**13. Security Scanning is Iterative, Not One-Shot**
+
+- Started with 8 HIGH/CRITICAL vulnerabilities across OS and Node.js layers
+- Each fix revealed new information (nested deps, npm bundled deps, dev vs prod separation)
+- Final state: zero HIGH/CRITICAL vulnerabilities through 6 different remediation strategies
+- Lesson: vulnerability remediation is a debugging process - each scan result informs the next action
+
+**14. Document Accepted Risks with Context**
+
+- Created `.trivyignore` for dev-specific Cloud SQL findings (public IP, non-TLS)
+- Included comments explaining why risks are accepted and plans for future mitigation
+- Better than disabling scans or letting noise hide real issues
+- Lesson: suppression files are living documentation of security decisions, not just scanner config
