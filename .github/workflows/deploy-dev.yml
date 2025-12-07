@@ -44,7 +44,11 @@ jobs:
 
       - name: Build image
         run: |
-          IMAGE="${{ env.ARTIFACT_REGISTRY_REPO }}:${{ github.sha }}"
+          if [ -z "${ARTIFACT_REGISTRY_REPO:-}" ]; then
+            echo "ARTIFACT_REGISTRY_REPO is required but not set."
+            exit 1
+          fi
+          IMAGE="${ARTIFACT_REGISTRY_REPO}:${GITHUB_SHA}"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
           docker build -t "$IMAGE" -f Dockerfile .
 
