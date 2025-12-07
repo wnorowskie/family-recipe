@@ -24,8 +24,13 @@ RUN npm run build
 
 FROM base AS production-deps
 ENV NODE_ENV=production
+ARG PRISMA_SCHEMA=prisma/schema.postgres.prisma
+ENV PRISMA_SCHEMA=${PRISMA_SCHEMA}
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts
+# Install prod deps, then install prisma CLI temporarily to generate the client.
+RUN npm ci --omit=dev --ignore-scripts \
+  && npm install prisma@5.11.0 --no-save \
+  && npx prisma generate --schema $PRISMA_SCHEMA
 
 FROM base AS runner
 ENV NODE_ENV=production
