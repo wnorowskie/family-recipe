@@ -144,8 +144,15 @@ resource "google_cloud_run_v2_service" "app" {
   name     = var.cloud_run_service_name
   location = var.region
   project  = var.project_id
-  # Private ingress via internal load balancer only.
-  ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  # Allow all ingress (auth still enforced via --no-allow-unauthenticated in deploys).
+  ingress = "INGRESS_TRAFFIC_ALL"
+
+  lifecycle {
+    ignore_changes = [
+      # CI/CD updates the image; keep Terraform from rolling it back.
+      template[0].containers[0].image,
+    ]
+  }
 
   template {
     service_account = google_service_account.runtime.email
@@ -154,7 +161,74 @@ resource "google_cloud_run_v2_service" "app" {
       image = "us-docker.pkg.dev/cloudrun/container/hello"
 
       ports {
-        container_port = 8080
+        container_port = 3000
+      }
+
+      env {
+        name  = "PRISMA_SCHEMA"
+        value = var.prisma_schema
+      }
+
+      env {
+        name  = "UPLOADS_BUCKET"
+        value = var.uploads_bucket_name
+      }
+
+      env {
+        name  = "UPLOADS_BASE_URL"
+        value = var.uploads_base_url
+      }
+
+      env {
+        name = "DATABASE_URL"
+
+        value_source {
+          secret_key_ref {
+            secret  = var.database_url_secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "JWT_SECRET"
+
+        value_source {
+          secret_key_ref {
+            secret  = var.jwt_secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.family_master_key_secret_id != "" ? [1] : []
+        content {
+          name = "FAMILY_MASTER_KEY"
+
+          value_source {
+            secret_key_ref {
+              secret  = var.family_master_key_secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+
+      volume_mounts {
+        name       = "cloudsql"
+        mount_path = "/cloudsql"
+      }
+    }
+
+    dynamic "volumes" {
+      for_each = length(var.cloud_sql_instances) > 0 ? [1] : []
+      content {
+        name = "cloudsql"
+
+        cloud_sql_instance {
+          instances = var.cloud_sql_instances
+        }
       }
     }
   }

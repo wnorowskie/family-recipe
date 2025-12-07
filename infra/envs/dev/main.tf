@@ -58,8 +58,11 @@ module "cloud_run_infra" {
   runtime_sa_id               = var.runtime_sa_id
   deployer_sa_id              = var.deployer_sa_id
   artifact_registry_repo_id   = var.artifact_registry_repo_id
+  cloud_sql_instances         = [module.sql_instance.instance_connection_name]
   cloud_run_service_name      = var.cloud_run_service_name
   uploads_bucket_name         = var.uploads_bucket_name
+  uploads_base_url            = var.uploads_base_url
+  prisma_schema               = var.prisma_schema
   database_url_secret_id      = var.database_url_secret_id
   jwt_secret_id               = var.jwt_secret_id
   family_master_key_secret_id = var.family_master_key_secret_id

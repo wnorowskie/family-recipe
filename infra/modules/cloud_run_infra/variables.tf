@@ -25,6 +25,12 @@ variable "artifact_registry_repo_id" {
   type        = string
 }
 
+variable "cloud_sql_instances" {
+  description = "List of Cloud SQL instance connection names for Cloud SQL connector"
+  type        = list(string)
+  default     = []
+}
+
 variable "cloud_run_service_name" {
   description = "Cloud Run service name"
   type        = string
@@ -34,6 +40,18 @@ variable "cloud_run_service_name" {
 variable "uploads_bucket_name" {
   description = "GCS bucket name for uploads (private, uniform access)"
   type        = string
+}
+
+variable "uploads_base_url" {
+  description = "Base URL for serving uploads (e.g., https://storage.googleapis.com/<bucket>)"
+  type        = string
+  default     = ""
+}
+
+variable "prisma_schema" {
+  description = "Prisma schema path to set in Cloud Run env"
+  type        = string
+  default     = "prisma/schema.postgres.prisma"
 }
 
 variable "database_url_secret_id" {

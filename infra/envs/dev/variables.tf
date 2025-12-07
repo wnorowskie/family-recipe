@@ -147,6 +147,12 @@ variable "artifact_registry_repo_id" {
   default     = "family-recipe-dev"
 }
 
+variable "cloud_sql_instances" {
+  description = "List of Cloud SQL instance connection names for Cloud Run connector"
+  type        = list(string)
+  default     = []
+}
+
 variable "cloud_run_service_name" {
   description = "Cloud Run service name"
   type        = string
@@ -157,6 +163,18 @@ variable "uploads_bucket_name" {
   description = "GCS bucket for uploads"
   type        = string
   default     = "family-recipe-dev-uploads"
+}
+
+variable "uploads_base_url" {
+  description = "Base URL for uploads (e.g., https://storage.googleapis.com/<bucket>)"
+  type        = string
+  default     = "https://storage.googleapis.com/family-recipe-dev-uploads"
+}
+
+variable "prisma_schema" {
+  description = "Prisma schema path"
+  type        = string
+  default     = "prisma/schema.postgres.prisma"
 }
 
 variable "database_url_secret_id" {
