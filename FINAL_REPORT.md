@@ -265,26 +265,29 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
   - [✓] Require CI to pass before merging into `develop`.
   - [✓] Require CI to pass before merging into `main`.
   - [✓] Disallow direct pushes to `main` and `develop`.
-- [ ] Add any additional checks that make sense given the current implementation (e.g., run Prisma migrations in CI using a temp DB to verify they apply cleanly).
+- [✓] Add any additional checks that make sense given the current implementation (e.g., run Prisma migrations in CI using a temp DB to verify they apply cleanly).
 
 ### Phase 5 – First “Dev” Deploy of the Monolith
 
 **Goal:** Deploy the app to a real dev environment with proper env vars and checks.
 
 - [ ] Choose hosting platform for v2:
-  - [ ] Vercel for the monolith Next.js app.
-- [ ] Connect repo to hosting platform.
-- [ ] Configure **dev environment**:
-  - [ ] `DATABASE_URL` (dev DB).
-  - [ ] Auth/crypto secrets (e.g., NextAuth secret, JWT secret).
-  - [ ] Any other required env vars (master key hash if needed, etc.).
-- [ ] Ensure deploys to dev are:
-  - [ ] Triggered from `develop` (or PR branches).
-  - [ ] Gated by CI passing.
-- [ ] Confirm:
-  - [ ] Dev URL is accessible.
-  - [ ] Basic flows work (signup, login, create post, “Cooked this”, comments, favorites, profile, recipes browse/search).
-- [ ] Verify any known limitations (e.g., image handling, search behavior) behave at least predictably in dev.
+  - [ ] GCP Cloud Run (monolith Next.js app), private (auth required; no public unauthenticated access).
+- [ ] Connect repo to GCP for builds/deploys:
+  - [ ] Artifact Registry for images.
+  - [ ] Workload Identity Federation for GitHub Actions to push and deploy.
+- [ ] Configure **dev environment** (Cloud Run + Cloud SQL):
+  - [ ] `DATABASE_URL` via Cloud SQL connector socket + Secret Manager (uses dev DB password already in GSM).
+  - [ ] Auth/crypto secrets: `JWT_SECRET` (Secret Manager), optional seeded `FAMILY_MASTER_KEY` if needed for bootstrap.
+  - [ ] Prisma schema set to Postgres (`PRISMA_SCHEMA=prisma/schema.postgres.prisma`).
+- [ ] GCS-backed uploads:
+  - [ ] Create private bucket for uploads; enforce signed URL access; set `UPLOADS_BUCKET` and `UPLOADS_BASE_URL`.
+  - [ ] Update upload helpers to write/delete in GCS and return signed URLs for reads.
+- [ ] Deployments to dev:
+  - [ ] Manual (`workflow_dispatch`) after CI green on `develop`; deploy Cloud Run service with Cloud SQL + secrets wired.
+- [ ] Post-deploy verification:
+  - [ ] Dev URL reachable (with auth); basic flows work (signup, login, create post, “Cooked this”, comments, favorites, profile, recipes browse/search).
+  - [ ] Validate signed URL image behavior and any known limitations (e.g., search quirks) behave predictably in dev.
 
 ### Phase 6 – Security & Privacy Polish (If Time Allows)
 
