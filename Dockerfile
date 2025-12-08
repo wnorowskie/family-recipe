@@ -9,7 +9,9 @@ RUN npm install -g npm@latest
 FROM base AS deps
 ENV NODE_ENV=development
 COPY package.json package-lock.json ./
-RUN npm ci
+# Install build deps for native modules (bcrypt) and install all deps (dev + prod)
+RUN apk add --no-cache python3 make g++ \
+  && npm ci
 
 FROM base AS builder
 ARG PRISMA_SCHEMA=prisma/schema.postgres.prisma
@@ -22,14 +24,9 @@ COPY . .
 RUN npx prisma generate --schema $PRISMA_SCHEMA
 RUN npm run build
 
-FROM base AS production-deps
-ENV NODE_ENV=production
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts
-
 FROM base AS runner
 ENV NODE_ENV=production
-COPY --from=production-deps /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
