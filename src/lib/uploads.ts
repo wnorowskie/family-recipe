@@ -179,7 +179,8 @@ async function generateSignedUrlV4(options: {
   // ISO 8601 date without separators for signing (YYYYMMDD) and full timestamp (YYYYMMDD'T'HHMMSS'Z')
   const isoNoMillis = now.toISOString().replace(/\.\d{3}Z$/, 'Z');
   const datestamp = isoNoMillis.slice(0, 10).replace(/-/g, '');
-  const timestamp = isoNoMillis.replace(/[-:]/g, '');
+  const timepart = isoNoMillis.slice(11, 19).replace(/:/g, '');
+  const timestamp = `${datestamp}T${timepart}Z`;
   const credentialScope = `${datestamp}/auto/storage/goog4_request`;
   const credential = `${serviceAccountEmail}/${credentialScope}`;
 
