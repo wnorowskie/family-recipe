@@ -47,6 +47,13 @@ resource "google_service_account_iam_member" "deployer_impersonates_runtime" {
   member             = "serviceAccount:${google_service_account.deployer.email}"
 }
 
+# Allow runtime service account to sign blobs as itself (for GCS signed URLs)
+resource "google_service_account_iam_member" "runtime_self_token_creator" {
+  service_account_id = google_service_account.runtime.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.runtime.email}"
+}
+
 resource "google_iam_workload_identity_pool" "github" {
   workload_identity_pool_id = var.wif_pool_id
   project                   = var.project_id

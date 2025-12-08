@@ -158,7 +158,7 @@ function signStringWithPrivateKey(
   return signer.sign(privateKey, 'base64');
 }
 
-async function generateSignedUrlV4(options: {
+export async function generateSignedUrlV4(options: {
   bucket: string;
   objectKey: string;
   expiresInSeconds: number;
