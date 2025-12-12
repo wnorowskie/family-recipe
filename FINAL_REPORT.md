@@ -293,21 +293,41 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 **Goal:** Go from “works” to “thoughtful about security and privacy.”
 
-- [ ] Ensure **all secrets** live only in:
-  - [ ] Hosting platform env settings.
-  - [ ] GitHub Secrets.
-- [ ] Configure basic security headers:
-  - [ ] Content-Security-Policy (CSP) (start with a simple one).
-  - [ ] X-Frame-Options.
-  - [ ] X-Content-Type-Options.
-  - [ ] Referrer-Policy.
-- [ ] Double-check logs:
-  - [ ] No sensitive tokens.
-  - [ ] No passwords or master key values.
-- [ ] Confirm rate limiting is in place on critical endpoints.
-- [ ] Address any specific security/privacy concerns (e.g., how long sessions last, how public URLs for images are handled).
+- [✓] Ensure **all secrets** live only in:
+  - [✓] Hosting platform env settings.
+  - [✓] GitHub Secrets.
+- [✓] Configure basic security headers:
+  - [✓] Content-Security-Policy (CSP) (start with a simple one).
+  - [✓] X-Frame-Options.
+  - [✓] X-Content-Type-Options.
+  - [✓] Referrer-Policy.
+- [✓] Double-check logs:
+  - [✓] No sensitive tokens.
+  - [✓] No passwords or master key values.
+- [✓] Confirm rate limiting is in place on critical endpoints.
+- [✓] Address any specific security/privacy concerns (e.g., how long sessions last, how public URLs for images are handled).
 
-### Phase 7 – Production Environment & Observability (If Time Allows)
+Security polish updates:
+
+- Added security headers via Next.js headers: CSP allowing self + storage.googleapis.com for signed URLs and local previews (data:/blob:), plus WS for dev HMR; media/image scoped accordingly; X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy same-origin.
+- Verified secrets remain sourced from env/Secret Manager and GitHub Secrets (no hardcoded secrets or sample values beyond `.env.example` placeholders).
+- Re-reviewed logging to avoid sensitive values and confirmed rate limiters cover auth and high-write endpoints; session cookies remain HTTP-only with 7/30 day lifetimes and uploads continue to use signed URLs with TTL.
+
+### Phase 7 – Extract API (If Time Allows)
+
+**Goal:** Prepare for a split architecture and Render/GCP move once v2 is stable.
+
+- [ ] Plan extraction of API into a separate Node/TS or Python service:
+  - [ ] Reuse Prisma models and API contracts defined in `TECHNICAL_SPEC.md`.
+  - [ ] Match existing REST endpoints so the frontend doesn’t have to change much.
+- [ ] Containerize API separately and:
+  - [ ] Deploy to GCP Cloud Run.
+  - [ ] Hits managed Postgres instance.
+- [ ] Consider building out testing frameworks for the new API service
+- [ ] Update frontend to call the external API service instead of internal API routes.
+- [ ] Remove frontend API routes in NextJs (after confirming API service is stable)
+
+### Phase 8 – Production Environment & Observability (If Time Allows)
 
 **Goal:** Bring up a monitored, safe prod environment my family can actually use.
 
@@ -327,23 +347,6 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 - [ ] Verify logs are:
   - [ ] Structured enough to debug.
   - [ ] Not leaking sensitive data (passwords, master key, tokens).
-
-### Phase 8 – Extract API (If Time Allows)
-
-**Goal:** Prepare for a split architecture and Render/GCP move once v2 is stable.
-
-- [ ] Plan extraction of API into a separate Node/TS or Python service:
-  - [ ] Reuse Prisma models and API contracts defined in `TECHNICAL_SPEC.md`.
-  - [ ] Match existing REST endpoints so the frontend doesn’t have to change much.
-- [ ] Containerize API separately and:
-  - [ ] Deploy to GCP Cloud Run or Render.
-  - [ ] Hits managed Postgres instance.
-- [ ] Add IaC (Terraform) for:
-  - [ ] Cloud Run service.
-  - [ ] Cloud SQL.
-  - [ ] Networking and secrets.
-- [ ] Update frontend to call the external API service instead of internal API routes.
-- [ ] Remove frontend API routes in NextJs
 
 ---
 
