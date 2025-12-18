@@ -2,11 +2,36 @@
 Pytest configuration and shared fixtures for the FastAPI tests.
 """
 import os
+import sys
+import types
 from typing import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+
+# Stub prisma import to avoid generation requirement during tests
+def _make_prisma_stub():
+    mock = MagicMock()
+    mock.is_connected.return_value = False
+
+    async def _connect():
+        return None
+
+    async def _disconnect():
+        return None
+
+    mock.connect = _connect
+    mock.disconnect = _disconnect
+    return mock
+
+
+prisma_stub = types.ModuleType("prisma")
+prisma_stub.Prisma = _make_prisma_stub
+errors_stub = types.ModuleType("prisma.errors")
+errors_stub.PrismaError = Exception
+sys.modules.setdefault("prisma", prisma_stub)
+sys.modules.setdefault("prisma.errors", errors_stub)
 
 # Set test environment before importing app modules
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test")
