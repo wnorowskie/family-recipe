@@ -1,19 +1,21 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from .db import connect_db, disconnect_db
 from .routers import auth, comments, family, health, me, posts, profile, reactions, recipes, tags, timeline
 
-app = FastAPI(title="Family Recipe API")
 
-
-@app.on_event("startup")
-async def on_startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     await connect_db()
+    try:
+        yield
+    finally:
+        await disconnect_db()
 
 
-@app.on_event("shutdown")
-async def on_shutdown() -> None:
-    await disconnect_db()
+app = FastAPI(title="Family Recipe API", lifespan=lifespan)
 
 
 app.include_router(health.router)

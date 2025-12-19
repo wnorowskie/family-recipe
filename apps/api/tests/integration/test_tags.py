@@ -1,39 +1,52 @@
-"""
-Integration tests for tags endpoint.
-"""
+"""Integration tests for the tags router."""
+
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import MagicMock
 
 
-class TestTagsEndpoint:
-    """Test GET /tags endpoint."""
+pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership")
 
-    def test_tags_unauthenticated(self, client):
-        """GET /tags without auth should return 401."""
-        response = client.get("/tags")
-        
-        assert response.status_code == 401
 
-    def test_tags_authenticated_empty(self, authenticated_client, mock_prisma):
-        """GET /tags with auth should return tags list."""
-        mock_prisma.tag.find_many.return_value = []
-        
-        response = authenticated_client.get("/tags")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert "tags" in data
-        assert data["tags"] == []
+def _make_tag(idx: int = 1, **overrides):
+    data = {
+        "id": overrides.get("id", f"tag-{idx}"),
+        "name": overrides.get("name", f"Tag {idx}"),
+    }
+    data.update(overrides)
+    return data
 
-    def test_tags_authenticated_with_data(self, authenticated_client, mock_prisma):
-        """GET /tags should return tag objects."""
-        mock_prisma.tag.find_many.return_value = [
-            MagicMock(id="tag-1", name="italian"),
-            MagicMock(id="tag-2", name="quick"),
-        ]
-        
-        response = authenticated_client.get("/tags")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert "tags" in data
+
+def test_list_tags_success(client, mock_prisma, member_auth):
+    tags = [_make_tag(name="Breakfast"), _make_tag(idx=2, name="Dinner")]
+    mock_prisma.tag.find_many = AsyncMock(return_value=tags)
+
+    response = client.get("/tags", headers=member_auth)
+
+    assert response.status_code == 200
+    assert response.json() == {"tags": tags}
+
+
+def test_list_tags_sorted_alphabetically(client, mock_prisma, member_auth):
+    tags = [_make_tag(idx=1, name="Appetizer"), _make_tag(idx=2, name="Zesty")]
+    mock_prisma.tag.find_many = AsyncMock(return_value=tags)
+
+    response = client.get("/tags", headers=member_auth)
+
+    assert response.status_code == 200
+    assert mock_prisma.tag.find_many.await_args.kwargs["order"] == {"name": "asc"}
+
+
+def test_list_tags_empty(client, mock_prisma, member_auth):
+    mock_prisma.tag.find_many = AsyncMock(return_value=[])
+
+    response = client.get("/tags", headers=member_auth)
+
+    assert response.status_code == 200
+    assert response.json() == {"tags": []}
+
+
+def test_list_tags_requires_auth(client):
+    response = client.get("/tags")
+
+    assert response.status_code == 401

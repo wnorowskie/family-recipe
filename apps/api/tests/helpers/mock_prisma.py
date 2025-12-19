@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 MODEL_NAMES = [
     "user",
     "post",
+    "postphoto",
     "comment",
     "reaction",
     "favorite",
@@ -32,8 +33,23 @@ def _make_model_mock() -> MagicMock:
 def create_mock_prisma_client() -> MagicMock:
     """Create a Prisma client mock with common async methods stubbed."""
     mock = MagicMock()
+    mock.connect = AsyncMock(return_value=None)
+    mock.disconnect = AsyncMock(return_value=None)
     for name in MODEL_NAMES:
         setattr(mock, name, _make_model_mock())
+
+    class TxContext:
+        def __init__(self, prisma_mock: MagicMock):
+            self.post = prisma_mock.post
+            self.postphoto = prisma_mock.postphoto
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):  # pragma: no cover - simple passthrough
+            return False
+
+    mock.tx = MagicMock(side_effect=lambda: TxContext(mock))
     return mock
 
 
