@@ -45,6 +45,10 @@ docker compose up fastapi
 
 The compose service reuses the same Postgres container as the Next.js app and exposes the API at http://localhost:8000. Override `DATABASE_URL`, `JWT_SECRET`, or any other settings via `docker compose run -e VAR=value fastapi` or by editing the service definition if you need different values locally.
 
+## Continuous Integration
+
+GitHub Actions workflow `/.github/workflows/api-ci.yml` keeps the FastAPI service green in CI. It runs Ruff linting, mypy type-checking, pytest (unit + integration), builds the Docker image, scans the image with Trivy, audits Python dependencies via `pip-audit`, and executes Semgrep plus Gitleaks for security coverage.
+
 ## Testing
 
 Install dev dependencies:
