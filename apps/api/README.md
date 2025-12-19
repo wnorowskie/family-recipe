@@ -31,6 +31,20 @@ uvicorn apps.api.src.main:app --reload
 
 The service will read env vars from the repo `.env` (via `pydantic-settings`).
 
+## Run (Docker)
+
+The API has a dedicated image definition at `apps/api/Dockerfile` and is wired into the root `docker-compose.yml`.
+
+```bash
+# Build the FastAPI image (only needed after dependency changes)
+docker compose build fastapi
+
+# Run the API + postgres dependencies
+docker compose up fastapi
+```
+
+The compose service reuses the same Postgres container as the Next.js app and exposes the API at http://localhost:8000. Override `DATABASE_URL`, `JWT_SECRET`, or any other settings via `docker compose run -e VAR=value fastapi` or by editing the service definition if you need different values locally.
+
 ## Testing
 
 Install dev dependencies:

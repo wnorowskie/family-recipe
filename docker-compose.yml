@@ -38,5 +38,19 @@ services:
       sh -c "npx prisma migrate deploy --schema ${PRISMA_SCHEMA:-prisma/schema.postgres.prisma} &&
       npm run start"
 
+  fastapi:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/family_recipe
+      JWT_SECRET: dev-jwt-secret-change-me
+      ENVIRONMENT: development
+    ports:
+      - '8000:8000'
+
 volumes:
   postgres-data:
