@@ -90,7 +90,7 @@ jobs:
       - name: Install Prisma Python generator
         run: pip install prisma==0.15.0
       - name: Generate Prisma Python client
-        run: npx prisma generate --schema prisma/schema.postgres.prisma --generator clientPy
+        run: npx prisma@5.17.0 generate --schema prisma/schema.postgres.prisma --generator clientPy
         env:
           DATABASE_URL: postgresql://user:pass@localhost:5432/db
 
