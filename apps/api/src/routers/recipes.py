@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from fastapi import APIRouter, Depends, Query
 from prisma.errors import PrismaError
@@ -165,9 +165,10 @@ async def browse_recipes(
         # Manually calculate grouped stats (Prisma Python doesn't have group_by with aggregates)
         cooked_map: dict = {}
         if ids:
-            all_cooked: List[CookedEvent] = await prisma.cookedevent.find_many(
+            all_cooked_raw = await prisma.cookedevent.find_many(
                 where={"postId": {"in": ids}},
             )
+            all_cooked: List[CookedEvent] = cast(List[CookedEvent], all_cooked_raw)
             from collections import defaultdict
             grouped: dict[str, List[Optional[int]]] = defaultdict(list)
             for c in all_cooked:

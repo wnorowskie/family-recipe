@@ -451,7 +451,7 @@ async def update_post(
         }
 
         async with prisma.tx() as tx:
-            updated = await tx.post.update(
+            await tx.post.update(
                 where={"id": post_id},
                 data=update_data,
                 include={
