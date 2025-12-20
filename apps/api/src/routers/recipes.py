@@ -172,7 +172,11 @@ async def browse_recipes(
             from collections import defaultdict
             grouped: dict[str, List[Optional[int]]] = defaultdict(list)
             for c in all_cooked:
-                grouped[c.postId].append(c.rating)
+                post_id = getattr(c, "postId", None)
+                rating: Optional[int] = getattr(c, "rating", None)
+                if not isinstance(post_id, str):
+                    continue
+                grouped[post_id].append(rating if isinstance(rating, int) else None)
             for post_id, ratings in grouped.items():
                 valid_ratings = [r for r in ratings if r is not None]
                 cooked_map[post_id] = {
