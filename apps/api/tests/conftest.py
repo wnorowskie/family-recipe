@@ -30,8 +30,22 @@ prisma_stub = types.ModuleType("prisma")
 prisma_stub.Prisma = _make_prisma_stub
 errors_stub = types.ModuleType("prisma.errors")
 errors_stub.PrismaError = Exception
+models_stub = types.ModuleType("prisma.models")
+
+
+class _CookedEvent:
+    postId: str
+    rating: int | None
+
+    def __init__(self, postId: str = "", rating: int | None = None) -> None:
+        self.postId = postId
+        self.rating = rating
+
+
+models_stub.CookedEvent = _CookedEvent
 sys.modules.setdefault("prisma", prisma_stub)
 sys.modules.setdefault("prisma.errors", errors_stub)
+sys.modules.setdefault("prisma.models", models_stub)
 
 # Set test environment before importing app modules
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test")
