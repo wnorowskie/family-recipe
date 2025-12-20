@@ -1,6 +1,6 @@
-from prisma import Prisma
+from prisma import Client
 
-prisma = Prisma()
+prisma = Client()
 
 
 async def connect_db() -> None:

@@ -388,12 +388,19 @@ async def update_post(
                 continue
             if entry["type"] == "existing":
                 existing_id = entry.get("id")
-                if existing_id in existing_map and existing_id not in used_existing:
+                if (
+                    isinstance(existing_id, str)
+                    and existing_id in existing_map
+                    and existing_id not in used_existing
+                ):
                     used_existing.add(existing_id)
                     resolved_photos.append((existing_map[existing_id].url, existing_id))
             elif entry["type"] == "new":
+                file_index_raw = entry.get("fileIndex")
+                if not isinstance(file_index_raw, (str, int)):
+                    continue
                 try:
-                    file_index = int(entry.get("fileIndex"))
+                    file_index = int(file_index_raw)
                 except Exception:
                     continue
                 if 0 <= file_index < len(saved_photos):
@@ -419,28 +426,34 @@ async def update_post(
         if update_payload.changeNote:
             change_note = update_payload.changeNote.strip() or None
 
+        recipe_details_data: Optional[Dict[str, Any]] = None
+        if recipe_data:
+            recipe_details_data = {"upsert": {"create": recipe_data, "update": recipe_data}}
+        elif post.recipeDetails:
+            recipe_details_data = {"delete": True}
+
+        update_data: Dict[str, Any] = {
+            "title": update_payload.title if update_payload.title is not None else post.title,
+            "caption": update_payload.caption if update_payload.caption is not None else post.caption,
+            "hasRecipeDetails": bool(recipe_data),
+            "recipeDetails": recipe_details_data,
+            "tags": {
+                "deleteMany": {},
+                "create": [{"tag": {"connect": {"id": tag["id"]}}} for tag in tags],
+            }
+            if tags is not None
+            else None,
+            "mainPhotoUrl": resolved_photos[0][0] if resolved_photos else None,
+            "lastEditNote": change_note,
+            "lastEditedBy": user.id,
+            "lastEditAt": datetime.now(timezone.utc),
+            "photos": {"deleteMany": {"id": {"notIn": list(keep_existing_ids) if keep_existing_ids else [""]}}},
+        }
+
         async with prisma.tx() as tx:
             updated = await tx.post.update(
                 where={"id": post_id},
-                data={
-                    "title": update_payload.title if update_payload.title is not None else post.title,
-                    "caption": update_payload.caption if update_payload.caption is not None else post.caption,
-                    "hasRecipeDetails": bool(recipe_data),
-                    "recipeDetails": {"upsert": {"create": recipe_data, "update": recipe_data}}
-                    if recipe_data
-                    else {"delete": True} if post.recipeDetails else None,
-                    "tags": {
-                        "deleteMany": {},
-                        "create": [{"tag": {"connect": {"id": tag["id"]}}} for tag in tags],
-                    }
-                    if tags is not None
-                    else None,
-                    "mainPhotoUrl": resolved_photos[0][0] if resolved_photos else None,
-                    "lastEditNote": change_note,
-                    "lastEditedBy": user.id,
-                    "lastEditAt": datetime.now(timezone.utc),
-                    "photos": {"deleteMany": {"id": {"notIn": list(keep_existing_ids) if keep_existing_ids else [""]}}},
-                },
+                data=update_data,
                 include={
                     "photos": {"orderBy": {"sortOrder": "asc"}},
                     "recipeDetails": True,

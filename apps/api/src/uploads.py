@@ -23,13 +23,8 @@ class SavedUpload(TypedDict, total=False):
 
 
 def _encode_rfc3986(value: str) -> str:
-    return (
-        httpx.QueryParams({value: ""})
-        .render()
-        .replace("=", "")
-        .replace("+", "%20")
-        .replace("%7E", "~")
-    )
+    encoded = str(httpx.QueryParams({value: ""}))
+    return encoded.replace("=", "").replace("+", "%20").replace("%7E", "~")
 
 
 def _encode_path(object_key: str) -> str:

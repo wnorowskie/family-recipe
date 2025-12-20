@@ -1,5 +1,5 @@
 import json
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TypedDict
 
 from fastapi import APIRouter, Depends, File, Form, Path, UploadFile, status
 from prisma.errors import PrismaError
@@ -16,6 +16,18 @@ from ..utils import iso, is_cuid
 router = APIRouter(prefix="/posts/{post_id}/comments", tags=["comments"])
 
 MAX_COMMENT_LIMIT = 50
+
+
+class ReactionUserSummary(TypedDict):
+    id: str
+    name: str
+    avatarUrl: Optional[str]
+
+
+class ReactionSummary(TypedDict):
+    emoji: str
+    count: int
+    users: List[ReactionUserSummary]
 
 
 def _clamp_limit(value: Optional[int], default: int, max_value: int) -> int:
@@ -50,7 +62,7 @@ async def list_comments(
         has_more = len(comments) > limit_clamped
         comments = comments[:limit_clamped]
         ids = [c.id for c in comments]
-        reaction_map: Dict[str, List[Dict[str, object]]] = {}
+        reaction_map: Dict[str, List[ReactionSummary]] = {}
         if ids:
             reactions = await prisma.reaction.find_many(
                 where={"targetType": "comment", "targetId": {"in": ids}},
@@ -58,12 +70,13 @@ async def list_comments(
                 include={"user": True},
             )
             for r in reactions:
-                lst = reaction_map.get(r.targetId) or []
+                if not r.user:
+                    continue
+                lst = reaction_map.setdefault(r.targetId, [])
                 found = next((entry for entry in lst if entry["emoji"] == r.emoji), None)
                 if not found:
                     found = {"emoji": r.emoji, "count": 0, "users": []}
                     lst.append(found)
-                    reaction_map[r.targetId] = lst
                 found["count"] += 1
                 found["users"].append(
                     {"id": r.user.id, "name": r.user.name, "avatarUrl": r.user.avatarUrl}

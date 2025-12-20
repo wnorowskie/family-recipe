@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from prisma.errors import PrismaError
+from prisma.models import CookedEvent
 
 from ..db import prisma
 from ..dependencies import get_current_user
@@ -165,11 +166,11 @@ async def browse_recipes(
         # Manually calculate grouped stats (Prisma Python doesn't have group_by with aggregates)
         cooked_map: dict = {}
         if ids:
-            all_cooked = await prisma.cookedevent.find_many(
+            all_cooked: List[CookedEvent] = await prisma.cookedevent.find_many(
                 where={"postId": {"in": ids}},
             )
             from collections import defaultdict
-            grouped: dict = defaultdict(list)
+            grouped: dict[str, List[Optional[int]]] = defaultdict(list)
             for c in all_cooked:
                 grouped[c.postId].append(c.rating)
             for post_id, ratings in grouped.items():
