@@ -3,7 +3,7 @@ from typing import Optional, TypedDict
 
 import bcrypt
 from fastapi import Response
-from jose import JWTError, jwt
+import jwt
 
 from .settings import settings
 
@@ -61,7 +61,7 @@ def verify_token(token: str) -> Optional[JWTPayload]:
                 "role": role,
             }
         return None
-    except JWTError:
+    except jwt.InvalidTokenError:
         return None
 
 
