@@ -10,6 +10,8 @@
 
 # Testing
 /coverage
+*.coverage
+*.coveragerc
 *.lcov
 .nyc_output
 .jest-cache/
@@ -106,6 +108,12 @@ tfplan.bin
 *.tmp
 *.temp
 .cache
+
+# Python virtualenvs for FastAPI service
+.venv
+venv
+apps/api/prisma-client/
+__pycache__/
 
 # Husky (git hooks will be installed locally)
 .husky/_

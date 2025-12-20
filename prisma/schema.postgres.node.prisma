@@ -1,11 +1,7 @@
-// Family Recipe App - Prisma Schema (PostgreSQL)
+// Family Recipe App - Prisma Schema (PostgreSQL, JS client only)
 
 generator client {
   provider = "prisma-client-js"
-}
-
-generator clientPy {
-  provider = "prisma-client-py"
 }
 
 datasource db {
