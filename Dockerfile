@@ -14,7 +14,7 @@ RUN apk add --no-cache python3 make g++ \
   && npm ci
 
 FROM base AS builder
-ARG PRISMA_SCHEMA=prisma/schema.postgres.prisma
+ARG PRISMA_SCHEMA=prisma/schema.postgres.node.prisma
 ENV PRISMA_SCHEMA=${PRISMA_SCHEMA}
 ENV NODE_ENV=production
 # Prisma commands need a placeholder URL; compose/runtime provide the real one

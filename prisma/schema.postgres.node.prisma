@@ -1,0 +1,239 @@
+// Family Recipe App - Prisma Schema (PostgreSQL, JS client only)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User represents an individual family member
+model User {
+  id                String   @id @default(cuid())
+  name              String
+  emailOrUsername   String   @unique @map("email_or_username")
+  passwordHash      String   @map("password_hash")
+  avatarUrl         String?  @map("avatar_url")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  memberships       FamilyMembership[]
+  posts             Post[]             @relation("PostAuthor")
+  editedPosts       Post[]             @relation("PostEditor")
+  comments          Comment[]
+  reactions         Reaction[]
+  cookedEvents      CookedEvent[]
+  favorites         Favorite[]
+
+  @@map("users")
+}
+
+// FamilySpace represents a family group
+model FamilySpace {
+  id              String   @id @default(cuid())
+  name            String
+  masterKeyHash   String   @map("master_key_hash")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  memberships     FamilyMembership[]
+  posts           Post[]
+
+  @@map("family_spaces")
+}
+
+// FamilyMembership links users to family spaces with roles
+model FamilyMembership {
+  id            String   @id @default(cuid())
+  familySpaceId String   @map("family_space_id")
+  userId        String   @map("user_id")
+  role          String   // 'owner', 'admin', 'member'
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  familySpace   FamilySpace @relation(fields: [familySpaceId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([familySpaceId, userId])
+  @@map("family_memberships")
+  @@index([familySpaceId])
+}
+
+// Post represents both quick posts and full recipe posts
+model Post {
+  id                String    @id @default(cuid())
+  familySpaceId     String    @map("family_space_id")
+  authorId          String    @map("author_id")
+  title             String
+  caption           String?
+  hasRecipeDetails  Boolean   @default(false) @map("has_recipe_details")
+  mainPhotoUrl      String?   @map("main_photo_url")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  lastEditedBy      String?   @map("last_edited_by")
+  lastEditNote      String?   @map("last_edit_note")
+  lastEditAt        DateTime? @map("last_edit_at")
+
+  // Relations
+  familySpace       FamilySpace      @relation(fields: [familySpaceId], references: [id], onDelete: Cascade)
+  author            User             @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  editor            User?            @relation("PostEditor", fields: [lastEditedBy], references: [id])
+  photos            PostPhoto[]
+  recipeDetails     RecipeDetails?
+  tags              PostTag[]
+  comments          Comment[]
+  reactions         Reaction[] @relation("PostReactions")
+  cookedEvents      CookedEvent[]
+  favorites         Favorite[]
+
+  @@map("posts")
+  @@index([familySpaceId, createdAt])
+  @@index([authorId])
+}
+
+// PostPhoto stores additional photos attached to a post
+model PostPhoto {
+  id          String   @id @default(cuid())
+  postId      String   @map("post_id")
+  url         String
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("post_photos")
+  @@index([postId])
+}
+
+// RecipeDetails stores optional recipe-specific information
+model RecipeDetails {
+  id          String   @id @default(cuid())
+  postId      String   @unique @map("post_id")
+  origin      String?
+  ingredients String
+  steps       String
+  totalTime   Int?     @map("total_time")
+  servings    Int?
+  course      String?  // Maintains primary course for legacy filters
+  courses     String?
+  difficulty  String?  // 'easy', 'medium', 'hard'
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("recipe_details")
+}
+
+// Tag represents all possible tags
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  type      String?  // 'general', 'dietary', 'other'
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  postTags  PostTag[]
+
+  @@map("tags")
+}
+
+// PostTag links tags to posts (many-to-many)
+model PostTag {
+  id        String   @id @default(cuid())
+  postId    String   @map("post_id")
+  tagId     String   @map("tag_id")
+
+  // Relations
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, tagId])
+  @@map("post_tags")
+  @@index([postId])
+  @@index([tagId])
+}
+
+// Comment represents flat comments on posts
+model Comment {
+  id        String    @id @default(cuid())
+  postId    String    @map("post_id")
+  authorId  String    @map("author_id")
+  text      String
+  photoUrl  String?   @map("photo_url")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  post      Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reactions Reaction[] @relation("CommentReactions")
+
+  @@map("comments")
+  @@index([postId, createdAt])
+}
+
+// Reaction represents emoji-based reactions on posts and comments
+model Reaction {
+  id         String   @id @default(cuid())
+  targetType String   @map("target_type") // 'post' or 'comment'
+  targetId   String   @map("target_id")
+  userId     String   @map("user_id")
+  emoji      String
+  postId     String?  @map("post_id")
+  commentId  String?  @map("comment_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post    Post?   @relation("PostReactions", fields: [postId], references: [id], onDelete: Cascade)
+  comment Comment? @relation("CommentReactions", fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([targetType, targetId, userId, emoji])
+  @@map("reactions")
+  @@index([targetType, targetId])
+  @@index([postId])
+  @@index([commentId])
+}
+
+// CookedEvent represents "Cooked this!" check-ins
+model CookedEvent {
+  id        String   @id @default(cuid())
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  rating    Int?     // 1-5
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("cooked_events")
+  @@index([postId])
+  @@index([userId])
+}
+
+// Favorite represents user's private bookmarks
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  postId    String   @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("favorites")
+  @@index([userId])
+  @@index([postId])
+}
