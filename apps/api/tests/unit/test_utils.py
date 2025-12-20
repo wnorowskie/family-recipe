@@ -1,7 +1,6 @@
 """
 Unit tests for utils module.
 """
-import pytest
 from datetime import datetime, timezone
 
 from src.utils import is_cuid, iso

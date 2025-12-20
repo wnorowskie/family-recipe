@@ -4,7 +4,6 @@ These fixtures keep tests aligned with the integration blueprint by
 providing auth cookies, mock Prisma, and common mock entities.
 """
 
-from datetime import datetime, timezone
 from typing import Dict
 from types import SimpleNamespace
 from unittest.mock import AsyncMock

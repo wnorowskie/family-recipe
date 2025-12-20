@@ -475,7 +475,7 @@ async def update_post(
                     )
                     sort_order += 1
 
-            updated = await tx.post.find_unique(
+            _ = await tx.post.find_unique(
                 where={"id": post_id},
                 include={
                     "photos": {"orderBy": {"sortOrder": "asc"}},

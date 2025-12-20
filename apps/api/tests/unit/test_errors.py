@@ -1,7 +1,6 @@
 """
 Unit tests for error response helpers.
 """
-import pytest
 
 from src.errors import (
     bad_request,

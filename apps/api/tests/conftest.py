@@ -4,7 +4,7 @@ Pytest configuration and shared fixtures for the FastAPI tests.
 import os
 import sys
 import types
-from typing import AsyncGenerator, Generator
+from typing import Generator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -38,8 +38,8 @@ os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/tes
 os.environ.setdefault("JWT_SECRET", "test-secret-key-for-testing-only")
 os.environ.setdefault("ENVIRONMENT", "test")
 
-from src.main import app
-from src.schemas.auth import UserResponse
+from src.main import app  # noqa: E402
+from src.schemas.auth import UserResponse  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

@@ -92,11 +92,11 @@ async def _generate_signed_url_v4(
 
     canonical_query = "&".join(
         [
-            f"X-Goog-Algorithm=GOOG4-RSA-SHA256",
+            "X-Goog-Algorithm=GOOG4-RSA-SHA256",
             f"X-Goog-Credential={_encode_rfc3986(credential)}",
             f"X-Goog-Date={timestamp}",
             f"X-Goog-Expires={expires_in_seconds}",
-            f"X-Goog-SignedHeaders=host",
+            "X-Goog-SignedHeaders=host",
         ]
     )
 

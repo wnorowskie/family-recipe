@@ -2,7 +2,6 @@
 Unit tests for security module (password hashing, JWT, cookies).
 """
 import pytest
-from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from src.security import (
@@ -12,9 +11,6 @@ from src.security import (
     sign_token,
     verify_password,
     verify_token,
-    JWT_ALGORITHM,
-    JWT_EXPIRES_IN_DAYS,
-    JWT_EXPIRES_IN_EXTENDED_DAYS,
     COOKIE_MAX_AGE_DEFAULT,
     COOKIE_MAX_AGE_EXTENDED,
 )

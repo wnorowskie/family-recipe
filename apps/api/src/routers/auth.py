@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from prisma.errors import PrismaError
 
 from ..db import prisma

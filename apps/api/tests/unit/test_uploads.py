@@ -1,17 +1,14 @@
 """Unit tests for src/uploads.py"""
 
-import io
 import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, mock_open
+from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 
 from src.uploads import (
     MAX_FILE_SIZE_BYTES,
     ALLOWED_MIME_TYPES,
     MAX_PHOTO_COUNT,
-    _encode_rfc3986,
-    _encode_path,
     _fetch_metadata,
     _get_gcp_access_token,
     _sign_string_with_iam,
@@ -19,7 +16,6 @@ from src.uploads import (
     _upload_to_gcs,
     save_photo_file,
     delete_uploads,
-    SavedUpload,
 )
 
 
@@ -382,8 +378,8 @@ class TestSavePhotoFile:
 
         with patch("src.uploads.settings") as mock_settings:
             mock_settings.uploads_bucket = ""
-            with patch.object(Path, "mkdir") as mock_mkdir:
-                with patch.object(Path, "write_bytes") as mock_write:
+            with patch.object(Path, "mkdir"):
+                with patch.object(Path, "write_bytes"):
                     result = await save_photo_file(mock_file)
 
         assert result["url"].startswith("/uploads/")

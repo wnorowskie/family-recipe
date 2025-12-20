@@ -2,8 +2,6 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from src.security import COOKIE_MAX_AGE_EXTENDED
 from tests.helpers.auth import make_auth_cookie
 from tests.helpers.test_data import make_mock_family_space, make_mock_membership, make_mock_user
@@ -274,4 +272,3 @@ class TestAuthLogin:
         set_cookie = response.headers.get("set-cookie", "")
         assert "Max-Age=" in set_cookie
         assert str(COOKIE_MAX_AGE_EXTENDED) in set_cookie
-
