@@ -330,11 +330,11 @@ Security polish updates:
 
 **Goal:** Bring up a monitored, safe prod environment my family can actually use.
 
-- [ ] Provision **prod database** (Cloud SQL Postgres) with backups/PITR and wire secrets.
+- [✓] Provision **prod database** (Cloud SQL Postgres) with backups/PITR and wire secrets.
   - [✓] Added Terraform scaffold for prod in `infra/envs/prod/` (defaults: PITR on, public IP off).
-- [ ] Configure **prod environment** on hosting platform:
-  - [ ] Point to prod `DATABASE_URL`.
-  - [ ] Set all required secrets (auth, master key related, etc.).
+- [✓] Configure **prod environment** on hosting platform:
+  - [✓] Point to prod `DATABASE_URL`.
+  - [✓] Set all required secrets (auth, master key related, etc.).
 - [✓] Set deployment rules:
   - [✓] Only deploy prod from `main` (via GitHub Actions workflow trigger).
   - [✓] Deploy triggered via merges to `main` (optionally gate via GitHub Environment approvals).
@@ -344,9 +344,9 @@ Security polish updates:
 - [ ] Set up monitoring:
   - [ ] Uptime monitor hitting prod URL and/or healthcheck (custom domain recommended).
   - [ ] Error monitoring (depends on deployment strategy) for frontend + backend.
-- [ ] Verify logs are:
-  - [ ] Structured enough to debug.
-  - [ ] Not leaking sensitive data (passwords, master key, tokens).
+- [✓] Verify logs are:
+  - [✓] Structured enough to debug.
+  - [✓] Not leaking sensitive data (passwords, master key, tokens).
 
 ---
 

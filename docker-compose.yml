@@ -21,15 +21,16 @@ services:
     build:
       context: .
       args:
-        PRISMA_SCHEMA: prisma/schema.postgres.prisma
+        PRISMA_SCHEMA: prisma/schema.postgres.node.prisma
     depends_on:
       db:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/family_recipe
       JWT_SECRET: dev-jwt-secret-change-me
-      PRISMA_SCHEMA: prisma/schema.postgres.prisma
+      PRISMA_SCHEMA: prisma/schema.postgres.node.prisma
       NEXT_TELEMETRY_DISABLED: 1
+      FAMILY_MASTER_KEY: ${FAMILY_MASTER_KEY:?Set FAMILY_MASTER_KEY in your .env for docker-compose}
     ports:
       - '3000:3000'
     volumes:

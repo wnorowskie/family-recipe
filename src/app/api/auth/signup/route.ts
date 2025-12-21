@@ -6,7 +6,12 @@ import { signToken } from '@/lib/jwt';
 import { setSessionCookie } from '@/lib/session';
 import { logError, logInfo, logWarn } from '@/lib/logger';
 import { signupLimiter, applyRateLimit } from '@/lib/rateLimit';
-import { parseRequestBody, badRequestError, internalError } from '@/lib/apiErrors';
+import {
+  parseRequestBody,
+  badRequestError,
+  internalError,
+} from '@/lib/apiErrors';
+import { ensureFamilySpace, getEnvMasterKeyHash } from '@/lib/masterKey';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,13 +27,17 @@ export async function POST(request: NextRequest) {
     // Validate input
     const body = await request.json();
     const bodyValidation = parseRequestBody(body, signupSchema);
-    
+
     if (!bodyValidation.success) {
       return bodyValidation.error;
     }
 
     const { name, emailOrUsername, password, familyMasterKey, rememberMe } =
       bodyValidation.data;
+
+    // Load master key hash from env and ensure FamilySpace exists/synced
+    const masterKeyHash = await getEnvMasterKeyHash();
+    const familySpace = await ensureFamilySpace(masterKeyHash);
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -37,21 +46,13 @@ export async function POST(request: NextRequest) {
 
     if (existingUser) {
       logWarn('auth.signup.user_exists', { emailOrUsername });
-      return badRequestError('A user with this email or username already exists');
+      return badRequestError(
+        'A user with this email or username already exists'
+      );
     }
 
-    // Get the family space (V1: assume single family space)
-    const familySpace = await prisma.familySpace.findFirst();
-
-    if (!familySpace) {
-      return internalError('No family space found. Please contact the administrator.');
-    }
-
-    // Verify the family master key
-    const isValidKey = await verifyPassword(
-      familyMasterKey,
-      familySpace.masterKeyHash
-    );
+    // Verify the family master key (env-driven)
+    const isValidKey = await verifyPassword(familyMasterKey, masterKeyHash);
 
     if (!isValidKey) {
       logWarn('auth.signup.invalid_master_key', { emailOrUsername });
