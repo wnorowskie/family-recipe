@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
 import { reactionSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
+import { withAuth } from '@/lib/apiAuth';
+import { reactionLimiter, applyRateLimit } from '@/lib/rateLimit';
+import { parseRequestBody, notFoundError, internalError } from '@/lib/apiErrors';
 
 type TargetType = 'post' | 'comment';
 
@@ -46,34 +48,25 @@ async function buildReactionSummary(targetType: TargetType, targetId: string) {
   return Array.from(summaryMap.values());
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request, user) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
+    // Apply rate limiting (30 reactions per user per minute)
+    const rateLimitResult = applyRateLimit(
+      reactionLimiter,
+      reactionLimiter.getUserKey(user.id)
+    );
+    if (rateLimitResult) {
+      return rateLimitResult;
     }
 
     const body = await request.json().catch(() => null);
+    const bodyValidation = parseRequestBody(body, reactionSchema);
 
-    const validationResult = reactionSchema.safeParse(body);
-
-    if (!validationResult.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: validationResult.error.errors[0]?.message ?? 'Invalid input',
-          },
-        },
-        { status: 400 }
-      );
+    if (!bodyValidation.success) {
+      return bodyValidation.error;
     }
 
-    const { targetType, targetId, emoji } = validationResult.data;
+    const { targetType, targetId, emoji } = bodyValidation.data;
 
     if (targetType === 'post') {
       const post = await prisma.post.findFirst({
@@ -85,10 +78,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (!post) {
-        return NextResponse.json(
-          { error: { code: 'NOT_FOUND', message: 'Post not found' } },
-          { status: 404 }
-        );
+        return notFoundError('Post not found');
       }
     } else {
       const comment = await prisma.comment.findFirst({
@@ -100,10 +90,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (!comment) {
-        return NextResponse.json(
-          { error: { code: 'NOT_FOUND', message: 'Comment not found' } },
-          { status: 404 }
-        );
+        return notFoundError('Comment not found');
       }
     }
 
@@ -136,14 +123,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     logError('reactions.toggle.error', error);
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError();
   }
-}
+});

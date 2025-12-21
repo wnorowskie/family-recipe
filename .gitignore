@@ -10,8 +10,13 @@
 
 # Testing
 /coverage
+*.coverage
+*.coveragerc
 *.lcov
 .nyc_output
+.jest-cache/
+test.db
+test.db-journal
 
 # Next.js
 /.next/
@@ -41,6 +46,15 @@ lerna-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Terraform
+**/.terraform/*
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/*.tfvars
+**/*.tfvars.json
+tfplan.bin
 
 # Vercel
 .vercel
@@ -81,10 +95,25 @@ Desktop.ini
 logs
 *.log
 
+# Terraform
+**/.terraform/*
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/*.tfvars
+**/*.tfvars.json
+tfplan.bin
+
 # Temporary files
 *.tmp
 *.temp
 .cache
+
+# Python virtualenvs for FastAPI service
+.venv
+venv
+apps/api/prisma-client/
+__pycache__/
 
 # Husky (git hooks will be installed locally)
 .husky/_

@@ -5,26 +5,29 @@ import { loginSchema } from '@/lib/validation';
 import { signToken } from '@/lib/jwt';
 import { setSessionCookie } from '@/lib/session';
 import { logError, logInfo, logWarn } from '@/lib/logger';
+import { loginLimiter, applyRateLimit } from '@/lib/rateLimit';
+import { parseRequestBody, invalidCredentialsError, forbiddenError, internalError } from '@/lib/apiErrors';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-
-    // Validate input
-    const validationResult = loginSchema.safeParse(body);
-    if (!validationResult.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: validationResult.error.errors[0].message,
-          },
-        },
-        { status: 400 }
-      );
+    // Apply rate limiting (5 per IP per 15 minutes)
+    const rateLimitResult = applyRateLimit(
+      loginLimiter,
+      loginLimiter.getIPKey(request)
+    );
+    if (rateLimitResult) {
+      return rateLimitResult;
     }
 
-    const { emailOrUsername, password, rememberMe } = body;
+    // Validate input
+    const body = await request.json();
+    const bodyValidation = parseRequestBody(body, loginSchema);
+    
+    if (!bodyValidation.success) {
+      return bodyValidation.error;
+    }
+
+    const { emailOrUsername, password, rememberMe } = bodyValidation.data;
 
     // Find user
     const user = await prisma.user.findUnique({
@@ -40,15 +43,7 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       logWarn('auth.login.invalid_credentials', { emailOrUsername, reason: 'user_not_found' });
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_CREDENTIALS',
-            message: 'Invalid email/username or password',
-          },
-        },
-        { status: 401 }
-      );
+      return invalidCredentialsError();
     }
 
     // Verify password
@@ -56,29 +51,13 @@ export async function POST(request: NextRequest) {
 
     if (!isValidPassword) {
       logWarn('auth.login.invalid_credentials', { emailOrUsername, reason: 'bad_password' });
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_CREDENTIALS',
-            message: 'Invalid email/username or password',
-          },
-        },
-        { status: 401 }
-      );
+      return invalidCredentialsError();
     }
 
     // Check if user has a family membership
     if (user.memberships.length === 0) {
       logWarn('auth.login.no_membership', { emailOrUsername, userId: user.id });
-      return NextResponse.json(
-        {
-          error: {
-            code: 'NO_MEMBERSHIP',
-            message: 'User is not a member of any family space',
-          },
-        },
-        { status: 403 }
-      );
+      return forbiddenError('User is not a member of any family space');
     }
 
     const membership = user.memberships[0];
@@ -121,14 +100,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     logError('auth.login.error', error);
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError();
   }
 }

@@ -1,90 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
 import { createPostSchema } from '@/lib/validation';
 import { savePhotoFile } from '@/lib/uploads';
 import { MAX_PHOTO_COUNT, normalizePostPayload } from '@/lib/postPayload';
 import { logError } from '@/lib/logger';
+import { withAuth } from '@/lib/apiAuth';
+import { postCreationLimiter, applyRateLimit } from '@/lib/rateLimit';
+import {
+  badRequestError,
+  validationError,
+  internalError,
+} from '@/lib/apiErrors';
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request, user) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'UNAUTHORIZED',
-            message: 'Not authenticated',
-          },
-        },
-        { status: 401 }
-      );
+    // Apply rate limiting (10 posts per user per hour)
+    const rateLimitResult = applyRateLimit(
+      postCreationLimiter,
+      postCreationLimiter.getUserKey(user.id)
+    );
+    if (rateLimitResult) {
+      return rateLimitResult;
     }
 
     const formData = await request.formData();
     const rawPayload = formData.get('payload');
 
     if (!rawPayload || typeof rawPayload !== 'string') {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_PAYLOAD',
-            message: 'Missing payload',
-          },
-        },
-        { status: 400 }
-      );
+      return badRequestError('Missing payload');
     }
 
     let parsedPayload: unknown;
     try {
       parsedPayload = JSON.parse(rawPayload);
     } catch {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_JSON',
-            message: 'Payload must be valid JSON',
-          },
-        },
-        { status: 400 }
-      );
+      return badRequestError('Payload must be valid JSON');
     }
 
     const normalizedPayload = normalizePostPayload(parsedPayload);
     const validatedPayload = createPostSchema.safeParse(normalizedPayload);
 
     if (!validatedPayload.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: validatedPayload.error.errors[0]?.message || 'Invalid input',
-          },
-        },
-        { status: 400 }
+      return validationError(
+        validatedPayload.error.errors[0]?.message || 'Invalid input'
       );
     }
+
+    const isFormDataFile = (entry: unknown): entry is File => {
+      if (typeof File !== 'undefined' && entry instanceof File)
+        return entry.size > 0;
+      if (!entry || typeof entry !== 'object') return false;
+      const maybe = entry as any;
+      return (
+        typeof maybe.size === 'number' &&
+        typeof maybe.arrayBuffer === 'function' &&
+        maybe.size > 0
+      );
+    };
 
     const files = formData
       .getAll('photos')
-      .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+      .filter((entry): entry is File => isFormDataFile(entry));
 
     if (files.length > MAX_PHOTO_COUNT) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'TOO_MANY_PHOTOS',
-            message: `You can upload up to ${MAX_PHOTO_COUNT} photos`,
-          },
-        },
-        { status: 400 }
-      );
+      return badRequestError(`You can upload up to ${MAX_PHOTO_COUNT} photos`);
     }
 
-    const savedPhotos = await Promise.all(files.map((file) => savePhotoFile(file)));
+    const savedPhotos = await Promise.all(
+      files.map((file) => savePhotoFile(file))
+    );
 
     const payload = validatedPayload.data;
     const recipeInput = payload.recipe;
@@ -93,8 +78,8 @@ export async function POST(request: NextRequest) {
       recipeInput?.courses && recipeInput.courses.length > 0
         ? recipeInput.courses
         : recipeInput?.course
-        ? [recipeInput.course]
-        : [];
+          ? [recipeInput.course]
+          : [];
 
     let tags: { id: string }[] = [];
 
@@ -141,7 +126,7 @@ export async function POST(request: NextRequest) {
             }
           : undefined,
         recipeDetails: recipeInput
-          ? {
+          ? ({
               create: {
                 origin: recipeInput.origin ?? null,
                 ingredients: JSON.stringify(
@@ -171,7 +156,7 @@ export async function POST(request: NextRequest) {
                   : null,
                 difficulty: recipeInput.difficulty ?? null,
               },
-            } as any
+            } as any)
           : undefined,
         tags: tags.length
           ? {
@@ -229,14 +214,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError();
   }
-}
+});

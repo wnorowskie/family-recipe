@@ -1,41 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
 import { logError } from '@/lib/logger';
+import { withAuth } from '@/lib/apiAuth';
+import { canDeleteComment } from '@/lib/permissions';
+import { parseRouteParams, notFoundError, forbiddenError, internalError } from '@/lib/apiErrors';
+import { commentIdParamSchema } from '@/lib/validation';
 
-const paramsSchema = z.object({
-  commentId: z.string().min(1, 'Comment ID is required'),
-});
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { commentId: string } }
-) {
+export const DELETE = withAuth(async (request, user, context?: { params: { commentId: string } }) => {
   try {
-    const user = await getCurrentUser(request);
+    const { params } = context!;
+    const paramsValidation = parseRouteParams(params, commentIdParamSchema);
 
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
+    if (!paramsValidation.success) {
+      return paramsValidation.error;
     }
 
-    const parseResult = paramsSchema.safeParse(params);
-    if (!parseResult.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_PARAMS',
-            message: parseResult.error.errors[0]?.message ?? 'Invalid comment ID',
-          },
-        },
-        { status: 400 }
-      );
-    }
-
-    const { commentId } = parseResult.data;
+    const { commentId } = paramsValidation.data;
 
     const comment = await prisma.comment.findUnique({
       where: { id: commentId },
@@ -49,35 +30,18 @@ export async function DELETE(
     });
 
     if (!comment || comment.post.familySpaceId !== user.familySpaceId) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'Comment not found' } },
-        { status: 404 }
-      );
+      return notFoundError('Comment not found');
     }
 
-    const isOwner = user.role === 'owner' || user.role === 'admin';
-    const isAuthor = comment.authorId === user.id;
-
-    if (!isOwner && !isAuthor) {
-      return NextResponse.json(
-        { error: { code: 'FORBIDDEN', message: 'Not allowed to delete comment' } },
-        { status: 403 }
-      );
+    if (!canDeleteComment(user, comment)) {
+      return forbiddenError('Not allowed to delete comment');
     }
 
     await prisma.comment.delete({ where: { id: commentId } });
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    logError('comments.delete.error', error, { commentId: params?.commentId });
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'An unexpected error occurred',
-        },
-      },
-      { status: 500 }
-    );
+    logError('comments.delete.error', error, { commentId: context?.params?.commentId });
+    return internalError();
   }
-}
+});

@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/apiAuth';
 import { prisma } from '@/lib/prisma';
 import { logError } from '@/lib/logger';
+import { notFoundError, internalError } from '@/lib/apiErrors';
 
 interface RouteContext {
   params: {
@@ -21,26 +22,15 @@ async function ensurePostAccess(postId: string, familySpaceId: string) {
   return Boolean(post);
 }
 
-export async function POST(request: NextRequest, { params }: RouteContext) {
+export const POST = withAuth(async (request, user, context?: RouteContext) => {
+  const { params } = context!;
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
     const postId = params.postId;
 
     const canAccess = await ensurePostAccess(postId, user.familySpaceId);
 
     if (!canAccess) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'Post not found' } },
-        { status: 404 }
-      );
+      return notFoundError('Post not found');
     }
 
     await prisma.favorite.upsert({
@@ -59,34 +49,20 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ status: 'favorited' }, { status: 200 });
   } catch (error) {
-    logError('favorites.add.error', error, { postId: params?.postId });
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Unable to favorite post' } },
-      { status: 500 }
-    );
+    logError('favorites.add.error', error, { postId: context?.params?.postId });
+    return internalError('Unable to favorite post');
   }
-}
+});
 
-export async function DELETE(request: NextRequest, { params }: RouteContext) {
+export const DELETE = withAuth(async (request, user, context?: RouteContext) => {
+  const { params } = context!;
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
     const postId = params.postId;
 
     const canAccess = await ensurePostAccess(postId, user.familySpaceId);
 
     if (!canAccess) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'Post not found' } },
-        { status: 404 }
-      );
+      return notFoundError('Post not found');
     }
 
     await prisma.favorite.deleteMany({
@@ -98,10 +74,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ status: 'unfavorited' }, { status: 200 });
   } catch (error) {
-    logError('favorites.remove.error', error, { postId: params?.postId });
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Unable to remove favorite' } },
-      { status: 500 }
-    );
+    logError('favorites.remove.error', error, { postId: context?.params?.postId });
+    return internalError('Unable to remove favorite');
   }
-}
+});

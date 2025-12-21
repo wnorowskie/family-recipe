@@ -92,6 +92,94 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Running with Docker (Postgres)
+
+To run the monolith + Postgres in containers:
+
+1. Build and start:
+
+```
+docker compose up --build
+```
+
+- App: <http://localhost:3000>
+- Postgres data persists in the `postgres-data` volume.
+- Uploaded images persist via the bind mount `./public/uploads:/app/public/uploads`.
+- Migrations run on container start via `prisma migrate deploy --schema prisma/schema.postgres.prisma`.
+
+2. Re-run migrations manually (if needed):
+
+```
+docker compose run --rm app npx prisma migrate deploy --schema prisma/schema.postgres.prisma
+```
+
+3. Seed data (optional):
+
+```
+docker compose exec app npm run db:seed
+```
+
+### Local Development Options
+
+- **SQLite (default):** Use the `.env` defaults and `npm run dev`.
+- **Local Postgres without Docker:** Set `DATABASE_URL` to the Postgres URL and `PRISMA_SCHEMA=prisma/schema.postgres.prisma`, then run:
+
+```
+npx prisma generate --schema prisma/schema.postgres.prisma
+npx prisma db push --schema prisma/schema.postgres.prisma
+npm run dev
+```
+
+Prisma migrations are generated for Postgres; stick to `prisma db push` for SQLite workflows.
+
+### Connecting to Cloud SQL (dev)
+
+- Run Cloud SQL Auth Proxy:
+
+```
+cloud-sql-proxy family-recipe-dev:us-east1:family-recipe-dev --port 5432
+```
+
+- Set `DATABASE_URL` using the Secret Manager password:
+
+```
+DATABASE_URL="postgresql://family_app:DB_PASSWORD@127.0.0.1:5432/family_recipe_dev?sslmode=disable"
+PRISMA_SCHEMA=prisma/schema.postgres.prisma
+```
+
+- Apply migrations and seed:
+
+```
+DATABASE_URL="postgresql://family_app:DB_PASSWORD@127.0.0.1:5432/family_recipe_dev?sslmode=disable" \
+PRISMA_SCHEMA=prisma/schema.postgres.prisma \
+npx prisma migrate deploy --schema prisma/schema.postgres.prisma
+
+DATABASE_URL="postgresql://family_app:DB_PASSWORD@127.0.0.1:5432/family_recipe_dev?sslmode=disable" \
+PRISMA_SCHEMA=prisma/schema.postgres.prisma \
+FAMILY_NAME="Family Recipe" FAMILY_MASTER_KEY="actual-master-key" \
+npm run db:seed
+```
+
+### Connecting to Cloud Run (dev)
+
+- Ensure the Cloud Run service ingress is set to **All traffic (INGRESS_TRAFFIC_ALL)**. Without that setting, the proxy will respond with 404s even when the service is healthy.
+- Start the Cloud Run proxy (requires `gcloud auth login` first):
+
+```
+gcloud run services proxy family-recipe-dev \
+	--project family-recipe-dev \
+	--region us-east1 \
+	--port 9999
+```
+
+- With the proxy running you can hit the deployed app at <http://127.0.0.1:9999>. For quick verification, curl the health check:
+
+```
+curl -i http://127.0.0.1:9999/api/health
+```
+
+- Stop the proxy with `Ctrl+C` when you're done.
+
 ---
 
 ## Project Structure

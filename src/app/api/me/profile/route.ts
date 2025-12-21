@@ -1,22 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
-import { getCurrentUser } from '@/lib/session';
+import { withAuth } from '@/lib/apiAuth';
 import { prisma } from '@/lib/prisma';
-import { savePhotoFile } from '@/lib/uploads';
+import { isFileLike, savePhotoFile } from '@/lib/uploads';
 import { updateProfileSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
+import { validationError, conflictError, internalError } from '@/lib/apiErrors';
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = withAuth(async (request, user) => {
   try {
-    const user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
     const formData = await request.formData();
     const rawPayload = {
       name: formData.get('name'),
@@ -26,14 +18,8 @@ export async function PATCH(request: NextRequest) {
     const parsed = updateProfileSchema.safeParse(rawPayload);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_INPUT',
-            message: parsed.error.errors[0]?.message ?? 'Invalid input',
-          },
-        },
-        { status: 400 }
+      return validationError(
+        parsed.error.errors[0]?.message ?? 'Invalid input'
       );
     }
 
@@ -41,7 +27,7 @@ export async function PATCH(request: NextRequest) {
     const removeAvatar = formData.get('removeAvatar') === 'true';
     const avatarFile = formData.get('avatar');
 
-    if (avatarFile instanceof File && avatarFile.size > 0) {
+    if (isFileLike(avatarFile) && avatarFile.size > 0) {
       try {
         const saved = await savePhotoFile(avatarFile);
         avatarUpdate = saved.url;
@@ -56,7 +42,11 @@ export async function PATCH(request: NextRequest) {
       avatarUpdate = null;
     }
 
-    const data: { name: string; emailOrUsername: string; avatarUrl?: string | null } = {
+    const data: {
+      name: string;
+      emailOrUsername: string;
+      avatarUrl?: string | null;
+    } = {
       name: parsed.data.name,
       emailOrUsername: parsed.data.emailOrUsername,
     };
@@ -82,26 +72,10 @@ export async function PATCH(request: NextRequest) {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2002'
     ) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'CONFLICT',
-            message: 'That email or username is already in use',
-          },
-        },
-        { status: 409 }
-      );
+      return conflictError('That email or username is already in use');
     }
 
     logError('profile.update.error', error);
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'Unable to update profile',
-        },
-      },
-      { status: 500 }
-    );
+    return internalError('Unable to update profile');
   }
-}
+});

@@ -134,7 +134,7 @@ The immediate goal is to take this V1 implementation and evolve it into a **prod
 
 **Goal:** Clean, understandable repo ready for DevSecOps work.
 
-- [ ] Update:
+- [✓] Update:
   - [✓] `.gitignore` (node_modules, .next, local DB, `.env*`, etc.)
   - [✓] `.editorconfig`
   - [✓] `README.md` with:
@@ -143,9 +143,9 @@ The immediate goal is to take this V1 implementation and evolve it into a **prod
     - [✓] Local run instructions
   - [✓] `.env.example` with all required env variables (no real secrets)
 - [✓] Create remote repo and push current code (GitHub).
-- [ ] Create branches:
+- [✓] Create branches:
   - [✓] `main` → production
-  - [ ] `develop` → active development
+  - [✓] `develop` → active development
 - [✓] Ensure ESLint + Prettier are configured for Next.js + TypeScript.
 - [✓] Ensure strict TypeScript (`"strict": true`).
 - [✓] Add pre-commit lint/format.
@@ -158,192 +158,572 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 
 #### 1.1 Auth & Access Control
 
-- [ ] Confirm password hashing uses a strong algorithm (bcrypt/argon2).
-- [ ] Store the **Family Master Key** as a **hash** in the database.
-- [ ] Ensure **all non-auth routes** require authentication.
-- [ ] Implement/verify permission checks:
-  - [ ] Only post author or admin can edit/delete a post.
-  - [ ] Only comment author or admin can delete a comment.
-  - [ ] Only owner can remove family members.
-- [ ] Add basic rate limiting to:
-  - [ ] Signup
-  - [ ] Login
-  - [ ] Any high-write endpoints identified as hot spots in V1 (e.g., comments, “Cooked this”).
+- [✓] Confirm password hashing uses a strong algorithm (bcrypt).
+- [✓] Store the **Family Master Key** as a **hash** in the database.
+- [✓] Ensure **all non-auth routes** require authentication.
+- [✓] Implement/verify permission checks:
+  - [✓] Only post author or admin can edit/delete a post.
+  - [✓] Only comment author or admin can delete a comment.
+  - [✓] Only owner can remove family members.
+- [✓] Add basic rate limiting to:
+  - [✓] Signup
+  - [✓] Login
+  - [✓] Any high-write endpoints identified as hot spots in V1 (e.g., comments, “Cooked this”).
 
 #### 1.2 Input Validation
 
-- [ ] Introduce schema validation (e.g., Zod) at API boundaries.
-- [ ] Validate inputs for:
-  - [ ] Signup/login
-  - [ ] Create/edit post (title required, enums valid, tags valid)
-  - [ ] Comments
-  - [ ] Reactions
-  - [ ] “Cooked this!” events
-  - [ ] Pagination/search query params
-- [ ] Implement a **consistent error response format**
-- [ ] Replace any “minimal validation” with concrete validation rules.
-- [ ] Ensure API endpoints that are “happy-path only” now handle invalid input properly.
+- [✓] Introduce schema validation (Zod) at API boundaries.
+- [✓] Validate inputs for:
+  - [✓] Signup/login
+  - [✓] Create/edit post (title required, enums valid, tags valid)
+  - [✓] Comments
+  - [✓] Reactions
+  - [✓] "Cooked this!" events
+  - [✓] Pagination/search query params
+- [✓] Implement a **consistent error response format**
+- [✓] Replace any "minimal validation" with concrete validation rules.
+- [✓] Ensure API endpoints that are "happy-path only" now handle invalid input properly.
 
 #### 1.3 Testing
 
-- [ ] Set up test framework (Jest).
-- [ ] Set up code coverage tool (Istanbul).
-- [ ] Write **unit tests** for:
-  - [ ] Auth helpers (e.g., password hashing, master key verification).
-  - [ ] Permission checks (“can this user edit/delete this resource?”).
-  - [ ] Validation helpers/schemas.
-- [ ] Write **API integration tests** for:
-  - [ ] Signup with valid/invalid master key.
-  - [ ] Login success/failure.
-  - [ ] Create post (quick + full recipe).
-  - [ ] Create comment.
-  - [ ] Create “Cooked this!” event.
-  - [ ] Favorite/unfavorite.
-  - [ ] Any other major feature flows.
-- [ ] (If time allows) Add minimal **E2E tests** (Playwright) for:
-  - [ ] Sign up and log in.
-  - [ ] Create a post and see it in the timeline.
-  - [ ] Mark “Cooked this” and see it reflected.
+- [✓] Set up test framework (Jest) and coverage (Istanbul).
+- [✓] Write **unit tests** for:
+  - [✓] Auth helpers (bcrypt, jwt).
+  - [✓] Permission checks.
+  - [✓] Validation helpers/schemas.
+  - [✓] Business logic: recipes, posts, uploads, rate limiting, timeline utilities, tags, ingredients, session, post payload, family.
+- [✓] Write **API integration tests** for:
+  - [✓] Signup with valid/invalid master key.
+  - [✓] Login success/failure.
+  - [✓] Create/update/delete post (quick + full recipe).
+  - [✓] Comment create/delete.
+  - [✓] “Cooked this!” events.
+  - [✓] Favorite/unfavorite.
+  - [✓] Reactions and timeline aggregation.
+  - [✓] Profile endpoints (posts/cooked/favorites).
+  - [✓] Family member add/remove/list.
+- [✓] Coverage target: achieved 98%+ statements/lines, 99%+ functions across 930 tests; remaining gaps isolated to rare branch-only paths.
 
 ### Phase 2 – Local Environment Parity & Dockerization
 
 **Goal:** Make the app easy to run as a containerized monolith locally, ready for future splitting.
 
-- [ ] Keep Next.js as a monolith (frontend + API) for now.
-- [ ] Create a `Dockerfile` for the app:
-  - [ ] Install dependencies.
-  - [ ] Build the app.
-  - [ ] Run `next start`.
-- [ ] Add a `docker-compose.yml` with:
-  - [ ] `app` service (Next.js container).
-  - [ ] `db` service (Postgres official image).
-  - [ ] Shared network and volume for Postgres data.
-- [ ] Ensure migrations run in containers:
-  - [ ] Command/steps to run `prisma migrate deploy` inside the app container.
-- [ ] Verify local dev can run:
-  - [ ] Directly via `npm run dev` (SQLite or local Postgres).
-  - [ ] Via `docker-compose up` using Postgres.
-- [ ] Address any local environment quirks (e.g., assumptions about file paths, local-only image storage) so they work inside containers.
+- [✓] Keep Next.js as a monolith (frontend + API) for now.
+- [✓] Create a `Dockerfile` for the app:
+  - [✓] Install dependencies.
+  - [✓] Build the app.
+  - [✓] Run `next start`.
+- [✓] Add a `docker-compose.yml` with:
+  - [✓] `app` service (Next.js container).
+  - [✓] `db` service (Postgres official image).
+  - [✓] Shared network and volume for Postgres data.
+- [✓] Ensure migrations run in containers:
+  - [✓] Command/steps to run `prisma migrate deploy` inside the app container.
+- [✓] Verify local dev can run:
+  - [✓] Directly via `npm run dev` (SQLite or local Postgres).
+  - [✓] Via `docker-compose up` using Postgres.
+- [✓] Address any local environment quirks (e.g., assumptions about file paths, local-only image storage) so they work inside containers.
 
 ### Phase 3 – External Database & Data Discipline
 
 **Goal:** Use a real managed Postgres instance with proper migrations and backups.
 
-- [ ] Choose a managed Postgres provider for v2 (Supabase or GCP Cloud SQL).
-- [ ] Create:
-  - [ ] Dev database.
-  - [ ] Prod database (can be empty for now).
-- [ ] Configure `DATABASE_URL` values for:
-  - [ ] Local dev
-  - [ ] Dev environment
-  - [ ] Prod environment
-- [ ] Run Prisma migrations against the **dev database** (`prisma migrate deploy`).
-- [ ] Add a **seed script**:
-  - [ ] Create initial `FamilySpace`.
-  - [ ] Store hashed family master key.
-  - [ ] Create owner user or a way to bootstrap one.
-- [ ] Enable **automatic backups** for the prod database with a reasonable retention period.
-- [ ] Ensure any **schema changes** (e.g., additional indexes, enum refinements) are captured in migrations.
-- [ ] Identify any data fields currently unused in V1 and decide whether to keep, remove, or fully wire them.
+- [✓] Choose a managed Postgres provider for v2 (GCP Cloud SQL).
+- [✓] Create:
+  - [✓] Dev database (Cloud SQL Postgres).
+  - [ ] (Prod database moved to Phase 7).
+- [✓] Configure `DATABASE_URL` values for:
+  - [✓] Local dev (Cloud SQL via proxy).
+  - [✓] Dev environment.
+  - [ ] (Prod environment moved to Phase 7).
+- [✓] Run Prisma migrations against the **dev database** (`prisma migrate deploy`).
+- [✓] Add a **seed script** (or reuse existing) to:
+  - [✓] Create initial `FamilySpace`.
+  - [✓] Store hashed family master key.
+  - [✓] Create owner user or a way to bootstrap one.
+- [✓] Ensure any **schema changes** (e.g., additional indexes, enum refinements) are captured in migrations.
+- [✓] Identify any data fields currently unused in V1 and decide whether to keep, remove, or fully wire them.
+
+**Open follow-up:** Dev currently allows Cloud SQL public IP with TLS; plan to move to private IP + TLS-only and tighten authorized networks when VPC/private service access is in place (phase 7).
 
 ### Phase 4 – CI Pipeline (DevSecOps Core)
 
 **Goal:** Every change is gated by tests, checks, and scans.
 
-- [ ] Set up CI using GitHub Actions.
-- [ ] CI workflow for PRs and pushes to `develop`/`main` should:
-  - [ ] Checkout code.
-  - [ ] Install dependencies.
-  - [ ] Run **typecheck** (TS).
-  - [ ] Run **lint**.
-  - [ ] Run **tests** (unit + integration).
-  - [ ] Run **build**.
-  - [ ] Run **dependency scan** (e.g., `npm audit` or similar).
-  - [ ] Run **secrets scan** (e.g., `gitleaks` / `detect-secrets`).
-  - [ ] Run **SAST** (GitHub CodeQL, semgrep, etc.).
-- [ ] Configure **branch protections**:
-  - [ ] Require CI to pass before merging into `develop`.
-  - [ ] Require CI to pass before merging into `main`.
-  - [ ] Disallow direct pushes to `main` and `develop`.
-- [ ] Add any additional checks that make sense given the current implementation (e.g., run Prisma migrations in CI using a temp DB to verify they apply cleanly).
+- [✓] Set up CI using GitHub Actions.
+- [✓] CI workflow for PRs and pushes to `develop`/`main` should:
+  - [✓] Checkout code.
+  - [✓] Install dependencies.
+  - [✓] Run **typecheck** (TS).
+  - [✓] Run **lint**.
+  - [✓] Run **tests** (unit + integration).
+  - [✓] Run **build**.
+  - [✓] Run **dependency scan** (e.g., `npm audit` or similar).
+  - [✓] Run **secrets scan** (e.g., `gitleaks` / `detect-secrets`).
+  - [✓] Run **SAST** (GitHub CodeQL).
+- [✓] Configure **branch protections**:
+  - [✓] Require CI to pass before merging into `develop`.
+  - [✓] Require CI to pass before merging into `main`.
+  - [✓] Disallow direct pushes to `main` and `develop`.
+- [✓] Add any additional checks that make sense given the current implementation (e.g., run Prisma migrations in CI using a temp DB to verify they apply cleanly).
 
 ### Phase 5 – First “Dev” Deploy of the Monolith
 
 **Goal:** Deploy the app to a real dev environment with proper env vars and checks.
 
-- [ ] Choose hosting platform for v2:
-  - [ ] Vercel for the monolith Next.js app.
-- [ ] Connect repo to hosting platform.
-- [ ] Configure **dev environment**:
-  - [ ] `DATABASE_URL` (dev DB).
-  - [ ] Auth/crypto secrets (e.g., NextAuth secret, JWT secret).
-  - [ ] Any other required env vars (master key hash if needed, etc.).
-- [ ] Ensure deploys to dev are:
-  - [ ] Triggered from `develop` (or PR branches).
-  - [ ] Gated by CI passing.
-- [ ] Confirm:
-  - [ ] Dev URL is accessible.
-  - [ ] Basic flows work (signup, login, create post, “Cooked this”, comments, favorites, profile, recipes browse/search).
-- [ ] Verify any known limitations (e.g., image handling, search behavior) behave at least predictably in dev.
+- [x] Choose hosting platform for v2:
+  - [x] GCP Cloud Run (monolith Next.js app), private (auth required; no public unauthenticated access).
+- [x] Connect repo to GCP for builds/deploys:
+  - [x] Artifact Registry for images.
+  - [x] Workload Identity Federation for GitHub Actions to push and deploy.
+- [x] Configure **dev environment** (Cloud Run + Cloud SQL):
+  - [x] `DATABASE_URL` via Cloud SQL connector socket + Secret Manager (uses dev DB password already in GSM).
+  - [x] Auth/crypto secrets: `JWT_SECRET` (Secret Manager), optional seeded `FAMILY_MASTER_KEY` if needed for bootstrap.
+  - [x] Prisma schema set to Postgres (`PRISMA_SCHEMA=prisma/schema.postgres.prisma`).
+- [x] GCS-backed uploads:
+  - [x] Create private bucket for uploads; enforce signed URL access; set `UPLOADS_BUCKET` and `UPLOADS_BASE_URL`.
+  - [x] Update upload helpers to write/delete in GCS and return signed URLs for reads.
+- [x] Deployments to dev:
+  - [x] Auto-deploy on `develop` (and manual `workflow_dispatch`); Cloud Run service provisioned with Cloud SQL + secrets wired.
+- [ ] Post-deploy verification:
+  - [ ] Dev URL reachable (with auth); basic flows work (signup, login, create post, “Cooked this”, comments, favorites, profile, recipes browse/search).
+  - [ ] Validate signed URL image behavior and any known limitations (e.g., search quirks) behave predictably in dev.
 
 ### Phase 6 – Security & Privacy Polish (If Time Allows)
 
 **Goal:** Go from “works” to “thoughtful about security and privacy.”
 
-- [ ] Ensure **all secrets** live only in:
-  - [ ] Hosting platform env settings.
-  - [ ] GitHub Secrets.
-- [ ] Configure basic security headers:
-  - [ ] Content-Security-Policy (CSP) (start with a simple one).
-  - [ ] X-Frame-Options.
-  - [ ] X-Content-Type-Options.
-  - [ ] Referrer-Policy.
-- [ ] Double-check logs:
-  - [ ] No sensitive tokens.
-  - [ ] No passwords or master key values.
-- [ ] Confirm rate limiting is in place on critical endpoints.
-- [ ] Address any specific security/privacy concerns (e.g., how long sessions last, how public URLs for images are handled).
+- [✓] Ensure **all secrets** live only in:
+  - [✓] Hosting platform env settings.
+  - [✓] GitHub Secrets.
+- [✓] Configure basic security headers:
+  - [✓] Content-Security-Policy (CSP) (start with a simple one).
+  - [✓] X-Frame-Options.
+  - [✓] X-Content-Type-Options.
+  - [✓] Referrer-Policy.
+- [✓] Double-check logs:
+  - [✓] No sensitive tokens.
+  - [✓] No passwords or master key values.
+- [✓] Confirm rate limiting is in place on critical endpoints.
+- [✓] Address any specific security/privacy concerns (e.g., how long sessions last, how public URLs for images are handled).
 
-### Phase 7 – Production Environment & Observability (If Time Allows)
+Security polish updates:
+
+- Added security headers via Next.js headers: CSP allowing self + storage.googleapis.com for signed URLs and local previews (data:/blob:), plus WS for dev HMR; media/image scoped accordingly; X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy same-origin.
+- Verified secrets remain sourced from env/Secret Manager and GitHub Secrets (no hardcoded secrets or sample values beyond `.env.example` placeholders).
+- Re-reviewed logging to avoid sensitive values and confirmed rate limiters cover auth and high-write endpoints; session cookies remain HTTP-only with 7/30 day lifetimes and uploads continue to use signed URLs with TTL.
+
+### Phase 7 – Extract API (If Time Allows)
+
+**Goal:** Prepare for a split architecture and GCP move.
+
+- [✓] Plan extraction of API into a separate Node/TS or Python service:
+  - [✓] Reuse Prisma models and API contracts defined in `TECHNICAL_SPEC.md`.
+  - [✓] Match existing REST endpoints so the frontend doesn’t have to change much.
+- [✓] Containerize API separately and:
+  - [ ] Deploy to GCP Cloud Run. (will do after prod deploy is complete)
+  - [✓] Hits managed Postgres instance.
+- [✓] Consider building out testing frameworks for the new API service
+- [ ] Update frontend to call the external API service instead of internal API routes. (will do after prod deploy is complete)
+
+### Phase 8 – Production Environment & Observability (If Time Allows)
 
 **Goal:** Bring up a monitored, safe prod environment my family can actually use.
 
+- [ ] Provision **prod database** (Cloud SQL Postgres) with backups/PITR and wire secrets.
+  - [✓] Added Terraform scaffold for prod in `infra/envs/prod/` (defaults: PITR on, public IP off).
 - [ ] Configure **prod environment** on hosting platform:
   - [ ] Point to prod `DATABASE_URL`.
   - [ ] Set all required secrets (auth, master key related, etc.).
-- [ ] Set deployment rules:
-  - [ ] Only deploy prod from `main`.
-  - [ ] Deploy triggered via merges to `main` (or manual approval of a green build).
-- [ ] Add **healthcheck** endpoint (e.g., `/api/health`) that:
-  - [ ] Checks DB connectivity.
-  - [ ] Returns simple status JSON.
+- [✓] Set deployment rules:
+  - [✓] Only deploy prod from `main` (via GitHub Actions workflow trigger).
+  - [✓] Deploy triggered via merges to `main` (optionally gate via GitHub Environment approvals).
+- [✓] Add **healthcheck** endpoint (e.g., `/api/health`) that:
+  - [✓] Checks DB connectivity.
+  - [✓] Returns simple status JSON.
 - [ ] Set up monitoring:
-  - [ ] Uptime monitor hitting prod URL and/or healthcheck.
+  - [ ] Uptime monitor hitting prod URL and/or healthcheck (custom domain recommended).
   - [ ] Error monitoring (depends on deployment strategy) for frontend + backend.
 - [ ] Verify logs are:
   - [ ] Structured enough to debug.
   - [ ] Not leaking sensitive data (passwords, master key, tokens).
 
-### Phase 8 – Extract API (If Time Allows)
-
-**Goal:** Prepare for a split architecture and Render/GCP move once v2 is stable.
-
-- [ ] Plan extraction of API into a separate Node/TS or Python service:
-  - [ ] Reuse Prisma models and API contracts defined in `TECHNICAL_SPEC.md`.
-  - [ ] Match existing REST endpoints so the frontend doesn’t have to change much.
-- [ ] Containerize API separately and:
-  - [ ] Deploy to GCP Cloud Run or Render.
-  - [ ] Hits managed Postgres instance.
-- [ ] Add IaC (Terraform) for:
-  - [ ] Cloud Run service.
-  - [ ] Cloud SQL.
-  - [ ] Networking and secrets.
-- [ ] Update frontend to call the external API service instead of internal API routes.
-- [ ] Remove frontend API routes in NextJs
-
 ---
 
 ## Implementation Accomplished
+
+### Phase 0 - Repo Setup & Baseline Hygiene
+
+**Goal:** Clean, understandable repo ready for DevSecOps work.
+
+#### What Was Accomplished
+
+1. **Repository Foundation**
+   - Enhanced `.gitignore` with comprehensive exclusions for Node.js, Next.js, IDE files, OS-specific files, databases, secrets, and uploads
+   - Created `.editorconfig` to enforce consistent code style across editors (UTF-8, LF line endings, 2-space indentation, trim trailing whitespace)
+   - Created `.env.example` documenting required environment variables (`DATABASE_URL`, `JWT_SECRET`) with security notes
+
+2. **Code Quality Infrastructure**
+   - Configured Prettier with React/Next.js industry standards (single quotes, semicolons, 80-char width, trailing commas ES5)
+   - Extended ESLint configuration with `eslint-config-prettier` to avoid conflicts
+   - Set up Husky + lint-staged for automated pre-commit hooks that:
+     - Run TypeScript type-checking (`npm run type-check`)
+     - Auto-fix ESLint issues on staged files
+     - Auto-format code with Prettier
+   - Added npm scripts: `lint:fix`, `format`, `format:check`, `type-check`, and `prepare`
+
+3. **TypeScript Strict Mode Cleanup**
+   - Fixed 18 TypeScript strict mode errors across 9 files:
+     - **Variable scope issues (6 files):** Moved user/postId variable declarations outside try blocks so they're accessible in catch block error handlers
+     - **JWT type safety:** Added runtime validation before type casting in `jwt.ts` to ensure payload properties exist and are correct types
+     - **SQLite compatibility:** Removed `mode: 'insensitive'` from Prisma queries (SQLite doesn't support this PostgreSQL feature)
+     - **Enum type assertions:** Fixed Set.has() calls with proper type casting for ingredient units and course values
+     - **Ingredient parsing:** Rewrote `parseRecipeIngredients` to properly handle nullable quantity fields
+   - Excluded `figma/` folder from TypeScript type-checking (prototyping code separate from production app)
+
+4. **Professional Documentation**
+   - Completely rewrote `README.md` with:
+     - Project overview with badges (TypeScript, Next.js, Prisma, License)
+     - Feature summary and project structure
+     - Clear setup instructions (environment setup, database initialization, dev server)
+     - Available scripts reference table
+     - Tech stack documentation
+     - V1/V2 roadmap
+
+5. **Version Control & GitHub**
+   - Initialized git repository
+   - Created initial commit with clean baseline (163 files, 29,204 insertions)
+   - Pushed to GitHub (`wnorowskie/family-recipe`)
+   - Established branch strategy: `main` (protected, production) and `develop` (active development)
+
+### Phase 1.1 - Auth & Access Control
+
+**Goal:** Harden authentication, authorization, and add rate limiting before deployment.
+
+#### What Was Accomplished
+
+1. **Password Security Verification**
+   - Confirmed bcrypt implementation in `src/lib/auth.ts` with 10 salt rounds
+   - Verified `hashPassword()` and `verifyPassword()` functions properly implemented
+   - Family Master Key stored as bcrypt hash in database, verified in signup flow
+
+2. **Authentication Middleware Infrastructure**
+   - Created `src/lib/apiAuth.ts` with `withAuth()` and `withRole()` wrapper functions
+   - Implemented `AuthenticatedUser` TypeScript interface for type safety
+   - Refactored all 21 API routes to use consistent authentication pattern:
+     - 2 auth routes (signup/login) remain unauthenticated
+     - 19 protected routes converted to `withAuth()` pattern
+   - Pattern guarantees authenticated user context in all handlers
+
+3. **Permission System**
+   - Created `src/lib/permissions.ts` with 5 centralized permission helpers:
+     - `isOwnerOrAdmin()` - checks elevated privileges
+     - `canEditPost()` - author or owner/admin can edit posts
+     - `canDeletePost()` - author or owner/admin can delete posts
+     - `canDeleteComment()` - author or owner/admin can delete comments
+     - `canRemoveMember()` - only owner/admin, with additional constraints (cannot remove self or owner)
+   - Integrated permission helpers into 5 routes:
+     - `/api/posts/[postId]` (PUT/DELETE handlers)
+     - `/api/comments/[commentId]` (DELETE handler)
+     - `/api/family/members/[userId]` (DELETE handler)
+
+4. **Rate Limiting Implementation**
+   - Installed `lru-cache` 7.18.3 for in-memory rate limiting (Vercel-compatible, single-instance safe)
+   - Created `src/lib/rateLimit.ts` with `RateLimiter` class supporting:
+     - LRU cache with configurable size (500 entries per limiter)
+     - TTL-based expiration
+     - IP detection following DevSecOps best practices (X-Forwarded-For → X-Real-IP → request.ip)
+     - Standard HTTP 429 responses with Retry-After header in seconds
+   - Configured 6 pre-configured rate limiters:
+     - **Signup:** 3 attempts per IP per hour
+     - **Login:** 5 attempts per IP per 15 minutes
+     - **Post Creation:** 10 per user per hour
+     - **Comments:** 10 per user per minute
+     - **"Cooked This" Events:** 10 per user per minute
+     - **Reactions:** 30 per user per minute
+   - Applied rate limiting to all critical write endpoints
+
+5. **Code Organization & Patterns**
+   - Established consistent route handler pattern:
+     ```typescript
+     export const METHOD = withAuth(async (request, user, context?) => {
+       // Rate limiting if needed
+       // Handler logic with permission helpers
+     });
+     ```
+   - Used optional context parameters for dynamic routes with non-null assertions
+   - Maintained TypeScript strict mode compliance (0 errors)
+   - Made 4 incremental commits on feature branch following git flow
+
+### Phase 1.2 - Input Validation
+
+**Goal:** Implement comprehensive schema validation and consistent error handling across all API endpoints.
+
+#### What Was Accomplished
+
+1. **Standardized Error Response System**
+   - Created `src/lib/apiErrors.ts` with consolidated error code enum:
+     - `VALIDATION_ERROR` - Schema validation failures
+     - `BAD_REQUEST` - General bad request errors
+     - `UNAUTHORIZED` - Missing/invalid authentication
+     - `INVALID_CREDENTIALS` - Failed login attempts
+     - `FORBIDDEN` - Insufficient permissions
+     - `NOT_FOUND` - Resource not found
+     - `CONFLICT` - Duplicate resource conflicts
+     - `RATE_LIMIT_EXCEEDED` - Rate limit violations
+     - `INTERNAL_ERROR` - Unexpected server errors
+   - Implemented 8 error helper functions returning consistent `NextResponse` objects
+   - Defined `ApiErrorResponse` TypeScript interface: `{ error: { code, message } }`
+   - All errors now use standard HTTP status codes with consistent JSON structure
+
+2. **Comprehensive Validation Schemas**
+   - Extended `src/lib/validation.ts` with Zod schemas for all API inputs:
+     - **Pagination schema**: limit (1-100, default 20), offset (≥0, default 0) with `.coerce` for automatic type conversion
+     - **Timeline/Comments/Cooked schemas**: Extend pagination for consistent query param handling
+     - **Recipe filters schema**: Complex validation with 13 filter types:
+       - Search query (max 200 chars)
+       - Arrays: course, tags, difficulty, authorId, ingredients (with deduplication)
+       - Number ranges: totalTime (0-720 min), servings (1-50) with cross-field validation (min≤max)
+       - Sort option (recent/alpha)
+     - **Route param schemas**: postId, commentId, userId all validated as CUID format
+   - Preserved existing business rules: MAX_TIME_MINUTES=720, MAX_SERVINGS=50, INGREDIENT_LIMIT=5
+   - Used `.transform()` for array deduplication and `.refine()` for cross-field validation
+
+3. **Validation Helper Utilities**
+   - Created 3 reusable helper functions in `apiErrors.ts`:
+     - `parseQueryParams<T>()`: Handles URLSearchParams including arrays via repeated params (?key=val1&key=val2)
+     - `parseRouteParams<T>()`: Validates dynamic route parameters with proper typing
+     - `parseRequestBody<T>()`: Validates request bodies with schema enforcement
+   - All helpers return discriminated union: `{ success: true, data: T } | { success: false, error: NextResponse }`
+   - Enables clean early-return pattern: `if (!validation.success) return validation.error;`
+
+4. **Route Validation Implementation**
+   - Applied validation to 7 routes missing proper input validation:
+     - `/api/timeline` - pagination query params
+     - `/api/recipes` - replaced ~90 lines of manual parsing with single schema validation
+     - `/api/family/members` - error helper adoption
+     - `/api/me/favorites` - pagination validation
+     - `/api/profile/posts` - pagination validation
+     - `/api/profile/cooked` - pagination validation
+     - `/api/auth/login` - request body validation with error helpers
+   - Eliminated manual parsing code with bounds checking scattered across routes
+   - Standardized error responses replacing 6+ different inline error formats
+
+5. **Technical Decisions & Patterns**
+   - Consolidated VALIDATION_ERROR and INVALID_INPUT into single code per requirements
+   - Used REST-standard repeated parameters for arrays (not query string array notation)
+   - Applied `.optional().default()` pattern with destructuring fallbacks for TypeScript type narrowing
+   - Maintained strict rejection of invalid input (no lenient coercion beyond explicit `.coerce` for numbers)
+
+6. **Complete Error Helper Refactoring (Task 5)**
+   - Systematically refactored all 21 API routes to use standardized error helpers
+   - Route groups refactored across 7 additional commits:
+     - Auth routes (signup, login, logout) - 3 routes
+     - Main posts route - 1 route
+     - Reactions route - 1 route
+     - Comments deletion route - 1 route
+     - Profile routes (update, password) - 2 routes
+     - Family member removal route - 1 route
+     - Posts subroutes (favorite, cooked, comments) - 3 routes
+   - Eliminated all inline error responses: `NextResponse.json({ error: { code, message }}, {status})`
+   - Replaced with error helpers: `notFoundError()`, `forbiddenError()`, `validationError()`, etc.
+   - Consolidated custom param schemas to centralized schemas from validation.ts
+
+### Phase 1.3 - Testing Implementation & Coverage
+
+**Goal:** Achieve comprehensive test coverage (≥80% on all metrics) with DevSecOps best practices, establishing confidence in code quality before deployment.
+
+#### What Was Accomplished
+
+1. **Testing Infrastructure Setup**
+   - Installed Jest 29.7+ with ts-jest for TypeScript support and Next.js integration
+   - Configured jest-mock-extended 3.0+ for type-safe Prisma mocking
+   - Created comprehensive `jest.config.js` with:
+     - Path mapping (`@/` alias) matching TypeScript configuration
+     - Coverage thresholds (75% minimum on all metrics)
+     - Next.js-specific test environment configuration
+     - Exclusion patterns for generated code and prototypes
+   - Set up `jest.setup.js` with global mocks:
+     - Prisma Client fully mocked to prevent real database access
+     - Rate limiters mocked to avoid flaky failures in test runs
+     - Console output suppressed by default (opt-in via `ALLOW_TEST_LOGS=true`)
+   - Added npm scripts: `test`, `test:watch`, `test:unit`, `test:integration`, `test:coverage`
+
+2. **Test Helper Infrastructure**
+   - Created `__tests__/integration/helpers/mock-prisma.ts`:
+     - Type-safe Prisma mock factory using jest-mock-extended
+     - Automatic mock reset before each test for isolation
+     - DeepMockProxy type for comprehensive mocking of Prisma operations
+   - Created `__tests__/integration/helpers/test-data.ts`:
+     - Factory functions for all major entities (users, posts, comments, reactions, etc.)
+     - Overridable defaults for flexible test data generation
+     - Consistent test data structure across all integration tests
+   - Created `__tests__/integration/helpers/request-helpers.ts`:
+     - `createAuthenticatedRequest()` - generates requests with valid JWT tokens
+     - `createUnauthenticatedRequest()` - generates requests without auth
+     - Proper handling of Next.js Request/Response objects
+
+3. **Unit Test Implementation (524 tests)**
+   - **Core Infrastructure Tests (439 base tests)**:
+     - `auth.test.ts` (24 tests, 100% coverage) - bcrypt password hashing/verification
+     - `permissions.test.ts` (54 tests, 100% coverage) - all authorization helpers (post/comment editing, deletion, member removal)
+     - `validation.test.ts` (109 tests, 92.98% coverage) - all Zod schemas (pagination, recipe filters, param validation)
+     - `apiErrors.test.ts` (60 tests, 100%/85% coverage) - error helpers and parsing utilities
+     - `jwt.test.ts` (22 tests, 100%/88.88% coverage) - token generation/verification with mocked jose library
+     - `ingredients.test.ts` (41 tests, 100%/75% coverage) - unit labels, formatting, options
+     - `tags.test.ts` (24 tests, 100% coverage) - tag grouping by type
+     - `postPayload.test.ts` (54 tests, 98.86%/94.23% coverage) - post normalization, recipe parsing, ingredient/step parsing
+     - `family.test.ts` (18 tests, 100% coverage) - member listing and removal logic
+     - `session.test.ts` (33 tests, 100%/87.5% coverage) - cookie management, user session retrieval
+     - `timeline.test.ts` (40 tests, 94.44% lines) - relative time formatting ("2 hours ago"), action text generation, actor initials
+     - `timeline-data.test.ts` (27 tests, 97.56% statements) - complex feed aggregation from posts/comments/reactions/cooked events
+     - `profile.test.ts` (34 tests, 100% all metrics) - user posts/cooked history/favorites with pagination and stats
+     - `rateLimit.test.ts` (33 tests, 100% statements, 91.66% branches) - RateLimiter class, IP detection, all pre-configured limiters
+     - `apiAuth.test.ts` (18 tests, 100% coverage) - withAuth/withRole wrappers
+
+4. **Integration Test Implementation (292 tests)**
+   - **Auth Routes (40 tests)**:
+     - Signup: 21 tests - validation, master key verification, role assignment (owner vs member), session creation
+     - Login: 15 tests - credential validation, password verification, rememberMe flag, error handling
+     - Me: 4 tests - authenticated user profile retrieval
+   - **Post Routes (112 tests)**:
+     - Create: 25 tests - validation, basic posts vs full recipes, tag association, photo handling
+     - Update: 23 tests - permissions (author/owner), recipe updates, tag updates, change notes
+     - Delete: 13 tests - permissions, file cleanup (post photos + comment photos), cache revalidation
+     - Favorite: 14 tests - add/remove favorites, idempotency
+     - Cooked: 15 tests - rating validation (1-5), aggregate stats, optional notes
+     - Comments: 25 tests (11 GET + 14 POST) - pagination, photo attachments, reactions array
+   - **Other Routes (140 tests)**:
+     - Comment deletion: 12 tests - permissions (author/owner/admin), cascading deletes
+     - Reactions: 21 tests - toggle behavior, post/comment targets, validation
+     - Timeline: 21 tests - pagination, activity type mixing, ordering
+     - Recipes browse: 41 tests - complex filter combinations (search/author/course/tag/difficulty/time/servings/ingredients), sorting, stats
+     - Profile endpoints: 27 tests - user posts (9), cooked history (9), favorites (9)
+     - Family management: 18 tests - member listing (5), removal with permissions (13)
+
+5. **Coverage Achievement**
+   - **Overall Metrics**: 98.06% statements, 88.67% branches, 99.2% functions, 98.4% lines
+   - **Exceeded Target**: All metrics well above ≥80% threshold (minimum gap: 8.67% above target)
+   - **Files at 100% Coverage**: apiAuth, auth, family, permissions, rateLimit, uploads, tags, profile, session
+   - **High Coverage (94-99%)**: posts (94.54%), recipes (98.71%), timeline-data (97.56%), timeline (94.44%), postPayload (98.86%), validation (96%)
+   - **Remaining Gaps**: Isolated branch-only paths in error handling and rare edge cases
+
+6. **DevSecOps Best Practices Implemented**
+   - **Security**: All JWT operations mocked (no real crypto in tests), passwords mocked (fast execution), rate limiters mocked (no flaky limits)
+   - **Isolation**: Every test uses fresh mocks, no shared state, no real database or external services
+   - **Consistency**: Same test environment will be possible local dev and CI, deterministic results via mocked Date/UUID
+   - **Speed**: Full 930-test suite completes in ~8 seconds locally (parallelized, no I/O)
+   - **Maintainability**: Test structure mirrors source code, clear naming conventions, reusable helpers
+   - **Fast Feedback**: Watch mode for instant rerun on file changes
+
+7. **Test Quality Patterns**
+   - Comprehensive error path testing - every validation failure, authentication failure, authorization failure tested
+   - Edge case coverage - null values, empty arrays, boundary conditions (min/max limits)
+   - Integration contract testing - verified all API routes return correct status codes and error structures
+   - Type safety - TypeScript ensures test mocks match actual implementations
+   - Descriptive test names - each test name describes exact scenario and expected outcome
+
+### Phase 2 – Local Environment Parity & Dockerization
+
+**Goal:** Make the monolith easy to run locally in containers with Postgres while retaining simple local dev options.
+
+#### What Was Accomplished
+
+1. **Containerized Monolith**
+   - Added multi-stage `Dockerfile` (deps → builder → runner) with OpenSSL installed for Prisma engines; runs `prisma generate` against the Postgres schema and `next build`, then serves via `next start`.
+   - Created `.dockerignore` to keep host `node_modules`, `.next`, local DBs, and secrets out of the build context.
+
+2. **Compose Stack with Postgres**
+   - Added `docker-compose.yml` with `app` + `db` (Postgres 16), healthchecks, persistent volume for Postgres data, and bind-mount for `public/uploads` so photos survive restarts.
+   - App container runs `prisma migrate deploy --schema prisma/schema.postgres.prisma` on start to ensure migrations apply automatically.
+
+3. **Postgres Schema & Environment Defaults**
+   - Introduced `prisma/schema.postgres.prisma` plus updated migration lock for Postgres workflows; documented `PRISMA_SCHEMA` usage and kept SQLite as default for local dev.
+   - Updated `.env.example` with optional `FAMILY_NAME`/`FAMILY_MASTER_KEY` for seeding and commented Postgres settings to avoid clobbering SQLite defaults.
+
+4. **Seed & Upload Parity**
+   - Seed script now generates a secure master key when none is provided and skips creating a family if one already exists, making it safe to run in Docker or locally.
+   - Hardened upload handling to accept file-like objects across environments, preserving photo uploads in Docker (backed by the uploads bind-mount).
+
+### Phase 3 – External Database & Data Discipline (Dev)
+
+**Goal:** Use a real managed Postgres instance with proper migrations and backups.
+
+#### What Was Accomplished
+
+1. **Cloud SQL Dev Provisioning (GCP)**
+   - Terraformized Cloud SQL Postgres dev instance (`family-recipe-dev`) with public IP, backups (7-day retention), maintenance window Sun 05:00 UTC, deletion protection on.
+   - Created least-privilege service accounts (`terraform-admin`, `app-sql-client`) and IAM bindings; state stored in GCS remote backend.
+
+2. **Secure Secret Handling**
+   - Database user password stored in Secret Manager; Terraform state no longer holds the real password (user password ignored, rotated, and secret version managed manually).
+
+3. **Migrations & Seeding on Cloud SQL**
+   - Connected via Cloud SQL Auth Proxy and ran `prisma migrate deploy` using the Postgres schema.
+   - Seeded dev DB with family space + master key + canonical tags.
+
+4. **Schema Performance Indexes**
+   - Added targeted indexes (posts timeline/author, comments by post/created, reactions by target/post/comment, favorites by user/post, cooked events by post/user, photo/tag lookups, family memberships).
+   - Captured in a Prisma migration (`20251205094500_add_core_indexes`).
+
+5. **Developer Guidance**
+   - Updated `.env.example`, app README, and infra README with Cloud SQL proxy connection strings, Postgres `PRISMA_SCHEMA`, and migrate/seed commands.
+   - Documented dev-only Cloud SQL flow; prod DB deferred to Phase 7.
+
+### Phase 4 – CI Pipeline (DevSecOps Core)
+
+**Goal:** Every change is gated by tests, checks, scans, and containerized builds.
+
+#### What Was Accomplished
+
+1. **GitHub Actions CI Jobs (Fan-out by Stage)**
+   - Jobs: `typecheck`, `lint`, `test`, `build` (Docker Buildx), `prisma-validate` (Postgres schema), `dependency-scan` (`npm audit --production --audit-level=high`).
+   - Build job now produces a Docker image matching deployment and hands it off via artifact for downstream scanning.
+
+2. **Secrets & SAST Coverage**
+   - Secrets scan with gitleaks (full history checkout) using a local install to avoid action input issues; fails on findings.
+   - Semgrep SAST job (config `p/ci`) running on full history checkout.
+
+3. **Dependency Risk Gate**
+   - Dependency Review action on pull requests to block new vulnerable packages.
+
+4. **IaC and Container Scanning**
+   - IaC scan migrated from deprecated tfsec action to Trivy config scanner against `infra/` to detect Terraform misconfigs.
+   - Container scan with Trivy against the built image (fail on HIGH/CRITICAL) using the artifact-loaded image to avoid rebuilds.
+   - Achieved zero HIGH/CRITICAL vulnerabilities in final container image.
+
+5. **Operational Hardening**
+   - Prisma schema validation in CI with a dummy `DATABASE_URL` to ensure migrations/schemas remain valid.
+   - CI Docker builds include `--pull` behavior in Dockerfile to pick up base image security patches.
+
+6. **Vulnerability Remediation (Iterative Process)**
+   - **Initial scan findings**: 5 Debian CVEs (libpam, zlib), 3 Node.js package CVEs (glob, cross-spawn, esbuild Go binaries).
+   - **Node.js dependency fixes**:
+     - Updated `glob` from `10.3.10` → `11.1.0` (fixed CVE-2025-64756)
+     - Updated `cross-spawn` to `7.0.6` (fixed CVE-2024-21538)
+     - Removed `esbuild` from production dependencies (eliminated Go stdlib CVEs)
+     - Added npm `overrides` to force nested dependencies to use patched versions
+   - **Base image migration**: Decide to use `node:20-alpine` (Alpine Linux 3.23) instead of `node:20-bookworm-slim` (Debian)
+     - Eliminated all OS-level vulnerabilities (libpam, zlib issues specific to Debian/glibc)
+     - Smaller image size and attack surface
+     - Different libc (musl vs glibc) avoids entire class of Debian-specific CVEs
+   - **npm bundled dependency fix**: Upgraded npm itself in Dockerfile (`npm install -g npm@latest`) to resolve CVEs in npm's bundled dependencies that ship with Node.js base image
+   - **Multi-stage build optimization**: Created separate `production-deps` stage with `npm ci --omit=dev --ignore-scripts` to exclude devDependencies (Jest, ESLint, etc.) from final runtime image, preventing dev-only vulnerabilities from appearing in container scans
+
+### Phase 5 – Dev Deploy Foundations
+
+**Goal:** Stand up dev on GCP with secure delivery and GCS-backed uploads.
+
+1. **Cloud Run + Artifact Registry**
+   - Provisioned baseline Cloud Run service (`family-recipe-dev`) with private ingress (internal/LB), runtime SA, and hello-world image; Artifact Registry repo created in `us-east1`.
+   - Added deploy workflow (`deploy-dev.yml`) to auto-deploy on `develop` (and manual) via WIF to the deployer SA; uses Cloud SQL connector, secrets, and uploads envs.
+2. **Secrets & Connectivity**
+   - Secret Manager shells for `DATABASE_URL`, `JWT_SECRET`, optional `FAMILY_MASTER_KEY`; versions added manually; `INSTANCE_CONNECTION_NAME` wired for Cloud SQL socket.
+3. **GCS Uploads**
+   - Created private uploads bucket with public access prevention; upload helper now stores to GCS with V4 signed URLs (fallback to local for local dev), delete supports GCS/local.
+   - Documented uploads env vars in `.env.example` (`UPLOADS_BUCKET`, `UPLOADS_SIGNED_URL_TTL_SECONDS`).
+4. **Infra CI**
+   - Added infra workflow for Trivy IaC scan + Terraform fmt/validate (plan kept manual to avoid backend auth); manual apply workflow via WIF remains for stateful changes.
 
 ---
 
@@ -352,3 +732,481 @@ Identify any **auth, validation, or error handling shortcuts** and make sure the
 ---
 
 ## Lessons Learned
+
+### Phase 0 - Repo Setup & Baseline Hygiene
+
+**1. TypeScript Strict Mode Reveals Real Issues**
+
+- Enabling strict mode uncovered actual bugs waiting to happen, particularly variable scope issues in error handlers where user context was being accessed but wasn't guaranteed to be in scope
+- The discipline of fixing these errors before the first commit established a clean baseline for future CI/CD pipelines
+
+**2. Database-Specific Features Need Abstraction Planning**
+
+- SQLite vs PostgreSQL differences (like case-insensitive queries) surfaced early
+- This highlighted the importance of testing against the target production database type, not just local development databases
+- Future consideration: abstract database-specific query patterns into utility functions for easier migration
+
+**3. DevSecOps Foundation Pays Dividends Immediately**
+
+- Setting up pre-commit hooks before any "real work" prevents bad habits from forming
+- Auto-formatting and linting on commit means code review can focus on logic, not style
+- Type-checking as a git hook catches errors before they even reach CI
+
+**4. Comprehensive .gitignore is Non-Negotiable**
+
+- Taking time to properly configure `.gitignore` before first commit prevents secrets and sensitive data from ever entering version control
+- Much easier to exclude patterns proactively than to scrub commit history reactively
+- Validated that no databases, environment files, or upload directories were committed
+
+**5. Documentation as Part of Foundation, Not Afterthought**
+
+- Writing a professional README at the start (rather than "will document later")
+- `.env.example` with comments serves as living documentation for required configuration
+
+**6. Multi-File Replacements Require Precision**
+
+- Using tools like `multi_replace_string_in_file` is efficient but demands exact string matching including all whitespace and formatting
+- Better to read more context and match precisely than to make multiple attempts with approximate matches
+
+**7. Separate Concerns Early (Figma Exclusion)**
+
+- Excluding the Figma prototyping code from production type-checking was the right call
+- Prototyping and design exploration code doesn't need the same rigor as production code
+- Keeping them in the same repo is fine, but tooling should distinguish between them
+
+### Phase 1.1 - Auth & Access Control
+
+**1. Middleware Abstractions Eliminate Repetitive Code**
+
+- The `withAuth()` wrapper pattern eliminated 19 instances of duplicate authentication checks
+- Before: every route had manual `getCurrentUser()` + null check + 401 response
+- After: authentication guaranteed by type system, user context always available
+- Side benefit: impossible to forget authentication on new routes when following established pattern
+- Future refactors (like changing JWT implementation) now touch only 1 file instead of 21
+
+**2. Centralized Permission Logic is Essential for Consistency**
+
+- Permission helpers in `permissions.ts` created single source of truth for authorization rules
+- Without helpers: permission logic scattered across routes, easy to miss edge cases or make inconsistent decisions
+- With helpers: changing "who can delete a post" requires updating one function, not hunting through multiple files
+- Detailed return types (with reason codes) enable better error messages without duplicating logic
+
+**3. Rate Limiting Requires Careful Dependency Selection**
+
+- Initial consideration of Redis for rate limiting would add infrastructure complexity for V1
+- LRU cache solution: simpler, works in serverless, no external dependencies, good enough for single-instance deployment (like I plan to do via Vercel to start)
+- Trade-off: resets on deploy, but acceptable for a 10 user (my family) app
+- Future consideration: when scaling beyond single instance, Redis or similar would be necessary
+- Key learning: "production-ready" doesn't have to mean "enterprise-scale ready"
+
+**4. TypeScript Context Parameters in Next.js App Router Need Care**
+
+- Dynamic route handlers receive context as second parameter after request
+- With `withAuth()` wrapper, context becomes third parameter and may be undefined
+- Solution: optional context type (`context?: { params: ... }`) with non-null assertion (`context!`) when needed
+- Pattern: extract params at function start so they're in scope for error handlers
+- Alternative considered: making context required, but that would break routes without params
+
+**5. Incremental Commits Create Safety Net**
+
+- Committing infrastructure separately from application (rate limiting → middleware → refactoring) made progress trackable
+- Each commit was independently verifiable with `npm run type-check`
+- When refactoring went wrong, could easily revert specific commit rather than losing all work
+- Pre-commit hooks caught issues before they entered version control
+- Lesson: even when working solo, commit discipline pays off
+
+**6. IP-Based Rate Limiting Has Security Implications**
+
+- Implemented best-practice IP detection: check `X-Forwarded-For` first (respecting proxies/load balancers)
+- Behind proxy: all requests appear from proxy IP without header forwarding
+- Must trust proxy headers (vulnerability if proxy not properly configured)
+- For authentication endpoints: IP-based limiting appropriate (no user context yet)
+- For authenticated endpoints: user ID-based limiting more accurate and fair
+- Future consideration: combine both (rate limit per user AND per IP) for defense in depth
+
+**7. Rate Limiting Windows Must Balance Security and UX**
+
+- Too strict: legitimate users get blocked (e.g., 3 comments per minute would frustrate active users)
+- Too loose: doesn't prevent abuse
+- Solution: different limits for different risk levels:
+  - Auth endpoints: very strict (3-5 attempts per window)
+  - High-frequency actions (reactions): loose (30 per minute)
+  - Moderate actions (comments, cooked events): balanced (10 per minute)
+- Testing needed: these limits are educated guesses, may need tuning based on real family usage
+
+**8. Pattern Consistency Accelerates Development**
+
+- After establishing `withAuth()` pattern on first 3 routes, remaining 18 routes were mechanical
+- Consistency meant: read existing route → identify auth check → apply pattern → verify with type-check
+- Total refactoring time: ~2 hours for 21 routes
+- Lesson: invest time in good patterns early, reap benefits in velocity later
+- Contrast with ad-hoc approach: would be constantly making micro-decisions about how to structure each route
+
+### Phase 1.2 - Input Validation
+
+**1. Schema Validation Eliminates Entire Classes of Bugs**
+
+- Before: manual parsing with `parseInt()`, bounds checking scattered across routes, inconsistent handling of missing/invalid values
+- After: single source of truth in Zod schemas with automatic type coercion, bounds enforcement, and default values
+- Recipes route example: replaced 90+ lines of manual parsing/validation logic with 6-line schema validation
+- Side benefits: TypeScript gets proper types from schema inference, impossible to forget validation rules
+- Future changes to validation rules now happen in one place (schema definition) rather than hunting through route handlers
+
+**2. Discriminated Unions Create Ergonomic Error Handling**
+
+- Validation helpers return `{ success: true, data } | { success: false, error }` pattern
+- Enables clean early-return: `if (!validation.success) return validation.error;`
+- TypeScript narrows types automatically - after success check, `validation.data` is fully typed
+- Pattern eliminates need for try/catch around validation and provides consistent error responses
+- Alternative considered: throwing errors from validators, but discriminated unions are more explicit and type-safe
+
+**3. Zod's `.optional().default()` Has TypeScript Quirks**
+
+- Expected: `.optional().default(value)` would infer type as `T`, not `T | undefined`
+- Reality: Zod's type inference still marks it as potentially undefined
+- Solution: destructuring with fallback defaults (`const { limit = 20 } = data`) for TypeScript narrowing
+- This is a known Zod limitation - `.catch()` has similar issues
+- Trade-off accepted: slight redundancy in destructuring vs. extensive type assertions everywhere
+
+**4. REST Array Parameters vs. JSON Query Strings**
+
+- Decision: use standard REST repeated params (`?course=breakfast&course=lunch`) over array notation (`?course[]=breakfast`)
+- Rationale: more universal support, explicit in URL encoding, matches HTTP standards
+- Implementation: `parseQueryParams()` detects multi-value keys via `URLSearchParams.getAll()`
+- Alternative would have required custom parsing or URL manipulation
+- Lesson: follow standards unless there's compelling reason to deviate
+
+**5. Validation Schemas Should Encode Business Rules**
+
+- Preserved existing constants (MAX_TIME_MINUTES, MAX_SERVINGS) as schema constraints
+- Schemas now serve as living documentation of valid input ranges
+- Cross-field validation (e.g., `minTime <= maxTime`) enforced at schema level with `.refine()`
+- Business logic changes (e.g., "increase max servings to 100") now require schema update, making them explicit
+- Future consideration: extract business rules to separate constants file that schemas reference
+
+**6. Early Validation Enables Better Error Messages**
+
+- Validating at API boundary means immediate, specific feedback to clients
+- Before: vague errors after database queries or business logic execution
+- After: precise errors like "Limit must be between 1 and 100" before any processing
+- Side benefit: prevents invalid data from ever reaching business logic or database layer
+- Improves security by rejecting malformed input before expensive operations
+
+**7. Schema Inference Provides Free Documentation**
+
+- TypeScript types generated from Zod schemas (e.g., `PaginationParams`, `RecipeFiltersParams`)
+- These types can be exported and shared with frontend code for consistency
+- Schema definitions are self-documenting - reading the schema shows all valid inputs and constraints
+- Eliminates drift between validation rules and type definitions
+- Future: could auto-generate OpenAPI/Swagger docs from Zod schemas
+
+**8. Incremental Refactoring Reduces Risk**
+
+- Approached validation in layers: error infrastructure → schemas → helpers → route application
+- Each layer committed separately with type-check verification
+- If validation broke a route, could pinpoint exact commit/change
+- Contrast with "big bang" refactor: would have 200+ line uncommitted changes, hard to debug
+- Pattern: build foundation tools first, then apply them systematically to existing code
+
+**9. Manual Parsing Code is a Maintenance Burden**
+
+- Recipes route had custom functions (`parseIntParam`, `normalizeRange`) used nowhere else
+- Each route implemented slightly different parsing logic with different edge case handling
+- Consolidating to schemas eliminated ~150 lines of duplicate parsing code across routes
+- Lesson: spot repetition early and abstract into reusable patterns before it spreads
+- Future vigilance: resist urge to write "quick" inline validation - always use schemas
+
+**10. Error Response Consistency is User Experience**
+
+- Found 6+ different inline error response formats before standardization
+- Some had `message` only, some had `code`, inconsistent status code usage
+- API clients now get predictable error structure: always `{ error: { code, message } }`
+- Enables frontend to build generic error handling (e.g., map error codes to user-friendly messages)
+- Lesson: establish error contract early before it proliferates across codebase
+
+**11. Centralized Schemas Reduce Duplication**
+
+- Found multiple routes defining custom param schemas (e.g., `postIdParamSchema` defined 3 times)
+- Consolidated to single source in validation.ts, imported where needed
+- Eliminates schema drift - changing CUID validation now happens in one place
+- Side benefit: reduces line count and makes imports explicit about validation dependencies
+- Lesson: as soon as you see a schema defined twice, extract it to shared validation file
+
+### Phase 1.3 - Testing Implementation & Coverage
+
+**Goal:** Comprehensive test coverage with predictable error logging.
+
+#### Lessons Learned (Testing)
+
+**1. Comprehensive Coverage Reveals Hidden Behaviors**
+
+- Testing timeline aggregation exposed complex edge cases in data joining and null handling that weren't documented
+- Recipe filtering tests revealed missing validation on multi-value filter combinations
+- Session management tests highlighted inconsistent cookie expiration handling between rememberMe flows
+- Unit tests caught type safety issues that TypeScript strict mode missed (runtime validation gaps)
+- Lesson: high coverage isn't about hitting a number - it's about exploring all the code paths and discovering what actually happens
+
+**2. Mocking Strategy is Critical for Test Speed and Isolation**
+
+- Global Prisma mocking via jest-mock-extended enabled fast, isolated tests (no database I/O)
+- Rate limiter mocking prevented flaky failures and allowed testing of protected endpoints without triggering limits
+- JWT mocking eliminated crypto overhead - tests run 10x faster than with real JWT operations
+- Trade-off: deep mocks require careful type assertions for complex queries (groupBy, aggregations)
+- Lesson: mock at the boundaries (database, external services, time) but test real business logic
+
+**3. Integration Tests Catch Contract Violations**
+
+- Found 3 API routes returning incorrect error codes (500 instead of 404/403)
+- Discovered validation bypasses where malformed input reached business logic
+- Identified missing permission checks in 2 deletion endpoints
+- Integration layer is where auth/validation/permissions compose - unit tests can't catch these interactions
+- Lesson: unit tests prove components work in isolation, integration tests prove they work together
+
+**4. Test Helpers Reduce Boilerplate, Increase Consistency**
+
+- Factory functions (`createMockUser`, `createMockPost`) eliminated 200+ lines of duplicate setup code
+- Request builders (`createAuthenticatedRequest`) ensured consistent auth token handling across all integration tests
+- Shared Prisma mock meant behavior changes propagate to all tests automatically
+- Investment in helpers paid off: last 50 tests took 1/3 the time of first 50
+- Lesson: front-load helper creation - it feels like overhead but becomes force multiplier
+
+**5. Coverage Gaps Point to Real Issues**
+
+- Initial 47.54% coverage revealed 5 untested helper files - all critical business logic
+- Branch coverage (88.67%) identified rare error paths that weren't documented or considered
+- Function coverage (99.2%) showed one dead function (never called) that was removed
+- Statement vs. branch gap revealed complex conditionals that needed decomposition for testability
+- Lesson: coverage metrics are feedback on code design, not just test quality
+
+**6. Console Noise Hides Real Failures**
+
+- Initial test runs buried actual failures in 500+ lines of Prisma query logs
+- Suppressing console in `jest.setup.js` made failures immediately visible in terminal output
+- Opt-in logging via `ALLOW_TEST_LOGS=true` preserved debugging ability when needed
+- Clean CI output is not vanity - it's essential for catching regressions quickly
+- Lesson: test output should be silent on success, loud on failure
+
+**7. Deterministic Tests Prevent Flakes**
+
+- Fixed date generation in profile tests (was creating invalid dates like 2025-01-32 due to template literal math)
+- Mocked `Date.now()` and `randomUUID()` for upload tests to get consistent filenames
+- Used Jest fake timers for rate limit window testing to control time progression
+- Zero flaky tests after determinism fixes - every failure is a real bug, not timing
+- Lesson: any randomness or time-dependency in tests will eventually cause CI failures
+
+**8. Test Organization Mirrors Production Structure**
+
+- `__tests__/unit/lib/` mirrors `src/lib/` - easy to find tests for any source file
+- `__tests__/integration/api/` mirrors `src/app/api/` - route tests live alongside routes
+- Naming convention: `filename.test.ts` for `filename.ts` - no guessing, no searching
+- Benefit: refactoring a file automatically suggests which test file needs updates
+- Lesson: co-location reduces cognitive load - developers shouldn't hunt for tests
+
+**9. Incremental Testing Builds Confidence**
+
+- Started with infrastructure (auth, validation) - foundation for higher-level tests
+- Added integration tests route-by-route - caught issues before they compounded
+- Obviously this was a bit reactionary because my V1 implementation was purely functional, but even then the incremental approach made debugging manageable
+- Lesson: test as you go, not as an afterthought
+
+**10. Branch Coverage Reveals Design Improvements**
+
+- Low branch coverage in `apiErrors.ts` (85%) highlighted overly complex error handling paths
+- High branch coverage in `permissions.ts` (100%) validated clean separation of concerns
+- Timeline formatting's 87.5% branches exposed rare edge cases worth documenting (null names, special characters)
+- Coverage metrics guided refactoring: complex branches → simpler functions with better coverage
+- Lesson: if a function is hard to get 100% coverage on, it's probably doing too much
+
+**11. Type-Safe Mocks Catch Breaking Changes Early**
+
+- jest-mock-extended's type checking prevented mock drift as Prisma schema evolved
+- When adding new required fields to models, tests failed at compile time, not runtime
+- Alternative (jest.fn()) would have silently returned undefined for new fields, causing cryptic failures
+- Investment in proper types pays dividends during refactoring and schema migrations
+- Lesson: type safety in tests is just as important as type safety in production code
+
+**12. Test Performance Enables Fast Iteration**
+
+- 930 tests complete in ~8 seconds - fast enough to run on every file save
+- Parallelization (Jest default) critical for maintaining speed as suite grew from 100 to 930 tests
+- No database I/O or network calls keeps tests CPU-bound and predictable
+- Fast tests enable test-driven development - can run full suite between every change
+- Lesson: test speed isn't a luxury - it's a prerequisite for developer productivity
+
+**13. Assert Error Paths, Don't Just Log Them**
+
+- Integration tests should assert response codes/bodies, not just log them and hope
+- Suppress background noise (Prisma queries, rate limit checks) in CI for signal-to-noise ratio
+- When tests fail, the error message should tell you exactly what went wrong, not require log archaeology
+- Lesson: test output is UI for developers - make it useful
+
+**14. 98% Coverage Doesn't Mean 100% Confidence**
+
+- Remaining 2% includes rare error handlers and branch-only code that's hard to trigger
+- Pursuing 100% coverage would mean testing Prisma client errors, Next.js framework errors, etc.
+- Diminishing returns: last 2% would take as long as first 98%
+- Documented remaining gaps rather than writing tests for framework-level errors
+- Lesson: know when to stop - perfect is the enemy of good enough
+
+### Phase 2 – Local Environment Parity & Dockerization
+
+**1. Container Builds Must Be Self-Contained**
+
+- Prisma engines need system OpenSSL libraries; installing them explicitly in the Dockerfile avoids build-time failures on slim images
+- Multi-stage builds can stay slim at runtime while still carrying dev deps in build stages for Prisma/Next compilation
+
+**2. Keep Host Artifacts Out of Images**
+
+- Copying host `node_modules` caused invalid ELF errors (bcrypt) in Linux containers; `.dockerignore` is mandatory to prevent platform-specific binaries from leaking into images
+
+**3. Database Targeting Needs Explicitness**
+
+- SQLite vs Postgres differences justified a dedicated `schema.postgres.prisma` and updated migration lock; always set `PRISMA_SCHEMA` with the matching `DATABASE_URL`
+
+**4. File Handling Differs Across Runtimes**
+
+- `instanceof File` checks can fail across environments; accepting "file-like" objects is more robust for uploads in Docker and Node
+- Binding `public/uploads` as a volume preserves photos across container restarts; without it, uploads disappear on rebuild
+
+**5. Idempotent Seeding Prevents Surprises**
+
+- Seed script now no-ops if a family exists and can auto-generate or accept `FAMILY_MASTER_KEY`; safe to re-run in Docker without overwriting existing keys
+
+**6. Compose Health + Migrations Reduce Drift**
+
+- Postgres healthchecks plus `prisma migrate deploy` on start keep the app from racing the DB and ensure schema is current in local containers
+
+### Phase 3 – External Database & Data Discipline (Dev)
+
+**1. Cloud Resources Belong in Code**
+
+- Terraforming Cloud SQL, SAs, and IAM avoided console drift and made least-privilege explicit; only the bootstrap credential was manual.
+- Remote state and role bindings keep infra changes reviewable.
+
+**2. Keep Secrets Out of State**
+
+- Passing DB passwords via TF vars leaks into state; better to create the secret shell via Terraform, add versions manually, and ignore DB user password changes in TF to keep state clean.
+
+**3. Proxy-First Connectivity Simplifies Dev**
+
+- Using the Cloud SQL Auth Proxy for dev (public IP) lets local and Vercel hit the same DB without early VPC complexity; private IP/VPC connector can come later for Cloud Run.
+
+**4. Targeted Indexes Matter**
+
+- Adding indexes for common queries (timeline, comments, reactions, favorites, cooked events, tags/photos) is a safer first optimization step than schema changes.
+
+**5. Align Prisma Schema per Backend**
+
+- Keeping SQLite schema for local fallback and a Postgres schema for Cloud SQL prevents provider mismatch; migrations capture the Postgres-specific changes.
+
+### Phase 4 – CI Pipeline (DevSecOps Core)
+
+**1. Small, Focused Jobs Improve Signal**
+
+- Breaking CI into discrete jobs (typecheck, lint, test, build, prisma validate, scans) makes failures obvious and faster to triage versus a monolithic pipeline.
+
+**2. Container-First CI Catches Drift Early**
+
+- Building the Docker image in CI (with Buildx and `--pull`) mirrors production and surfaces base image CVEs and platform issues that `npm run build` alone would miss.
+
+**3. Security Scans Need Real Inputs**
+
+- Prisma validation failed without a dummy `DATABASE_URL`; gitleaks needed full history and a token; Trivy needed the actual image artifact to avoid rebuild differences. Feeding scanners realistic inputs reduces false positives and setup failures.
+
+**4. Supply Chain Checks Must Be Actionable**
+
+- Dependency Review blocked outdated esbuild; fixing the lockfile was the right move. Automated gates are only useful if the team commits to patching or explicitly documenting exceptions.
+
+**5. IaC Scans Require Context**
+
+- Public-IP/TLS findings on Cloud SQL were dev-specific; adding planned remediation (move to private IP + TLS-only) and, if necessary, scoped ignores kept the pipeline green while documenting risk.
+
+**6. Artifact Handoff Simplifies Downstream Scans**
+
+- Saving the built image as an artifact allowed Trivy to scan exactly what was built, avoiding redundant rebuilds and keeping results consistent across jobs.
+
+**7. Vulnerability Remediation is Detective Work**
+
+- Container scans showed old dependency versions despite local updates - traced to nested dependencies in devDependencies
+- Trivy was detecting npm's bundled dependencies in `/usr/local/lib/node_modules/npm/`, not application code
+- Required investigating JSON output (`--format json`) to see exact paths: `usr/local/lib/node_modules/npm/node_modules/glob/package.json`
+- Lesson: don't assume scanner findings are always about code - they might be about the toolchain
+
+**8. Base Image Selection Has Security Implications**
+
+- Switching from Debian to Alpine eliminated 5 CVEs without any code changes
+- Different OS families have different vulnerability profiles and patch cycles
+- Alpine's smaller package set means fewer potential vulnerabilities
+- Trade-off: Alpine uses musl libc vs glibc, can cause compatibility issues with some binaries.
+- Lesson: base image choice is a security decision, not just a size optimization
+
+**9. npm Overrides Force Consistency Across Dependency Tree**
+
+- Adding `overrides` in package.json forced all nested dependencies to use patched versions
+- Without overrides, transitive dependencies can stay vulnerable even after updating direct dependencies
+- Reduced `npm ls glob` output from 3 different versions to single patched version
+- Eliminated 19 separate package copies using old vulnerable glob versions
+- Lesson: `overrides` is essential for ensuring deep dependency tree is fully patched
+
+**10. Multi-Stage Builds Reduce Attack Surface**
+
+- Initial Dockerfile copied all node_modules (including devDependencies) to runtime image
+- Trivy flagged vulnerabilities in Jest, ESLint, and other dev-only tools that shouldn't be in production
+- Created separate `production-deps` stage with `--omit=dev` flag
+- Runtime image now only contains production dependencies, reducing scan findings and image size
+- Lesson: what you build with shouldn't be what you ship
+
+**11. npm Lifecycle Scripts Can Break CI**
+
+- `npm ci --omit=dev` failed because `prepare` script tried to run husky (a devDependency)
+- Solution: `--ignore-scripts` flag skips lifecycle hooks during production dependency install
+- Trade-off: can't rely on postinstall scripts for production dependencies
+- Lesson: production dependency installation should be deterministic and not require dev tools
+
+**12. Upgrading Tooling Can Fix Unfixable CVEs**
+
+- npm's bundled dependencies are part of Node.js distribution, not controllable via package.json
+- Adding `RUN npm install -g npm@latest` in Dockerfile upgraded npm and its dependencies
+- Fixed vulnerabilities that were considered "not fixable by application" initially
+- Lesson: sometimes the fix isn't updating your code, it's updating the tools that run your code
+
+**13. Security Scanning is Iterative, Not One-Shot**
+
+- Started with 8 HIGH/CRITICAL vulnerabilities across OS and Node.js layers
+- Each fix revealed new information (nested deps, npm bundled deps, dev vs prod separation)
+- Final state: zero HIGH/CRITICAL vulnerabilities through 6 different remediation strategies
+- Lesson: vulnerability remediation is a debugging process - each scan result informs the next action
+
+**14. Document Accepted Risks with Context**
+
+- Created `.trivyignore` for dev-specific Cloud SQL findings (public IP, non-TLS)
+- Included comments explaining why risks are accepted and plans for future mitigation
+- Better than disabling scans or letting noise hide real issues
+- Lesson: suppression files are living documentation of security decisions, not just scanner config
+
+### Phase 5 – Dev Deploy Foundations
+
+**1. Private Dev Ingress Simplifies Early Hardening**
+
+- Keeping dev Cloud Run private (internal/LB only) avoided rushing public exposure before auth/infra were ready
+- Access via `gcloud run services proxy` is acceptable for single-user dev; prod will open ingress with app-level auth
+
+**2. WIF + Artifact Registry Keeps CI Stateless**
+
+- Workload Identity Federation for deploy jobs removed the need for long-lived JSON keys
+- Deploy pipeline pushes to Artifact Registry and deploys to Cloud Run without storing credentials in the repo
+
+**3. Signed URLs Need SA Token Creator**
+
+- Generating V4 signed URLs in Cloud Run requires `iam.serviceAccountTokenCreator` on the runtime SA
+- Without it, signed URL generation fails even if storage access is present
+
+**4. Cloud Run Metadata Simplifies GCS Access**
+
+- Using metadata server tokens for uploads avoids bundling keyfiles; local dev falls back to disk when metadata is absent
+- Upload helper now supports both GCS (signed URLs) and local disk without separate codepaths
+
+**5. IaC Plan in CI Requires Real Backend**
+
+- Attempting offline `terraform plan` with `backend=false` conflicted with the configured GCS backend
+- Resolution: keep CI to fmt/validate + scans; run plan/apply with real backend via WIF in a dedicated workflow

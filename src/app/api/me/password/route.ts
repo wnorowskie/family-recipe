@@ -1,44 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/apiAuth';
 import { prisma } from '@/lib/prisma';
 import { changePasswordSchema } from '@/lib/validation';
 import { hashPassword, verifyPassword } from '@/lib/auth';
 import { logError, logWarn } from '@/lib/logger';
+import { parseRequestBody, notFoundError, invalidCredentialsError, internalError } from '@/lib/apiErrors';
 
-export async function POST(request: NextRequest) {
-  let user;
+export const POST = withAuth(async (request, user) => {
   try {
-    user = await getCurrentUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
-        { status: 401 }
-      );
-    }
-
     const body = await request.json().catch(() => null);
-
-    if (!body) {
-      return NextResponse.json(
-        { error: { code: 'INVALID_INPUT', message: 'Missing request body' } },
-        { status: 400 }
-      );
-    }
-
-    const parsed = changePasswordSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'INVALID_INPUT',
-            message: parsed.error.errors[0]?.message ?? 'Invalid input',
-          },
-        },
-        { status: 400 }
-      );
-    }
+    const validation = parseRequestBody(body, changePasswordSchema);
+    if (!validation.success) return validation.error;
+    const parsed = validation.data;
 
     const currentUser = await prisma.user.findUnique({
       where: { id: user.id },
@@ -49,26 +22,20 @@ export async function POST(request: NextRequest) {
     });
 
     if (!currentUser) {
-      return NextResponse.json(
-        { error: { code: 'NOT_FOUND', message: 'User not found' } },
-        { status: 404 }
-      );
+      return notFoundError('User not found');
     }
 
     const matches = await verifyPassword(
-      parsed.data.currentPassword,
+      parsed.currentPassword,
       currentUser.passwordHash
     );
 
     if (!matches) {
       logWarn('profile.password.invalid_current', { userId: user.id });
-      return NextResponse.json(
-        { error: { code: 'INVALID_CREDENTIALS', message: 'Incorrect current password' } },
-        { status: 400 }
-      );
+      return invalidCredentialsError('Incorrect current password');
     }
 
-    const newHash = await hashPassword(parsed.data.newPassword);
+    const newHash = await hashPassword(parsed.newPassword);
 
     await prisma.user.update({
       where: { id: currentUser.id },
@@ -79,15 +46,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ status: 'updated' }, { status: 200 });
   } catch (error) {
-    logError('profile.password.error', error, { userId: user?.id });
-    return NextResponse.json(
-      {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'Unable to update password',
-        },
-      },
-      { status: 500 }
-    );
+    logError('profile.password.error', error, { userId: user.id });
+    return internalError('Unable to update password');
   }
-}
+});

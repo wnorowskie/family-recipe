@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { clearSessionCookie, getCurrentUser } from '@/lib/session';
+import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/apiAuth';
+import { clearSessionCookie } from '@/lib/session';
 import { logError, logInfo } from '@/lib/logger';
+import { internalError } from '@/lib/apiErrors';
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request, user) => {
   try {
-    const user = await getCurrentUser(request);
     const response = NextResponse.json(
       { message: 'Logged out successfully' },
       { status: 200 }
@@ -12,16 +13,13 @@ export async function POST(request: NextRequest) {
 
     clearSessionCookie(response);
     logInfo('auth.logout', {
-      userId: user?.id ?? null,
-      familySpaceId: user?.familySpaceId ?? null,
+      userId: user.id,
+      familySpaceId: user.familySpaceId,
     });
 
     return response;
   } catch (error) {
     logError('auth.logout.error', error);
-    return NextResponse.json(
-      { error: { code: 'INTERNAL_ERROR', message: 'Failed to logout' } },
-      { status: 500 }
-    );
+    return internalError('Failed to logout');
   }
-}
+});

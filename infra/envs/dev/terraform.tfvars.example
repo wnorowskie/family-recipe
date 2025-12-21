@@ -1,0 +1,37 @@
+# Example values for dev environment. Do NOT commit real secrets.
+
+project_id              = "family-recipe-dev"
+region                  = "us-east1"
+state_bucket_name       = "family-recipe-tf-state-dev"
+terraform_admin_sa_id   = "terraform-admin"
+app_sql_client_sa_id    = "app-sql-client"
+db_instance_name        = "family-recipe-dev"
+db_name                 = "family_recipe_dev"
+db_user                 = "family_app"
+db_password             = "REPLACE_ME" # store real value outside git; consider using Secret Manager and adding versions manually
+db_password_secret_id   = "family-recipe-dev-db-password"
+tier                    = "db-custom-1-3840"
+disk_size_gb            = 20
+backup_retention_days   = 7
+maintenance_window_day  = 7  # Sunday (GCP expects 1-7; Sunday=7)
+maintenance_window_hour = 5  # 05:00 UTC
+pitr_enabled            = false
+create_db_password_secret = true
+grant_secret_accessor_to_app = false
+
+# Cloud Run / CI/CD
+runtime_sa_id              = "family-recipe-runner"
+deployer_sa_id             = "family-recipe-deployer"
+artifact_registry_repo_id  = "family-recipe-dev"
+cloud_sql_instances        = ["family-recipe-dev:us-east1:family-recipe-dev"]
+cloud_run_service_name     = "family-recipe-dev"
+uploads_bucket_name        = "family-recipe-dev-uploads"
+uploads_base_url           = "https://storage.googleapis.com/family-recipe-dev-uploads"
+prisma_schema              = "prisma/schema.postgres.prisma"
+database_url_secret_id     = "family-recipe-dev-database-url"
+jwt_secret_id              = "family-recipe-dev-jwt-secret"
+family_master_key_secret_id = "family-recipe-dev-family-master-key"
+wif_pool_id                = "github-pool"
+wif_provider_id            = "github-provider"
+github_repository          = "wnorowskie/family-recipe"
+github_ref                 = "refs/heads/develop"
