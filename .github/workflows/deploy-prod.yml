@@ -1,0 +1,148 @@
+name: Deploy Prod (Cloud Run)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT_ID: ${{ secrets.PROD_GCP_PROJECT }}
+      REGION: ${{ secrets.PROD_GCP_REGION }}
+      CLOUD_RUN_SERVICE: ${{ secrets.PROD_CLOUD_RUN_SERVICE }}
+      ARTIFACT_REGISTRY_REPO: ${{ secrets.PROD_ARTIFACT_REGISTRY_REPO }}
+      INSTANCE_CONNECTION_NAME: ${{ secrets.PROD_INSTANCE_CONNECTION_NAME }}
+      RUNTIME_SERVICE_ACCOUNT: ${{ secrets.PROD_RUNTIME_SERVICE_ACCOUNT }}
+      DATABASE_URL_SECRET: ${{ secrets.PROD_DATABASE_URL_SECRET }}
+      JWT_SECRET_NAME: ${{ secrets.PROD_JWT_SECRET_NAME }}
+      FAMILY_MASTER_KEY_SECRET_NAME: ${{ secrets.PROD_FAMILY_MASTER_KEY_SECRET_NAME }}
+      UPLOADS_BUCKET: ${{ secrets.PROD_UPLOADS_BUCKET }}
+      UPLOADS_BASE_URL: ${{ secrets.PROD_UPLOADS_BASE_URL }}
+      PRISMA_SCHEMA: prisma/schema.postgres.prisma
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.PROD_GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.PROD_GCP_DEPLOYER_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up Cloud SQL Auth Proxy
+        uses: google-github-actions/setup-cloud-sql-proxy@v2
+
+      - name: Run Prisma migrations (prod)
+        env:
+          DATABASE_URL_SECRET: ${{ env.DATABASE_URL_SECRET }}
+        run: |
+          if [ -z "${INSTANCE_CONNECTION_NAME:-}" ]; then
+            echo "INSTANCE_CONNECTION_NAME is required but not set."
+            exit 1
+          fi
+          if [ -z "${DATABASE_URL_SECRET:-}" ]; then
+            echo "DATABASE_URL_SECRET is required but not set."
+            exit 1
+          fi
+
+          sudo mkdir -p /cloudsql
+
+          cloud-sql-proxy "${INSTANCE_CONNECTION_NAME}" \
+            --unix-socket /cloudsql \
+            --quiet &
+
+          # Wait for the Postgres unix socket to be ready.
+          SOCKET_DIR="/cloudsql/${INSTANCE_CONNECTION_NAME}"
+          for i in {1..30}; do
+            if [ -S "${SOCKET_DIR}/.s.PGSQL.5432" ]; then
+              break
+            fi
+            sleep 1
+          done
+          if [ ! -S "${SOCKET_DIR}/.s.PGSQL.5432" ]; then
+            echo "Cloud SQL Proxy did not create expected socket at ${SOCKET_DIR}/.s.PGSQL.5432"
+            exit 1
+          fi
+
+          # Use the same Cloud Run DATABASE_URL (unix socket) for migrations.
+          DATABASE_URL="$(gcloud secrets versions access latest --secret "${DATABASE_URL_SECRET}" | tr -d '\n')"
+          echo "::add-mask::${DATABASE_URL}"
+          export DATABASE_URL
+
+          npx prisma migrate deploy --schema "${PRISMA_SCHEMA}"
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
+
+      - name: Build image
+        run: |
+          if [ -z "${ARTIFACT_REGISTRY_REPO:-}" ]; then
+            echo "ARTIFACT_REGISTRY_REPO is required but not set."
+            exit 1
+          fi
+          IMAGE="${ARTIFACT_REGISTRY_REPO}:${GITHUB_SHA}"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          docker build -t "$IMAGE" -f Dockerfile .
+
+      - name: Push image
+        run: docker push "$IMAGE"
+
+      - name: Deploy to Cloud Run (prod)
+        run: |
+          gcloud run deploy "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --image "$IMAGE" \
+            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
+            --platform managed \
+            --port 3000 \
+            --quiet \
+            --add-cloudsql-instances "$INSTANCE_CONNECTION_NAME" \
+            --set-secrets DATABASE_URL=${DATABASE_URL_SECRET}:latest,JWT_SECRET=${JWT_SECRET_NAME}:latest,FAMILY_MASTER_KEY=${FAMILY_MASTER_KEY_SECRET_NAME}:latest \
+            --set-env-vars PRISMA_SCHEMA=${PRISMA_SCHEMA},UPLOADS_BUCKET=${UPLOADS_BUCKET},UPLOADS_BASE_URL=${UPLOADS_BASE_URL} \
+            --ingress all \
+            --allow-unauthenticated
+
+      - name: Print service URL
+        run: |
+          URI="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          echo "Cloud Run URL: $URI"
+          echo "Healthcheck:  $URI/api/health"
+
+      - name: Smoke check /api/health
+        run: |
+          URI="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          for i in {1..20}; do
+            STATUS="$(curl -sS -o /dev/null -w '%{http_code}' "$URI/api/health" || true)"
+            if [ "$STATUS" = "200" ]; then
+              echo "Healthcheck OK (200)"
+              exit 0
+            fi
+            echo "Healthcheck not ready yet (status=$STATUS), retrying..."
+            sleep 3
+          done
+          echo "Healthcheck did not return 200 within timeout."
+          exit 1

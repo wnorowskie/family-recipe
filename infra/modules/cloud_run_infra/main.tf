@@ -20,6 +20,8 @@ locals {
 
   deployer_roles = [
     "roles/artifactregistry.writer",
+    # Needed for Cloud SQL Auth Proxy during CI migrations.
+    "roles/cloudsql.client",
     "roles/run.admin",
     "roles/secretmanager.secretAccessor",
   ]
@@ -151,7 +153,7 @@ resource "google_cloud_run_v2_service" "app" {
   name     = var.cloud_run_service_name
   location = var.region
   project  = var.project_id
-  # Allow all ingress (auth still enforced via --no-allow-unauthenticated in deploys).
+  # Allow all ingress; prod deploys can decide whether to allow unauthenticated.
   ingress = "INGRESS_TRAFFIC_ALL"
 
   lifecycle {
@@ -163,6 +165,11 @@ resource "google_cloud_run_v2_service" "app" {
 
   template {
     service_account = google_service_account.runtime.email
+
+    scaling {
+      min_instance_count = var.min_instance_count
+      max_instance_count = var.max_instance_count
+    }
 
     containers {
       image = "us-docker.pkg.dev/cloudrun/container/hello"

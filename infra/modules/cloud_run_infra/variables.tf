@@ -37,6 +37,18 @@ variable "cloud_run_service_name" {
   default     = "family-recipe-dev"
 }
 
+variable "min_instance_count" {
+  description = "Minimum number of instances to keep warm in Cloud Run"
+  type        = number
+  default     = 0
+}
+
+variable "max_instance_count" {
+  description = "Maximum number of instances to allow in Cloud Run autoscaling"
+  type        = number
+  default     = 20
+}
+
 variable "uploads_bucket_name" {
   description = "GCS bucket name for uploads (private, uniform access)"
   type        = string

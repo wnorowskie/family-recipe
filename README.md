@@ -160,6 +160,26 @@ FAMILY_NAME="Family Recipe" FAMILY_MASTER_KEY="actual-master-key" \
 npm run db:seed
 ```
 
+### Connecting to Cloud Run (dev)
+
+- Ensure the Cloud Run service ingress is set to **All traffic (INGRESS_TRAFFIC_ALL)**. Without that setting, the proxy will respond with 404s even when the service is healthy.
+- Start the Cloud Run proxy (requires `gcloud auth login` first):
+
+```
+gcloud run services proxy family-recipe-dev \
+	--project family-recipe-dev \
+	--region us-east1 \
+	--port 9999
+```
+
+- With the proxy running you can hit the deployed app at <http://127.0.0.1:9999>. For quick verification, curl the health check:
+
+```
+curl -i http://127.0.0.1:9999/api/health
+```
+
+- Stop the proxy with `Ctrl+C` when you're done.
+
 ---
 
 ## Project Structure
