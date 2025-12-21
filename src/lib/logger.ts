@@ -4,6 +4,58 @@ interface LogMeta {
   [key: string]: unknown;
 }
 
+const REDACTED_VALUE = '[REDACTED]';
+const SENSITIVE_META_KEYS = new Set([
+  'password',
+  'newpassword',
+  'currentpassword',
+  'token',
+  'accesstoken',
+  'refreshtoken',
+  'secret',
+  'jwt',
+  'jwtsecret',
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'familymasterkey',
+  'family_master_key',
+  'database_url',
+  'databaseurl',
+]);
+
+function isSensitiveKey(key: string) {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  if (SENSITIVE_META_KEYS.has(normalized)) return true;
+  if (normalized.includes('password')) return true;
+  if (normalized.includes('secret')) return true;
+  if (normalized.endsWith('token')) return true;
+  return false;
+}
+
+function redactMeta(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (value === null) return value;
+  if (typeof value !== 'object') return value;
+
+  if (seen.has(value as object)) return '[Circular]';
+  seen.add(value as object);
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactMeta(item, seen));
+  }
+
+  const record = value as Record<string, unknown>;
+  const redacted: Record<string, unknown> = {};
+
+  for (const [key, val] of Object.entries(record)) {
+    redacted[key] = isSensitiveKey(key)
+      ? REDACTED_VALUE
+      : redactMeta(val, seen);
+  }
+
+  return redacted;
+}
+
 function serializeError(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -28,7 +80,7 @@ function writeLog(level: LogLevel, event: string, meta?: LogMeta) {
   };
 
   if (meta && Object.keys(meta).length > 0) {
-    payload.meta = meta;
+    payload.meta = redactMeta(meta);
   }
 
   const line = JSON.stringify(payload);

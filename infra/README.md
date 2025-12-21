@@ -1,16 +1,18 @@
-# Infrastructure (dev) – GCP Cloud SQL
+# Infrastructure – GCP Cloud SQL + Cloud Run
 
-This folder contains Terraform config for the **dev** environment only (`family-recipe-dev`). Prod will be handled separately (Phase 7). Structure:
+This folder contains Terraform config for **dev** and **prod** environments. Structure:
 
 - `envs/dev/` – environment wiring and backend config
+- `envs/prod/` – environment wiring and backend config
 - `modules/iam/` – service accounts + IAM bindings
 - `modules/sql_instance/` – Cloud SQL instance/db/user (+ optional Secret Manager secret)
+- `modules/cloud_run_infra/` – Cloud Run baseline service, Artifact Registry, uploads bucket, Secret Manager, and GitHub Actions WIF
 
 ## Prereqs (one-time manual)
 
-1. GCP project: `family-recipe-dev`
+1. GCP project: `family-recipe-dev` (and/or `family-recipe-prod`)
 2. APIs enabled: Cloud SQL Admin, Service Networking, IAM, Secret Manager, Cloud Logging/Monitoring (Cloud Run + VPC Access later if needed).
-3. Remote state bucket: `family-recipe-tf-state-dev` (with versioning).
+3. Remote state bucket: `family-recipe-tf-state-<env>` (with versioning).
 4. Bootstrap credentials: used my user creds to run the initial apply. Terraform will create:
 
 ## How to run Terraform (dev)

@@ -1,5 +1,5 @@
 variable "project_id" {
-  description = "GCP project ID for dev"
+  description = "GCP project ID for prod"
   type        = string
 }
 
@@ -12,7 +12,7 @@ variable "region" {
 variable "state_bucket_name" {
   description = "GCS bucket for Terraform state"
   type        = string
-  default     = "family-recipe-tf-state-dev"
+  default     = "family-recipe-tf-state-prod"
 }
 
 variable "terraform_admin_sa_id" {
@@ -30,13 +30,13 @@ variable "app_sql_client_sa_id" {
 variable "db_instance_name" {
   description = "Cloud SQL instance name"
   type        = string
-  default     = "family-recipe-dev"
+  default     = "family-recipe-prod"
 }
 
 variable "db_name" {
   description = "Database name"
   type        = string
-  default     = "family_recipe_dev"
+  default     = "family_recipe_prod"
 }
 
 variable "db_user" {
@@ -54,7 +54,7 @@ variable "db_password" {
 variable "db_password_secret_id" {
   description = "Secret Manager secret ID for DB password (secret resource only; add versions manually)"
   type        = string
-  default     = "family-recipe-dev-db-password"
+  default     = "family-recipe-prod-db-password"
 }
 
 variable "tier" {
@@ -72,7 +72,7 @@ variable "disk_size_gb" {
 variable "backup_retention_days" {
   description = "Automated backup retention (days)"
   type        = number
-  default     = 7
+  default     = 14
 }
 
 variable "maintenance_window_day" {
@@ -90,7 +90,7 @@ variable "maintenance_window_hour" {
 variable "pitr_enabled" {
   description = "Enable point-in-time recovery (PITR)"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "create_db_password_secret" {
@@ -106,15 +106,9 @@ variable "grant_secret_accessor_to_app" {
 }
 
 variable "enable_public_ip" {
-  description = "Whether to allocate a public IPv4 address for the instance (dev can set true, prod should set false)"
+  description = "Whether to allocate a public IPv4 address for the instance (prod should generally set false)"
   type        = bool
-  default     = true
-}
-
-variable "require_ssl" {
-  description = "Require SSL/TLS for all incoming connections to Cloud SQL"
-  type        = bool
-  default     = true
+  default     = false
 }
 
 variable "authorized_networks" {
@@ -144,19 +138,13 @@ variable "deployer_sa_id" {
 variable "artifact_registry_repo_id" {
   description = "Artifact Registry repository ID for app images"
   type        = string
-  default     = "family-recipe-dev"
-}
-
-variable "cloud_sql_instances" {
-  description = "List of Cloud SQL instance connection names for Cloud Run connector"
-  type        = list(string)
-  default     = []
+  default     = "family-recipe-prod"
 }
 
 variable "cloud_run_service_name" {
   description = "Cloud Run service name"
   type        = string
-  default     = "family-recipe-dev"
+  default     = "family-recipe-prod"
 }
 
 variable "min_instance_count" {
@@ -174,13 +162,13 @@ variable "max_instance_count" {
 variable "uploads_bucket_name" {
   description = "GCS bucket for uploads"
   type        = string
-  default     = "family-recipe-dev-uploads"
+  default     = "family-recipe-prod-uploads"
 }
 
 variable "uploads_base_url" {
   description = "Base URL for uploads (e.g., https://storage.googleapis.com/<bucket>)"
   type        = string
-  default     = "https://storage.googleapis.com/family-recipe-dev-uploads"
+  default     = "https://storage.googleapis.com/family-recipe-prod-uploads"
 }
 
 variable "prisma_schema" {
@@ -192,19 +180,19 @@ variable "prisma_schema" {
 variable "database_url_secret_id" {
   description = "Secret Manager secret ID for DATABASE_URL"
   type        = string
-  default     = "family-recipe-dev-database-url"
+  default     = "family-recipe-prod-database-url"
 }
 
 variable "jwt_secret_id" {
   description = "Secret Manager secret ID for JWT secret"
   type        = string
-  default     = "family-recipe-dev-jwt-secret"
+  default     = "family-recipe-prod-jwt-secret"
 }
 
 variable "family_master_key_secret_id" {
   description = "Secret Manager secret ID for FAMILY_MASTER_KEY"
   type        = string
-  default     = "family-recipe-dev-family-master-key"
+  default     = "family-recipe-prod-family-master-key"
 }
 
 variable "wif_pool_id" {
@@ -220,13 +208,12 @@ variable "wif_provider_id" {
 }
 
 variable "github_repository" {
-  description = "GitHub repository (owner/repo) allowed for WIF"
+  description = "GitHub repository in owner/repo form"
   type        = string
-  default     = "wnorowskie/family-recipe"
 }
 
 variable "github_ref" {
-  description = "Git ref allowed for WIF (e.g., refs/heads/develop)"
+  description = "Git ref allowed to assume WIF (e.g., refs/heads/main)"
   type        = string
-  default     = "refs/heads/develop"
+  default     = "refs/heads/main"
 }
