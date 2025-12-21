@@ -52,8 +52,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Set up Cloud SQL Auth Proxy
-        uses: google-github-actions/setup-cloud-sql-proxy@v2
+      - name: Install Cloud SQL Auth Proxy
+        run: |
+          for version in 2.11.4 2.11.3 2.11.0 2.10.1 2.9.0 2.8.0; do
+            url="https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v${version}/cloud-sql-proxy.linux.amd64"
+            echo "Attempting to download Cloud SQL Auth Proxy v${version}..."
+            if curl -sSfL "$url" -o cloud-sql-proxy; then
+              chmod +x cloud-sql-proxy
+              sudo mv cloud-sql-proxy /usr/local/bin/cloud-sql-proxy
+              echo "Installed Cloud SQL Auth Proxy v${version}"
+              exit 0
+            fi
+          done
+          echo "Failed to download Cloud SQL Auth Proxy" >&2
+          exit 1
 
       - name: Run Prisma migrations (prod)
         env:
@@ -69,6 +81,7 @@ jobs:
           fi
 
           sudo mkdir -p /cloudsql
+          sudo chown "$USER":"$USER" /cloudsql
 
           cloud-sql-proxy "${INSTANCE_CONNECTION_NAME}" \
             --unix-socket /cloudsql \
