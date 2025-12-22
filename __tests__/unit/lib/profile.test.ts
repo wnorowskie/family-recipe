@@ -7,8 +7,14 @@ import {
   getUserFavorites,
 } from '@/lib/profile';
 
+const mockResolveUrl = jest.fn(async (key?: string | null) => key ?? null);
+
 jest.mock('@/lib/prisma', () => ({
   prisma: mockDeep<PrismaClient>(),
+}));
+
+jest.mock('@/lib/uploads', () => ({
+  createSignedUrlResolver: jest.fn(() => mockResolveUrl),
 }));
 
 const prismaMock = prisma as unknown as DeepMockProxy<PrismaClient>;
@@ -19,6 +25,10 @@ describe('getUserPostsForProfile', () => {
 
   beforeEach(() => {
     mockReset(prismaMock);
+    mockResolveUrl.mockReset();
+    mockResolveUrl.mockImplementation(
+      async (key?: string | null) => key ?? null
+    );
   });
 
   describe('Empty Results', () => {
@@ -77,8 +87,12 @@ describe('getUserPostsForProfile', () => {
         mainPhotoUrl: null,
         authorId: userId,
         familySpaceId,
-        createdAt: new Date(`2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`),
-        updatedAt: new Date(`2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`),
+        createdAt: new Date(
+          `2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`
+        ),
+        updatedAt: new Date(
+          `2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`
+        ),
         lastEditedById: null,
         lastEditAt: null,
         lastEditNote: null,
@@ -144,6 +158,7 @@ describe('getUserPostsForProfile', () => {
           title: 'Recipe 1',
           caption: null,
           mainPhotoUrl: 'photo1.jpg',
+          mainPhotoStorageKey: 'photo1.jpg',
           authorId: userId,
           familySpaceId,
           createdAt: new Date('2025-01-01T00:00:00.000Z'),
@@ -164,7 +179,9 @@ describe('getUserPostsForProfile', () => {
       ];
 
       prismaMock.post.findMany.mockResolvedValue(posts as any);
-      (prismaMock.cookedEvent.groupBy as any).mockResolvedValue(cookedStats as any);
+      (prismaMock.cookedEvent.groupBy as any).mockResolvedValue(
+        cookedStats as any
+      );
 
       const result = await getUserPostsForProfile(userId, familySpaceId);
 
@@ -230,7 +247,9 @@ describe('getUserPostsForProfile', () => {
       ];
 
       prismaMock.post.findMany.mockResolvedValue(posts as any);
-      (prismaMock.cookedEvent.groupBy as any).mockResolvedValue(cookedStats as any);
+      (prismaMock.cookedEvent.groupBy as any).mockResolvedValue(
+        cookedStats as any
+      );
 
       const result = await getUserPostsForProfile(userId, familySpaceId);
 
@@ -256,8 +275,12 @@ describe('getUserPostsForProfile', () => {
         mainPhotoUrl: null,
         authorId: userId,
         familySpaceId,
-        createdAt: new Date(`2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`),
-        updatedAt: new Date(`2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`),
+        createdAt: new Date(
+          `2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`
+        ),
+        updatedAt: new Date(
+          `2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`
+        ),
         lastEditedById: null,
         lastEditAt: null,
         lastEditNote: null,
@@ -288,6 +311,7 @@ describe('getUserPostsForProfile', () => {
           title: 'My Recipe',
           caption: 'A delicious recipe',
           mainPhotoUrl: 'https://example.com/photo.jpg',
+          mainPhotoStorageKey: 'https://example.com/photo.jpg',
           authorId: userId,
           familySpaceId,
           createdAt: new Date('2025-01-15T12:30:00.000Z'),
@@ -350,6 +374,10 @@ describe('getUserCookedHistory', () => {
 
   beforeEach(() => {
     mockReset(prismaMock);
+    mockResolveUrl.mockReset();
+    mockResolveUrl.mockImplementation(
+      async (key?: string | null) => key ?? null
+    );
   });
 
   describe('Empty Results', () => {
@@ -383,7 +411,7 @@ describe('getUserCookedHistory', () => {
             select: {
               id: true,
               title: true,
-              mainPhotoUrl: true,
+              mainPhotoStorageKey: true,
             },
           },
         },
@@ -415,7 +443,7 @@ describe('getUserCookedHistory', () => {
             select: {
               id: true,
               title: true,
-              mainPhotoUrl: true,
+              mainPhotoStorageKey: true,
             },
           },
         },
@@ -429,11 +457,14 @@ describe('getUserCookedHistory', () => {
         postId: `post-${i}`,
         rating: 5,
         note: `Note ${i}`,
-        createdAt: new Date(`2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`),
+        createdAt: new Date(
+          `2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`
+        ),
         post: {
           id: `post-${i}`,
           title: `Recipe ${i}`,
           mainPhotoUrl: `photo${i}.jpg`,
+          mainPhotoStorageKey: `photo${i}.jpg`,
         },
       }));
 
@@ -499,6 +530,7 @@ describe('getUserCookedHistory', () => {
             id: 'post-456',
             title: 'Chocolate Cake',
             mainPhotoUrl: 'https://example.com/cake.jpg',
+            mainPhotoStorageKey: 'https://example.com/cake.jpg',
           },
         },
       ];
@@ -581,6 +613,7 @@ describe('getUserCookedHistory', () => {
             id: 'post-1',
             title: 'No Photo Recipe',
             mainPhotoUrl: null,
+            mainPhotoStorageKey: null,
           },
         },
       ];
@@ -642,6 +675,10 @@ describe('getUserFavorites', () => {
 
   beforeEach(() => {
     mockReset(prismaMock);
+    mockResolveUrl.mockReset();
+    mockResolveUrl.mockImplementation(
+      async (key?: string | null) => key ?? null
+    );
   });
 
   describe('Empty Results', () => {
@@ -675,7 +712,7 @@ describe('getUserFavorites', () => {
             select: {
               id: true,
               title: true,
-              mainPhotoUrl: true,
+              mainPhotoStorageKey: true,
               author: {
                 select: {
                   name: true,
@@ -712,7 +749,7 @@ describe('getUserFavorites', () => {
             select: {
               id: true,
               title: true,
-              mainPhotoUrl: true,
+              mainPhotoStorageKey: true,
               author: {
                 select: {
                   name: true,
@@ -729,11 +766,14 @@ describe('getUserFavorites', () => {
         id: `fav-${i}`,
         userId,
         postId: `post-${i}`,
-        createdAt: new Date(`2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`),
+        createdAt: new Date(
+          `2025-01-01T${String(i).padStart(2, '0')}:00:00.000Z`
+        ),
         post: {
           id: `post-${i}`,
           title: `Recipe ${i}`,
           mainPhotoUrl: `photo${i}.jpg`,
+          mainPhotoStorageKey: `photo${i}.jpg`,
           author: {
             name: `Author ${i}`,
           },
@@ -801,6 +841,7 @@ describe('getUserFavorites', () => {
             id: 'post-456',
             title: 'Amazing Recipe',
             mainPhotoUrl: 'https://example.com/recipe.jpg',
+            mainPhotoStorageKey: 'https://example.com/recipe.jpg',
             author: {
               name: 'John Doe',
             },
@@ -835,6 +876,7 @@ describe('getUserFavorites', () => {
             id: 'post-1',
             title: 'No Photo Recipe',
             mainPhotoUrl: null,
+            mainPhotoStorageKey: null,
             author: {
               name: 'Jane Smith',
             },
@@ -860,6 +902,7 @@ describe('getUserFavorites', () => {
             id: 'post-1',
             title: 'Recipe',
             mainPhotoUrl: null,
+            mainPhotoStorageKey: null,
             author: {
               name: 'Alice Johnson',
             },
@@ -887,6 +930,7 @@ describe('getUserFavorites', () => {
             id: 'post-3',
             title: 'Recipe 3',
             mainPhotoUrl: null,
+            mainPhotoStorageKey: null,
             author: { name: 'Author 3' },
           },
         },
@@ -899,6 +943,7 @@ describe('getUserFavorites', () => {
             id: 'post-2',
             title: 'Recipe 2',
             mainPhotoUrl: null,
+            mainPhotoStorageKey: null,
             author: { name: 'Author 2' },
           },
         },

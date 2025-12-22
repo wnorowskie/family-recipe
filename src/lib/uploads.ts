@@ -19,6 +19,7 @@ const SIGNED_URL_TTL_SECONDS = Number(
 );
 
 export interface SavedUpload {
+  storageKey: string;
   url: string;
   filePath?: string;
 }
@@ -90,6 +91,18 @@ async function fetchMetadata(pathname: string): Promise<string> {
   }
 
   return response.text();
+}
+
+let cachedServiceAccountEmail: string | null = null;
+
+async function getServiceAccountEmail(): Promise<string> {
+  if (cachedServiceAccountEmail) {
+    return cachedServiceAccountEmail;
+  }
+
+  const email = await fetchMetadata('instance/service-accounts/default/email');
+  cachedServiceAccountEmail = email;
+  return email;
 }
 
 async function getGcpAccessToken(): Promise<string> {
@@ -296,9 +309,9 @@ function extractGcsObjectKey(url: string): string | null {
 }
 
 export async function deleteUploadedFiles(
-  urls: Array<string | null | undefined>
+  inputs: Array<string | null | undefined>
 ): Promise<void> {
-  const filtered = urls.filter(Boolean) as string[];
+  const filtered = inputs.filter(Boolean) as string[];
   if (!filtered.length) {
     return;
   }
@@ -307,8 +320,10 @@ export async function deleteUploadedFiles(
     try {
       const accessToken = await getGcpAccessToken();
       await Promise.all(
-        filtered.map(async (url) => {
-          const key = extractGcsObjectKey(url);
+        filtered.map(async (value) => {
+          const key =
+            extractGcsObjectKey(value) ??
+            value.replace(/^\/+uploads\//, '').replace(/^\/+/, '');
           if (!key) {
             return;
           }
@@ -339,12 +354,10 @@ export async function deleteUploadedFiles(
 
   const publicDir = path.join(process.cwd(), 'public');
   await Promise.all(
-    filtered.map(async (url) => {
-      if (!url.startsWith('/uploads/')) {
-        return;
-      }
-
-      const relativePath = url.replace(/^\/+/, '');
+    filtered.map(async (value) => {
+      const relativePath = value.startsWith('/uploads/')
+        ? value.replace(/^\/+/, '')
+        : path.join('uploads', value);
       const absolutePath = path.join(publicDir, relativePath);
 
       try {
@@ -378,9 +391,7 @@ export async function savePhotoFile(file: FileLike): Promise<SavedUpload> {
   if (UPLOADS_BUCKET) {
     try {
       const accessToken = await getGcpAccessToken();
-      const serviceAccountEmail = await fetchMetadata(
-        'instance/service-accounts/default/email'
-      );
+      const serviceAccountEmail = await getServiceAccountEmail();
       const privateKey = process.env.GCS_SIGNING_PRIVATE_KEY;
 
       await uploadToGcs({
@@ -401,6 +412,7 @@ export async function savePhotoFile(file: FileLike): Promise<SavedUpload> {
       });
 
       return {
+        storageKey: filename,
         url: signedUrl,
         filePath: `gs://${UPLOADS_BUCKET}/${filename}`,
       };
@@ -417,7 +429,50 @@ export async function savePhotoFile(file: FileLike): Promise<SavedUpload> {
   await fs.writeFile(destination, buffer);
 
   return {
+    storageKey: filename,
     url: `/uploads/${filename}`,
     filePath: destination,
+  };
+}
+
+export async function getSignedUploadUrl(
+  storageKey: string | null | undefined
+): Promise<string | null> {
+  if (!storageKey) {
+    return null;
+  }
+
+  if (!UPLOADS_BUCKET) {
+    return `/uploads/${storageKey}`;
+  }
+
+  const accessToken = await getGcpAccessToken();
+  const serviceAccountEmail = await getServiceAccountEmail();
+  const privateKey = process.env.GCS_SIGNING_PRIVATE_KEY;
+
+  return generateSignedUrlV4({
+    bucket: UPLOADS_BUCKET,
+    objectKey: storageKey,
+    expiresInSeconds: SIGNED_URL_TTL_SECONDS,
+    accessToken,
+    serviceAccountEmail,
+    privateKey,
+  });
+}
+
+export function createSignedUrlResolver() {
+  const cache = new Map<string, Promise<string | null>>();
+
+  return (storageKey: string | null | undefined): Promise<string | null> => {
+    if (!storageKey) {
+      return Promise.resolve(null);
+    }
+
+    const normalized = storageKey;
+    if (!cache.has(normalized)) {
+      cache.set(normalized, getSignedUploadUrl(normalized));
+    }
+
+    return cache.get(normalized)!;
   };
 }

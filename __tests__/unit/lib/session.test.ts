@@ -19,6 +19,7 @@ import {
 } from '@/lib/session';
 import { verifyToken, JWTPayload } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
+import { getSignedUploadUrl } from '@/lib/uploads';
 
 // Mock jose library (used by jwt.ts)
 jest.mock('jose', () => ({
@@ -36,9 +37,16 @@ jest.mock('@/lib/prisma', () => ({
   },
 }));
 
+jest.mock('@/lib/uploads', () => ({
+  getSignedUploadUrl: jest.fn(),
+}));
+
 const mockVerifyToken = verifyToken as jest.MockedFunction<typeof verifyToken>;
 const mockFindUnique = prisma.user.findUnique as jest.MockedFunction<
   typeof prisma.user.findUnique
+>;
+const mockGetSignedUploadUrl = getSignedUploadUrl as jest.MockedFunction<
+  typeof getSignedUploadUrl
 >;
 
 describe('Session Management', () => {
@@ -59,6 +67,10 @@ describe('Session Management', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetSignedUploadUrl.mockReset();
+    mockGetSignedUploadUrl.mockImplementation(
+      async (key: string | null | undefined) => key ?? null
+    );
   });
 
   // Helper to set NODE_ENV for testing
@@ -345,7 +357,7 @@ describe('Session Management', () => {
         id: 'user_123',
         name: 'John Doe',
         emailOrUsername: 'john@example.com',
-        avatarUrl: 'https://example.com/avatar.jpg',
+        avatarStorageKey: 'avatars/john.jpg',
         memberships: [
           {
             role: 'member',
@@ -357,6 +369,9 @@ describe('Session Management', () => {
         ],
       };
       mockFindUnique.mockResolvedValue(mockUser as any);
+      mockGetSignedUploadUrl.mockResolvedValueOnce(
+        'https://example.com/avatar.jpg'
+      );
 
       const request = new NextRequest('http://localhost/api/test', {
         headers: { cookie: 'session=valid-token' },
@@ -415,7 +430,7 @@ describe('Session Management', () => {
         id: 'user_123',
         name: 'No Membership User',
         emailOrUsername: 'nomember@example.com',
-        avatarUrl: null,
+        avatarStorageKey: null,
         memberships: [],
       };
       mockFindUnique.mockResolvedValue(mockUser as any);
@@ -560,9 +575,12 @@ describe('Session Management', () => {
       };
       mockFindUnique.mockResolvedValue(mockUser as any);
 
-      const authenticatedRequest = new NextRequest('http://localhost/api/posts', {
-        headers: { cookie: 'session=login-token' },
-      });
+      const authenticatedRequest = new NextRequest(
+        'http://localhost/api/posts',
+        {
+          headers: { cookie: 'session=login-token' },
+        }
+      );
 
       const user = await getCurrentUser(authenticatedRequest);
       expect(user).toEqual({

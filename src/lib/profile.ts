@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { createSignedUrlResolver } from '@/lib/uploads';
 
 const DEFAULT_LIMIT = 10;
 
@@ -60,7 +61,10 @@ export async function getUserPostsForProfile(
   const slice = hasMore ? posts.slice(0, limit) : posts;
   const postIds = slice.map((post) => post.id);
 
-  let cookedStatsMap: Record<string, { timesCooked: number; averageRating: number | null }> = {};
+  let cookedStatsMap: Record<
+    string,
+    { timesCooked: number; averageRating: number | null }
+  > = {};
 
   if (postIds.length > 0) {
     const cookedGroups = await prisma.cookedEvent.groupBy({
@@ -76,28 +80,33 @@ export async function getUserPostsForProfile(
       },
     });
 
-    cookedStatsMap = cookedGroups.reduce<Record<string, { timesCooked: number; averageRating: number | null }>>(
-      (acc, group) => {
-        acc[group.postId] = {
-          timesCooked: group._count._all,
-          averageRating: group._avg.rating,
-        };
-        return acc;
-      },
-      {}
-    );
+    cookedStatsMap = cookedGroups.reduce<
+      Record<string, { timesCooked: number; averageRating: number | null }>
+    >((acc, group) => {
+      acc[group.postId] = {
+        timesCooked: group._count._all,
+        averageRating: group._avg.rating,
+      };
+      return acc;
+    }, {});
   }
 
-  const items: ProfilePostListItem[] = slice.map((post) => {
-    const stats = cookedStatsMap[post.id] ?? { timesCooked: 0, averageRating: null };
-    return {
-      id: post.id,
-      title: post.title,
-      mainPhotoUrl: post.mainPhotoUrl,
-      createdAt: post.createdAt.toISOString(),
-      cookedStats: stats,
-    };
-  });
+  const resolveUrl = createSignedUrlResolver();
+  const items: ProfilePostListItem[] = await Promise.all(
+    slice.map(async (post) => {
+      const stats = cookedStatsMap[post.id] ?? {
+        timesCooked: 0,
+        averageRating: null,
+      };
+      return {
+        id: post.id,
+        title: post.title,
+        mainPhotoUrl: await resolveUrl(post.mainPhotoStorageKey),
+        createdAt: post.createdAt.toISOString(),
+        cookedStats: stats,
+      };
+    })
+  );
 
   return {
     items,
@@ -126,7 +135,7 @@ export async function getUserCookedHistory(
         select: {
           id: true,
           title: true,
-          mainPhotoUrl: true,
+          mainPhotoStorageKey: true,
         },
       },
     },
@@ -135,17 +144,20 @@ export async function getUserCookedHistory(
   const hasMore = cookedEvents.length > limit;
   const slice = hasMore ? cookedEvents.slice(0, limit) : cookedEvents;
 
-  const items: ProfileCookedItem[] = slice.map((entry) => ({
-    id: entry.id,
-    createdAt: entry.createdAt.toISOString(),
-    rating: entry.rating,
-    note: entry.note,
-    post: {
-      id: entry.post.id,
-      title: entry.post.title,
-      mainPhotoUrl: entry.post.mainPhotoUrl,
-    },
-  }));
+  const resolveUrl = createSignedUrlResolver();
+  const items: ProfileCookedItem[] = await Promise.all(
+    slice.map(async (entry) => ({
+      id: entry.id,
+      createdAt: entry.createdAt.toISOString(),
+      rating: entry.rating,
+      note: entry.note,
+      post: {
+        id: entry.post.id,
+        title: entry.post.title,
+        mainPhotoUrl: await resolveUrl(entry.post.mainPhotoStorageKey),
+      },
+    }))
+  );
 
   return {
     items,
@@ -174,7 +186,7 @@ export async function getUserFavorites(
         select: {
           id: true,
           title: true,
-          mainPhotoUrl: true,
+          mainPhotoStorageKey: true,
           author: {
             select: {
               name: true,
@@ -188,16 +200,19 @@ export async function getUserFavorites(
   const hasMore = favorites.length > limit;
   const slice = hasMore ? favorites.slice(0, limit) : favorites;
 
-  const items: ProfileFavoriteItem[] = slice.map((favorite) => ({
-    id: favorite.id,
-    createdAt: favorite.createdAt.toISOString(),
-    post: {
-      id: favorite.post.id,
-      title: favorite.post.title,
-      mainPhotoUrl: favorite.post.mainPhotoUrl,
-      authorName: favorite.post.author.name,
-    },
-  }));
+  const resolveUrl = createSignedUrlResolver();
+  const items: ProfileFavoriteItem[] = await Promise.all(
+    slice.map(async (favorite) => ({
+      id: favorite.id,
+      createdAt: favorite.createdAt.toISOString(),
+      post: {
+        id: favorite.post.id,
+        title: favorite.post.title,
+        mainPhotoUrl: await resolveUrl(favorite.post.mainPhotoStorageKey),
+        authorName: favorite.post.author.name,
+      },
+    }))
+  );
 
   return {
     items,

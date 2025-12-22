@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import type { TimelineItem, TimelineItemType } from '@/lib/timeline';
+import { createSignedUrlResolver } from '@/lib/uploads';
 
 const PAGE_SIZE = 20;
 
@@ -31,7 +32,11 @@ export async function getTimelineFeed({
   familySpaceId,
   limit = PAGE_SIZE,
   offset = 0,
-}: TimelineQueryInput): Promise<{ items: TimelineItem[]; hasMore: boolean; nextOffset: number }> {
+}: TimelineQueryInput): Promise<{
+  items: TimelineItem[];
+  hasMore: boolean;
+  nextOffset: number;
+}> {
   const postEvents = await prisma.post.findMany({
     where: { familySpaceId },
     orderBy: { createdAt: 'desc' },
@@ -39,13 +44,13 @@ export async function getTimelineFeed({
     select: {
       id: true,
       title: true,
-      mainPhotoUrl: true,
+      mainPhotoStorageKey: true,
       createdAt: true,
       author: {
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
     },
@@ -66,14 +71,14 @@ export async function getTimelineFeed({
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
       post: {
         select: {
           id: true,
           title: true,
-          mainPhotoUrl: true,
+          mainPhotoStorageKey: true,
         },
       },
     },
@@ -94,14 +99,14 @@ export async function getTimelineFeed({
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
       post: {
         select: {
           id: true,
           title: true,
-          mainPhotoUrl: true,
+          mainPhotoStorageKey: true,
         },
       },
     },
@@ -122,14 +127,14 @@ export async function getTimelineFeed({
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
       post: {
         select: {
           id: true,
           title: true,
-          mainPhotoUrl: true,
+          mainPhotoStorageKey: true,
         },
       },
     },
@@ -149,7 +154,7 @@ export async function getTimelineFeed({
     select: {
       id: true,
       title: true,
-      mainPhotoUrl: true,
+      mainPhotoStorageKey: true,
       createdAt: true,
       lastEditAt: true,
       lastEditNote: true,
@@ -157,14 +162,14 @@ export async function getTimelineFeed({
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
       author: {
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
     },
@@ -179,10 +184,10 @@ export async function getTimelineFeed({
       createdAt: event.createdAt,
       actorId: event.author.id,
       actorName: event.author.name,
-      actorAvatar: event.author.avatarUrl,
+      actorAvatar: event.author.avatarStorageKey,
       postId: event.id,
       postTitle: event.title,
-      postPhoto: event.mainPhotoUrl,
+      postPhoto: event.mainPhotoStorageKey,
     })
   );
 
@@ -193,10 +198,10 @@ export async function getTimelineFeed({
       createdAt: event.createdAt,
       actorId: event.author.id,
       actorName: event.author.name,
-      actorAvatar: event.author.avatarUrl,
+      actorAvatar: event.author.avatarStorageKey,
       postId: event.post.id,
       postTitle: event.post.title,
-      postPhoto: event.post.mainPhotoUrl,
+      postPhoto: event.post.mainPhotoStorageKey,
       commentId: event.id,
       commentText: event.text,
     })
@@ -209,10 +214,10 @@ export async function getTimelineFeed({
       createdAt: event.createdAt,
       actorId: event.user.id,
       actorName: event.user.name,
-      actorAvatar: event.user.avatarUrl,
+      actorAvatar: event.user.avatarStorageKey,
       postId: event.post?.id ?? '',
       postTitle: event.post?.title ?? 'A post',
-      postPhoto: event.post?.mainPhotoUrl ?? null,
+      postPhoto: event.post?.mainPhotoStorageKey ?? null,
       reactionEmoji: event.emoji,
     })
   );
@@ -224,10 +229,10 @@ export async function getTimelineFeed({
       createdAt: event.createdAt,
       actorId: event.user.id,
       actorName: event.user.name,
-      actorAvatar: event.user.avatarUrl,
+      actorAvatar: event.user.avatarStorageKey,
       postId: event.post.id,
       postTitle: event.post.title,
-      postPhoto: event.post.mainPhotoUrl,
+      postPhoto: event.post.mainPhotoStorageKey,
       cookedRating: event.rating,
       cookedNote: event.note,
     })
@@ -251,10 +256,10 @@ export async function getTimelineFeed({
       createdAt: event.lastEditAt,
       actorId: actor.id,
       actorName: actor.name,
-      actorAvatar: actor.avatarUrl,
+      actorAvatar: actor.avatarStorageKey,
       postId: event.id,
       postTitle: event.title,
-      postPhoto: event.mainPhotoUrl,
+      postPhoto: event.mainPhotoStorageKey,
       editNote: event.lastEditNote ?? null,
     });
   });
@@ -264,21 +269,22 @@ export async function getTimelineFeed({
   const slice = raw.slice(offset, offset + limit);
   const hasMore = raw.length > offset + limit;
 
-  const items: TimelineItem[] = slice
-    .filter((entry) => entry.postId)
-    .map((entry) => {
+  const resolveUrl = createSignedUrlResolver();
+  const filteredEntries = slice.filter((entry) => entry.postId);
+  const items: TimelineItem[] = await Promise.all(
+    filteredEntries.map(async (entry) => {
       const base = {
         id: entry.id,
         timestamp: entry.createdAt,
         actor: {
           id: entry.actorId,
           name: entry.actorName,
-          avatarUrl: entry.actorAvatar,
+          avatarUrl: await resolveUrl(entry.actorAvatar),
         },
         post: {
           id: entry.postId,
           title: entry.postTitle,
-          mainPhotoUrl: entry.postPhoto,
+          mainPhotoUrl: await resolveUrl(entry.postPhoto),
         },
       } as const;
 
@@ -328,7 +334,8 @@ export async function getTimelineFeed({
             type: 'post_created' as const,
           };
       }
-    });
+    })
+  );
 
   return {
     items,

@@ -15,7 +15,7 @@ model User {
   name              String
   emailOrUsername   String   @unique @map("email_or_username")
   passwordHash      String   @map("password_hash")
-  avatarUrl         String?  @map("avatar_url")
+  avatarStorageKey  String?  @map("avatar_url")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -71,7 +71,7 @@ model Post {
   title             String
   caption           String?
   hasRecipeDetails  Boolean   @default(false) @map("has_recipe_details")
-  mainPhotoUrl      String?   @map("main_photo_url")
+  mainPhotoStorageKey String?   @map("main_photo_url")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   lastEditedBy      String?   @map("last_edited_by")
@@ -99,7 +99,7 @@ model Post {
 model PostPhoto {
   id          String   @id @default(cuid())
   postId      String   @map("post_id")
-  url         String
+  storageKey  String   @map("url")
   sortOrder   Int      @default(0) @map("sort_order")
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -166,7 +166,7 @@ model Comment {
   postId    String    @map("post_id")
   authorId  String    @map("author_id")
   text      String
-  photoUrl  String?   @map("photo_url")
+  photoStorageKey  String?   @map("photo_url")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime? @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")

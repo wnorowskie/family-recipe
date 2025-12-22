@@ -4,7 +4,12 @@ import { reactionSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { reactionLimiter, applyRateLimit } from '@/lib/rateLimit';
-import { parseRequestBody, notFoundError, internalError } from '@/lib/apiErrors';
+import {
+  parseRequestBody,
+  notFoundError,
+  internalError,
+} from '@/lib/apiErrors';
+import { createSignedUrlResolver } from '@/lib/uploads';
 
 type TargetType = 'post' | 'comment';
 
@@ -20,30 +25,44 @@ async function buildReactionSummary(targetType: TargetType, targetId: string) {
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
     },
   });
 
-  const summaryMap = reactions.reduce(
-    (acc, reaction) => {
-      const entry = acc.get(reaction.emoji) ?? {
-        emoji: reaction.emoji,
-        count: 0,
-        users: [] as Array<{ id: string; name: string; avatarUrl: string | null }>,
-      };
-      entry.count += 1;
-      entry.users.push({
+  const resolveUrl = createSignedUrlResolver();
+  const enrichedReactions = await Promise.all(
+    reactions.map(async (reaction) => ({
+      emoji: reaction.emoji,
+      user: {
         id: reaction.user.id,
         name: reaction.user.name,
-        avatarUrl: reaction.user.avatarUrl,
-      });
-      acc.set(reaction.emoji, entry);
-      return acc;
-    },
-    new Map<string, { emoji: string; count: number; users: Array<{ id: string; name: string; avatarUrl: string | null }> }>()
+        avatarUrl: await resolveUrl(reaction.user.avatarStorageKey),
+      },
+      targetId: reaction.targetId,
+    }))
   );
+
+  const summaryMap = enrichedReactions.reduce((acc, reaction) => {
+    const entry = acc.get(reaction.emoji) ?? {
+      emoji: reaction.emoji,
+      count: 0,
+      users: [] as Array<{
+        id: string;
+        name: string;
+        avatarUrl: string | null;
+      }>,
+    };
+    entry.count += 1;
+    entry.users.push({
+      id: reaction.user.id,
+      name: reaction.user.name,
+      avatarUrl: reaction.user.avatarUrl,
+    });
+    acc.set(reaction.emoji, entry);
+    return acc;
+  }, new Map<string, { emoji: string; count: number; users: Array<{ id: string; name: string; avatarUrl: string | null }> }>());
 
   return Array.from(summaryMap.values());
 }

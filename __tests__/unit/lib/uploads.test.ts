@@ -30,8 +30,15 @@ const createMockFile = (options: {
   size?: number;
   data?: string;
 }) => {
-  const { name = 'photo.jpg', type = 'image/jpeg', size = 100, data = 'data' } = options;
-  const arrayBufferMock = jest.fn(async () => new TextEncoder().encode(data).buffer);
+  const {
+    name = 'photo.jpg',
+    type = 'image/jpeg',
+    size = 100,
+    data = 'data',
+  } = options;
+  const arrayBufferMock = jest.fn(
+    async () => new TextEncoder().encode(data).buffer
+  );
   const file = {
     name,
     type,
@@ -90,6 +97,7 @@ describe('Uploads Utilities', () => {
     const expectedName = '1700000000000-uuid-123.jpeg';
     const expectedPath = path.join(uploadDir, expectedName);
     expect(result).toEqual({
+      storageKey: expectedName,
       url: `/uploads/${expectedName}`,
       filePath: expectedPath,
     });
@@ -109,14 +117,20 @@ describe('Uploads Utilities', () => {
     { type: 'image/webp', expectedExt: '.webp' },
     { type: 'image/gif', expectedExt: '.gif' },
     { type: 'image/jpeg', expectedExt: '.jpg' }, // default fallback
-  ])('derives extension from mime type when name lacks ext: $type', async ({ type, expectedExt }) => {
-    const { file } = createMockFile({ name: 'upload', type });
-    jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
-    mockRandomUUID.mockReturnValue('fixed' as any);
+  ])(
+    'derives extension from mime type when name lacks ext: $type',
+    async ({ type, expectedExt }) => {
+      const { file } = createMockFile({ name: 'upload', type });
+      jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
+      mockRandomUUID.mockReturnValue('fixed' as any);
 
-    const result = await savePhotoFile(file);
+      const result = await savePhotoFile(file);
 
-    expect(result.url).toBe(`/uploads/1700000000000-fixed${expectedExt}`);
-    expect(result.filePath).toBe(path.join(uploadDir, `1700000000000-fixed${expectedExt}`));
-  });
+      expect(result.storageKey).toBe(`1700000000000-fixed${expectedExt}`);
+      expect(result.url).toBe(`/uploads/1700000000000-fixed${expectedExt}`);
+      expect(result.filePath).toBe(
+        path.join(uploadDir, `1700000000000-fixed${expectedExt}`)
+      );
+    }
+  );
 });
