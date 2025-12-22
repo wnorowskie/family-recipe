@@ -7,15 +7,28 @@
  */
 
 import { getRecipes } from '@/lib/recipes';
-import { prismaMock, resetPrismaMock } from '../../integration/helpers/mock-prisma';
+import {
+  prismaMock,
+  resetPrismaMock,
+} from '../../integration/helpers/mock-prisma';
+
+const mockResolveUrl = jest.fn(async (key?: string | null) => key ?? null);
 
 // Mock Prisma client
 jest.mock('@/lib/prisma', () => ({
   prisma: require('../../integration/helpers/mock-prisma').prismaMock,
 }));
 
-const mockPostFindMany = prismaMock.post.findMany as jest.MockedFunction<typeof prismaMock.post.findMany>;
-const mockCookedGroupBy = prismaMock.cookedEvent.groupBy as jest.MockedFunction<typeof prismaMock.cookedEvent.groupBy>;
+jest.mock('@/lib/uploads', () => ({
+  createSignedUrlResolver: jest.fn(() => mockResolveUrl),
+}));
+
+const mockPostFindMany = prismaMock.post.findMany as jest.MockedFunction<
+  typeof prismaMock.post.findMany
+>;
+const mockCookedGroupBy = prismaMock.cookedEvent.groupBy as jest.MockedFunction<
+  typeof prismaMock.cookedEvent.groupBy
+>;
 
 const latestPostArgs = () => {
   const args = mockPostFindMany.mock.calls.at(-1)?.[0];
@@ -36,6 +49,10 @@ describe('Recipe Utilities', () => {
     resetPrismaMock();
     mockPostFindMany.mockResolvedValue([] as any);
     mockCookedGroupBy.mockResolvedValue([] as any);
+    mockResolveUrl.mockReset();
+    mockResolveUrl.mockImplementation(
+      async (key?: string | null) => key ?? null
+    );
   });
 
   describe('getRecipes - query building', () => {
@@ -47,7 +64,7 @@ describe('Recipe Utilities', () => {
       expect(args.take).toBe(baseInput.limit + 1);
       expect(args.skip).toBe(baseInput.offset);
       expect(args.include).toEqual({
-        author: { select: { id: true, name: true, avatarUrl: true } },
+        author: { select: { id: true, name: true, avatarStorageKey: true } },
         recipeDetails: true,
         tags: { include: { tag: true } },
       });
@@ -61,10 +78,7 @@ describe('Recipe Utilities', () => {
       await getRecipes({ ...baseInput, sort: 'alpha' });
 
       const args = latestPostArgs();
-      expect(args.orderBy).toEqual([
-        { title: 'asc' },
-        { createdAt: 'desc' },
-      ]);
+      expect(args.orderBy).toEqual([{ title: 'asc' }, { createdAt: 'desc' }]);
     });
 
     it('adds trimmed search filter when search provided', async () => {
@@ -113,7 +127,10 @@ describe('Recipe Utilities', () => {
                   OR: [
                     { course: 'breakfast' },
                     {
-                      courses: { contains: JSON.stringify('breakfast'), mode: 'insensitive' },
+                      courses: {
+                        contains: JSON.stringify('breakfast'),
+                        mode: 'insensitive',
+                      },
                     },
                   ],
                 },
@@ -125,7 +142,10 @@ describe('Recipe Utilities', () => {
                   OR: [
                     { course: 'dinner' },
                     {
-                      courses: { contains: JSON.stringify('dinner'), mode: 'insensitive' },
+                      courses: {
+                        contains: JSON.stringify('dinner'),
+                        mode: 'insensitive',
+                      },
                     },
                   ],
                 },
@@ -167,7 +187,11 @@ describe('Recipe Utilities', () => {
     });
 
     it('applies total time filters when provided', async () => {
-      await getRecipes({ ...baseInput, minTotalMinutes: 15, maxTotalMinutes: 60 });
+      await getRecipes({
+        ...baseInput,
+        minTotalMinutes: 15,
+        maxTotalMinutes: 60,
+      });
 
       const args = latestPostArgs();
       expect(args.where?.AND).toEqual([
@@ -269,7 +293,10 @@ describe('Recipe Utilities', () => {
                   OR: [
                     { course: 'dinner' },
                     {
-                      courses: { contains: JSON.stringify('dinner'), mode: 'insensitive' },
+                      courses: {
+                        contains: JSON.stringify('dinner'),
+                        mode: 'insensitive',
+                      },
                     },
                   ],
                 },
@@ -362,7 +389,13 @@ describe('Recipe Utilities', () => {
           id: 'post_2',
           title: 'Apple Pie',
           mainPhotoUrl: '/pie.jpg',
-          author: { id: 'user_2', name: 'Bob', avatarUrl: '/avatar.jpg' },
+          mainPhotoStorageKey: '/pie.jpg',
+          author: {
+            id: 'user_2',
+            name: 'Bob',
+            avatarUrl: '/avatar.jpg',
+            avatarStorageKey: '/avatar.jpg',
+          },
           recipeDetails: {
             courses: 'not valid json',
             course: 'dessert',
@@ -484,8 +517,14 @@ describe('Recipe Utilities', () => {
       const result = await getRecipes({ ...baseInput, limit: 5 });
 
       expect(result.items).toHaveLength(2);
-      expect(result.items[0].cookedStats).toEqual({ timesCooked: 3, averageRating: 4.5 });
-      expect(result.items[1].cookedStats).toEqual({ timesCooked: 1, averageRating: 5 });
+      expect(result.items[0].cookedStats).toEqual({
+        timesCooked: 3,
+        averageRating: 4.5,
+      });
+      expect(result.items[1].cookedStats).toEqual({
+        timesCooked: 1,
+        averageRating: 5,
+      });
     });
 
     it('defaults cooked stats when no group data returned', async () => {
@@ -495,7 +534,10 @@ describe('Recipe Utilities', () => {
           title: 'Soup',
           mainPhotoUrl: null,
           author: { id: 'user_1', name: 'Alice', avatarUrl: null },
-          recipeDetails: { courses: JSON.stringify(['dinner']), course: 'dinner' },
+          recipeDetails: {
+            courses: JSON.stringify(['dinner']),
+            course: 'dinner',
+          },
           tags: [],
         },
         {
@@ -503,7 +545,10 @@ describe('Recipe Utilities', () => {
           title: 'Bread',
           mainPhotoUrl: null,
           author: { id: 'user_2', name: 'Bob', avatarUrl: null },
-          recipeDetails: { courses: JSON.stringify(['snack']), course: 'snack' },
+          recipeDetails: {
+            courses: JSON.stringify(['snack']),
+            course: 'snack',
+          },
           tags: [],
         },
       ] as any);
@@ -518,8 +563,14 @@ describe('Recipe Utilities', () => {
 
       const result = await getRecipes({ ...baseInput, limit: 5 });
 
-      expect(result.items[0].cookedStats).toEqual({ timesCooked: 2, averageRating: null });
-      expect(result.items[1].cookedStats).toEqual({ timesCooked: 0, averageRating: null });
+      expect(result.items[0].cookedStats).toEqual({
+        timesCooked: 2,
+        averageRating: null,
+      });
+      expect(result.items[1].cookedStats).toEqual({
+        timesCooked: 0,
+        averageRating: null,
+      });
     });
 
     it('queries cooked stats only for sliced post IDs', async () => {
@@ -529,7 +580,10 @@ describe('Recipe Utilities', () => {
           title: 'First',
           mainPhotoUrl: null,
           author: { id: 'user_1', name: 'Alice', avatarUrl: null },
-          recipeDetails: { courses: JSON.stringify(['breakfast']), course: 'breakfast' },
+          recipeDetails: {
+            courses: JSON.stringify(['breakfast']),
+            course: 'breakfast',
+          },
           tags: [],
         },
         {
@@ -537,7 +591,10 @@ describe('Recipe Utilities', () => {
           title: 'Second',
           mainPhotoUrl: null,
           author: { id: 'user_2', name: 'Bob', avatarUrl: null },
-          recipeDetails: { courses: JSON.stringify(['lunch']), course: 'lunch' },
+          recipeDetails: {
+            courses: JSON.stringify(['lunch']),
+            course: 'lunch',
+          },
           tags: [],
         },
       ] as any);
@@ -560,7 +617,10 @@ describe('Recipe Utilities', () => {
           title: 'First',
           mainPhotoUrl: null,
           author: { id: 'user_1', name: 'Alice', avatarUrl: null },
-          recipeDetails: { courses: JSON.stringify(['breakfast']), course: 'breakfast' },
+          recipeDetails: {
+            courses: JSON.stringify(['breakfast']),
+            course: 'breakfast',
+          },
           tags: [],
         },
         {
@@ -568,7 +628,10 @@ describe('Recipe Utilities', () => {
           title: 'Second',
           mainPhotoUrl: null,
           author: { id: 'user_2', name: 'Bob', avatarUrl: null },
-          recipeDetails: { courses: JSON.stringify(['lunch']), course: 'lunch' },
+          recipeDetails: {
+            courses: JSON.stringify(['lunch']),
+            course: 'lunch',
+          },
           tags: [],
         },
         {
@@ -576,7 +639,10 @@ describe('Recipe Utilities', () => {
           title: 'Third',
           mainPhotoUrl: null,
           author: { id: 'user_3', name: 'Carol', avatarUrl: null },
-          recipeDetails: { courses: JSON.stringify(['dinner']), course: 'dinner' },
+          recipeDetails: {
+            courses: JSON.stringify(['dinner']),
+            course: 'dinner',
+          },
           tags: [],
         },
       ] as any);

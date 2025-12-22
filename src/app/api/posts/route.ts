@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
+import { getPostDetail } from '@/lib/posts';
 import { createPostSchema } from '@/lib/validation';
 import { savePhotoFile } from '@/lib/uploads';
 import { MAX_PHOTO_COUNT, normalizePostPayload } from '@/lib/postPayload';
@@ -116,11 +117,11 @@ export const POST = withAuth(async (request, user) => {
         title: payload.title,
         caption: payload.caption ?? null,
         hasRecipeDetails: Boolean(recipeInput),
-        mainPhotoUrl: savedPhotos[0]?.url,
+        mainPhotoStorageKey: savedPhotos[0]?.storageKey,
         photos: savedPhotos.length
           ? {
               create: savedPhotos.map((photo, index) => ({
-                url: photo.url,
+                storageKey: photo.storageKey,
                 sortOrder: index,
               })),
             }
@@ -170,22 +171,24 @@ export const POST = withAuth(async (request, user) => {
             }
           : undefined,
       },
-      include: {
-        photos: {
-          orderBy: { sortOrder: 'asc' },
-        },
-        recipeDetails: true,
-        tags: {
-          include: {
-            tag: true,
-          },
-        },
+      select: {
+        id: true,
       },
     });
 
     revalidatePath('/timeline');
 
-    return NextResponse.json({ post: createdPost }, { status: 201 });
+    const hydratedPost = await getPostDetail(
+      createdPost.id,
+      user.familySpaceId,
+      user.id
+    );
+
+    if (!hydratedPost) {
+      return internalError();
+    }
+
+    return NextResponse.json({ post: hydratedPost }, { status: 201 });
   } catch (error) {
     logError('posts.create.error', error);
     if (error instanceof Error) {

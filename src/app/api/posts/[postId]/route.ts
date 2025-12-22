@@ -36,8 +36,8 @@ const photoOrderSchema = z
 type PhotoOrderEntry = z.infer<typeof photoOrderEntrySchema>;
 
 type ResolvedPhotoEntry =
-  | { type: 'existing'; id: string; url: string }
-  | { type: 'new'; fileIndex: number; url: string };
+  | { type: 'existing'; id: string; storageKey: string }
+  | { type: 'new'; fileIndex: number; storageKey: string };
 
 function extractChangeNote(value: unknown): {
   changeNote?: string;
@@ -178,6 +178,10 @@ export const PUT = withAuth(
         include: {
           photos: {
             orderBy: { sortOrder: 'asc' },
+            select: {
+              id: true,
+              storageKey: true,
+            },
           },
           recipeDetails: true,
         },
@@ -391,7 +395,7 @@ export const PUT = withAuth(
           orderedPhotoEntries.push({
             type: 'existing',
             id: photo.id,
-            url: photo.url,
+            storageKey: photo.storageKey,
           });
         } else {
           if (entry.fileIndex < 0 || entry.fileIndex >= files.length) {
@@ -421,7 +425,7 @@ export const PUT = withAuth(
           orderedPhotoEntries.push({
             type: 'new',
             fileIndex: entry.fileIndex,
-            url: '',
+            storageKey: '',
           });
         }
       }
@@ -436,11 +440,11 @@ export const PUT = withAuth(
           if (!saved) {
             throw new Error('PHOTO_SAVE_MISMATCH');
           }
-          entry.url = saved.url;
+          entry.storageKey = saved.storageKey;
         }
       });
 
-      const primaryPhotoUrl = orderedPhotoEntries[0]?.url ?? null;
+      const primaryPhotoStorageKey = orderedPhotoEntries[0]?.storageKey ?? null;
       const keepExistingIds = orderedPhotoEntries
         .filter(
           (entry): entry is Exclude<ResolvedPhotoEntry, { type: 'new' }> =>
@@ -497,7 +501,7 @@ export const PUT = withAuth(
             title: payload.title,
             caption: payload.caption ?? null,
             hasRecipeDetails: Boolean(recipeInput),
-            mainPhotoUrl: primaryPhotoUrl,
+            mainPhotoStorageKey: primaryPhotoStorageKey,
             lastEditedBy: user!.id,
             lastEditNote: changeNoteResult.changeNote ?? null,
             lastEditAt: new Date(),
@@ -528,7 +532,7 @@ export const PUT = withAuth(
             await tx.postPhoto.create({
               data: {
                 postId,
-                url: entry.url,
+                storageKey: entry.storageKey,
                 sortOrder: index,
               },
             });
@@ -694,12 +698,12 @@ export const DELETE = withAuth(
           authorId: true,
           photos: {
             select: {
-              url: true,
+              storageKey: true,
             },
           },
           comments: {
             select: {
-              photoUrl: true,
+              photoStorageKey: true,
             },
           },
         },
@@ -733,12 +737,17 @@ export const DELETE = withAuth(
         where: { id: postId },
       });
 
-      const photoUrls = existingPost.photos.map((photo) => photo.url);
-      const commentPhotoUrls = existingPost.comments
-        .map((comment) => comment.photoUrl)
-        .filter((url): url is string => Boolean(url));
+      const photoStorageKeys = existingPost.photos.map(
+        (photo) => photo.storageKey
+      );
+      const commentPhotoStorageKeys = existingPost.comments
+        .map((comment) => comment.photoStorageKey)
+        .filter((key): key is string => Boolean(key));
 
-      await deleteUploadedFiles([...photoUrls, ...commentPhotoUrls]);
+      await deleteUploadedFiles([
+        ...photoStorageKeys,
+        ...commentPhotoStorageKeys,
+      ]);
 
       revalidatePath('/timeline');
       revalidatePath('/recipes');

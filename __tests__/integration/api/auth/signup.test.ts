@@ -21,6 +21,7 @@ import {
   createUnauthenticatedRequest,
   parseResponseJSON,
 } from '../../helpers/request-helpers';
+import { getSignedUploadUrl } from '@/lib/uploads';
 
 // Mock dependencies
 jest.mock('jose', () => ({
@@ -43,6 +44,9 @@ jest.mock('@/lib/rateLimit', () => ({
   applyRateLimit: jest.fn().mockReturnValue(null),
 }));
 jest.mock('@/lib/masterKey');
+jest.mock('@/lib/uploads', () => ({
+  getSignedUploadUrl: jest.fn(),
+}));
 
 import { hashPassword, verifyPassword } from '@/lib/auth';
 import { signToken } from '@/lib/jwt';
@@ -55,6 +59,9 @@ const mockVerifyPassword = verifyPassword as jest.MockedFunction<
   typeof verifyPassword
 >;
 const mockSignToken = signToken as jest.MockedFunction<typeof signToken>;
+const mockGetSignedUploadUrl = getSignedUploadUrl as jest.MockedFunction<
+  typeof getSignedUploadUrl
+>;
 
 describe('POST /api/auth/signup', () => {
   const mockEnsureFamilySpace = ensureFamilySpace as jest.MockedFunction<
@@ -74,6 +81,9 @@ describe('POST /api/auth/signup', () => {
     mockSignToken.mockResolvedValue('mock-jwt-token');
     mockGetEnvMasterKeyHash.mockResolvedValue('env-master-key-hash');
     mockEnsureFamilySpace.mockResolvedValue(defaultFamilySpace as any);
+    mockGetSignedUploadUrl.mockResolvedValue(
+      'https://signed.example/avatar.jpg'
+    );
     process.env.FAMILY_MASTER_KEY = 'env-master-key';
   });
 
@@ -583,7 +593,7 @@ describe('POST /api/auth/signup', () => {
         id: 'new_user_id',
         name: 'John Doe',
         emailOrUsername: 'john@example.com',
-        avatarUrl: null,
+        avatarStorageKey: null,
       });
       const membership = createMockFamilyMembership({
         userId: newUser.id,
@@ -603,6 +613,8 @@ describe('POST /api/auth/signup', () => {
         });
       });
 
+      mockGetSignedUploadUrl.mockResolvedValueOnce(null);
+
       const request = createUnauthenticatedRequest(
         'POST',
         'http://localhost/api/auth/signup',
@@ -618,7 +630,7 @@ describe('POST /api/auth/signup', () => {
         id: newUser.id,
         name: newUser.name,
         emailOrUsername: newUser.emailOrUsername,
-        avatarUrl: newUser.avatarUrl,
+        avatarUrl: null,
         role: membership.role,
         familySpaceId: membership.familySpaceId,
       });

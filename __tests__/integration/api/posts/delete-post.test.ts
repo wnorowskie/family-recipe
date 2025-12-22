@@ -42,10 +42,8 @@ jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
 }));
 
-jest.mock('fs', () => ({
-  promises: {
-    unlink: jest.fn().mockResolvedValue(undefined),
-  },
+jest.mock('@/lib/uploads', () => ({
+  deleteUploadedFiles: jest.fn(),
 }));
 
 // Import after mocks
@@ -53,11 +51,17 @@ import { DELETE } from '@/app/api/posts/[postId]/route';
 import { prismaMock } from '../../helpers/mock-prisma';
 import { getCurrentUser } from '@/lib/session';
 import { revalidatePath } from 'next/cache';
-import { promises as fs } from 'fs';
+import { deleteUploadedFiles } from '@/lib/uploads';
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
-const mockRevalidatePath = revalidatePath as jest.MockedFunction<typeof revalidatePath>;
-const mockFsUnlink = fs.unlink as jest.MockedFunction<typeof fs.unlink>;
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
+>;
+const mockRevalidatePath = revalidatePath as jest.MockedFunction<
+  typeof revalidatePath
+>;
+const mockDeleteUploadedFiles = deleteUploadedFiles as jest.MockedFunction<
+  typeof deleteUploadedFiles
+>;
 
 // Helper to parse JSON response
 async function parseResponseJSON(response: Response) {
@@ -107,6 +111,7 @@ describe('DELETE /api/posts/[postId]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetCurrentUser.mockResolvedValue(mockAuthor);
+    mockDeleteUploadedFiles.mockResolvedValue(undefined);
   });
 
   describe('Authentication', () => {
@@ -179,7 +184,7 @@ describe('DELETE /api/posts/[postId]', () => {
         caption: null,
         authorId: 'user_author',
         familySpaceId: 'family_123',
-        mainPhotoUrl: null,
+        mainPhotoStorageKey: null,
         hasRecipeDetails: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -215,7 +220,7 @@ describe('DELETE /api/posts/[postId]', () => {
         caption: null,
         authorId: 'user_author',
         familySpaceId: 'family_123',
-        mainPhotoUrl: null,
+        mainPhotoStorageKey: null,
         hasRecipeDetails: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -248,7 +253,9 @@ describe('DELETE /api/posts/[postId]', () => {
       expect(response.status).toBe(403);
       const data = await parseResponseJSON(response);
       expect(data.error.code).toBe('FORBIDDEN');
-      expect(data.error.message).toBe('You do not have permission to delete this post');
+      expect(data.error.message).toBe(
+        'You do not have permission to delete this post'
+      );
       expect(prismaMock.post.delete).not.toHaveBeenCalled();
     });
   });
@@ -259,8 +266,8 @@ describe('DELETE /api/posts/[postId]', () => {
         id: 'post_123',
         authorId: 'user_author',
         photos: [
-          { url: '/uploads/photo1.jpg' },
-          { url: '/uploads/photo2.jpg' },
+          { storageKey: 'uploads/photo1.jpg' },
+          { storageKey: 'uploads/photo2.jpg' },
         ],
         comments: [],
       } as any;
@@ -272,7 +279,7 @@ describe('DELETE /api/posts/[postId]', () => {
         caption: null,
         authorId: 'user_author',
         familySpaceId: 'family_123',
-        mainPhotoUrl: null,
+        mainPhotoStorageKey: null,
         hasRecipeDetails: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -284,7 +291,10 @@ describe('DELETE /api/posts/[postId]', () => {
       const response = await DELETE(mockRequest, mockContext);
 
       expect(response.status).toBe(200);
-      expect(mockFsUnlink).toHaveBeenCalled();
+      expect(mockDeleteUploadedFiles).toHaveBeenCalledWith([
+        'uploads/photo1.jpg',
+        'uploads/photo2.jpg',
+      ]);
     });
 
     it('deletes comment photos from file system', async () => {
@@ -293,9 +303,9 @@ describe('DELETE /api/posts/[postId]', () => {
         authorId: 'user_author',
         photos: [],
         comments: [
-          { photoUrl: '/uploads/comment1.jpg' },
-          { photoUrl: '/uploads/comment2.jpg' },
-          { photoUrl: null },
+          { photoStorageKey: 'uploads/comment1.jpg' },
+          { photoStorageKey: 'uploads/comment2.jpg' },
+          { photoStorageKey: null },
         ],
       } as any;
 
@@ -306,7 +316,7 @@ describe('DELETE /api/posts/[postId]', () => {
         caption: null,
         authorId: 'user_author',
         familySpaceId: 'family_123',
-        mainPhotoUrl: null,
+        mainPhotoStorageKey: null,
         hasRecipeDetails: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -318,7 +328,10 @@ describe('DELETE /api/posts/[postId]', () => {
       const response = await DELETE(mockRequest, mockContext);
 
       expect(response.status).toBe(200);
-      expect(mockFsUnlink).toHaveBeenCalled();
+      expect(mockDeleteUploadedFiles).toHaveBeenCalledWith([
+        'uploads/comment1.jpg',
+        'uploads/comment2.jpg',
+      ]);
     });
 
     it('deletes both post and comment photos', async () => {
@@ -326,12 +339,12 @@ describe('DELETE /api/posts/[postId]', () => {
         id: 'post_123',
         authorId: 'user_author',
         photos: [
-          { url: '/uploads/post1.jpg' },
-          { url: '/uploads/post2.jpg' },
+          { storageKey: 'uploads/post1.jpg' },
+          { storageKey: 'uploads/post2.jpg' },
         ],
         comments: [
-          { photoUrl: '/uploads/comment1.jpg' },
-          { photoUrl: null },
+          { photoStorageKey: 'uploads/comment1.jpg' },
+          { photoStorageKey: null },
         ],
       } as any;
 
@@ -342,7 +355,7 @@ describe('DELETE /api/posts/[postId]', () => {
         caption: null,
         authorId: 'user_author',
         familySpaceId: 'family_123',
-        mainPhotoUrl: null,
+        mainPhotoStorageKey: null,
         hasRecipeDetails: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -354,7 +367,11 @@ describe('DELETE /api/posts/[postId]', () => {
       const response = await DELETE(mockRequest, mockContext);
 
       expect(response.status).toBe(200);
-      expect(mockFsUnlink).toHaveBeenCalled();
+      expect(mockDeleteUploadedFiles).toHaveBeenCalledWith([
+        'uploads/post1.jpg',
+        'uploads/post2.jpg',
+        'uploads/comment1.jpg',
+      ]);
     });
   });
 
@@ -374,7 +391,7 @@ describe('DELETE /api/posts/[postId]', () => {
         caption: null,
         authorId: 'user_author',
         familySpaceId: 'family_123',
-        mainPhotoUrl: null,
+        mainPhotoStorageKey: null,
         hasRecipeDetails: false,
         createdAt: new Date(),
         updatedAt: new Date(),

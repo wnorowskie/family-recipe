@@ -2,6 +2,10 @@ import { NextRequest } from 'next/server';
 import { prismaMock } from '../../helpers/mock-prisma';
 import { GET, POST } from '@/app/api/posts/[postId]/comments/route';
 
+const mockResolveUrl = jest.fn(async (key?: string | null) =>
+  key ? `https://signed.example/${key}` : null
+);
+
 // Mock dependencies
 jest.mock('jose', () => ({
   SignJWT: jest.fn(),
@@ -34,17 +38,26 @@ jest.mock('@/lib/posts', () => ({
 
 jest.mock('@/lib/uploads', () => ({
   savePhotoFile: jest.fn(),
+  getSignedUploadUrl: jest.fn(),
+  createSignedUrlResolver: jest.fn(() => mockResolveUrl),
 }));
 
 import { getCurrentUser } from '@/lib/session';
 import { getPostCommentsPage } from '@/lib/posts';
-import { savePhotoFile } from '@/lib/uploads';
+import { savePhotoFile, getSignedUploadUrl } from '@/lib/uploads';
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
+>;
 const mockGetPostCommentsPage = getPostCommentsPage as jest.MockedFunction<
   typeof getPostCommentsPage
 >;
-const mockSavePhotoFile = savePhotoFile as jest.MockedFunction<typeof savePhotoFile>;
+const mockSavePhotoFile = savePhotoFile as jest.MockedFunction<
+  typeof savePhotoFile
+>;
+const mockGetSignedUploadUrl = getSignedUploadUrl as jest.MockedFunction<
+  typeof getSignedUploadUrl
+>;
 
 // Helper to parse response JSON
 const parseResponseJSON = async (response: Response) => {
@@ -70,15 +83,26 @@ describe('GET /api/posts/[postId]/comments', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetCurrentUser.mockResolvedValue(mockUser);
+    mockGetSignedUploadUrl.mockImplementation(
+      async (key: string | null | undefined) =>
+        key ? `https://signed.example/${key}` : null
+    );
+    mockResolveUrl.mockReset();
+    mockResolveUrl.mockImplementation(async (key?: string | null) =>
+      key ? `https://signed.example/${key}` : null
+    );
   });
 
   describe('Authentication', () => {
     it('requires authentication', async () => {
       mockGetCurrentUser.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request, mockContext);
 
@@ -108,11 +132,16 @@ describe('GET /api/posts/[postId]/comments', () => {
     it('returns 404 for non-existent post', async () => {
       prismaMock.post.findFirst.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000999/comments', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000999/comments',
+        {
+          method: 'GET',
+        }
+      );
 
-      const response = await GET(request, { params: { postId: 'clh0000000000000000000999' } });
+      const response = await GET(request, {
+        params: { postId: 'clh0000000000000000000999' },
+      });
 
       expect(response.status).toBe(404);
       const data = await parseResponseJSON(response);
@@ -122,11 +151,16 @@ describe('GET /api/posts/[postId]/comments', () => {
     it('returns 404 for post in different family', async () => {
       prismaMock.post.findFirst.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000002/comments', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000002/comments',
+        {
+          method: 'GET',
+        }
+      );
 
-      const response = await GET(request, { params: { postId: 'clh0000000000000000000002' } });
+      const response = await GET(request, {
+        params: { postId: 'clh0000000000000000000002' },
+      });
 
       expect(response.status).toBe(404);
       expect(prismaMock.post.findFirst).toHaveBeenCalledWith({
@@ -141,7 +175,9 @@ describe('GET /api/posts/[postId]/comments', () => {
 
   describe('Success Cases', () => {
     it('returns paginated comments for post', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       mockGetPostCommentsPage.mockResolvedValue({
         comments: [
           {
@@ -173,9 +209,12 @@ describe('GET /api/posts/[postId]/comments', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request, mockContext);
 
@@ -187,16 +226,21 @@ describe('GET /api/posts/[postId]/comments', () => {
     });
 
     it('returns empty array when post has no comments', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       mockGetPostCommentsPage.mockResolvedValue({
         comments: [],
         hasMore: false,
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request, mockContext);
 
@@ -206,7 +250,9 @@ describe('GET /api/posts/[postId]/comments', () => {
     });
 
     it('accepts limit and offset parameters', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       mockGetPostCommentsPage.mockResolvedValue({
         comments: [],
         hasMore: true,
@@ -234,9 +280,12 @@ describe('GET /api/posts/[postId]/comments', () => {
     it('handles database errors during post lookup', async () => {
       prismaMock.post.findFirst.mockRejectedValue(new Error('Database error'));
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request, mockContext);
 
@@ -246,12 +295,17 @@ describe('GET /api/posts/[postId]/comments', () => {
     });
 
     it('handles errors during comment fetch', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       mockGetPostCommentsPage.mockRejectedValue(new Error('Fetch error'));
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request, mockContext);
 
@@ -289,10 +343,13 @@ describe('POST /api/posts/[postId]/comments', () => {
       const formData = new FormData();
       formData.append('payload', JSON.stringify({ text: 'Great!' }));
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -324,10 +381,13 @@ describe('POST /api/posts/[postId]/comments', () => {
     it('requires payload in form data', async () => {
       const formData = new FormData();
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -338,15 +398,20 @@ describe('POST /api/posts/[postId]/comments', () => {
     });
 
     it('requires text content', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
 
       const formData = new FormData();
       formData.append('payload', JSON.stringify({}));
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -356,15 +421,20 @@ describe('POST /api/posts/[postId]/comments', () => {
     });
 
     it('rejects empty text content', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
 
       const formData = new FormData();
       formData.append('payload', JSON.stringify({ text: '' }));
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -381,12 +451,17 @@ describe('POST /api/posts/[postId]/comments', () => {
       const formData = new FormData();
       formData.append('payload', JSON.stringify({ text: 'Great!' }));
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000999/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000999/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
-      const response = await POST(request, { params: { postId: 'clh0000000000000000000999' } });
+      const response = await POST(request, {
+        params: { postId: 'clh0000000000000000000999' },
+      });
 
       expect(response.status).toBe(404);
       const data = await parseResponseJSON(response);
@@ -400,12 +475,17 @@ describe('POST /api/posts/[postId]/comments', () => {
       const formData = new FormData();
       formData.append('payload', JSON.stringify({ text: 'Great!' }));
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000002/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000002/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
-      const response = await POST(request, { params: { postId: 'clh0000000000000000000002' } });
+      const response = await POST(request, {
+        params: { postId: 'clh0000000000000000000002' },
+      });
 
       expect(response.status).toBe(404);
       expect(prismaMock.post.findFirst).toHaveBeenCalledWith({
@@ -421,28 +501,33 @@ describe('POST /api/posts/[postId]/comments', () => {
 
   describe('Success Cases', () => {
     it('creates comment successfully', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       prismaMock.comment.create.mockResolvedValue({
         id: 'clh0000000000000000000101',
         postId: 'clh0000000000000000000001',
         authorId: 'user_123',
         text: 'Great recipe!',
-        photoUrl: null,
+        photoStorageKey: null,
         createdAt: new Date('2024-01-01'),
         author: {
           id: 'user_123',
           name: 'Test User',
-          avatarUrl: null,
+          avatarStorageKey: null,
         },
       } as any);
 
       const formData = new FormData();
       formData.append('payload', JSON.stringify({ text: 'Great recipe!' }));
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -456,14 +541,14 @@ describe('POST /api/posts/[postId]/comments', () => {
           postId: 'clh0000000000000000000001',
           authorId: 'user_123',
           text: 'Great recipe!',
-          photoUrl: null,
+          photoStorageKey: null,
         },
         include: {
           author: {
             select: {
               id: true,
               name: true,
-              avatarUrl: true,
+              avatarStorageKey: true,
             },
           },
         },
@@ -471,8 +556,11 @@ describe('POST /api/posts/[postId]/comments', () => {
     });
 
     it('accepts optional photo', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       mockSavePhotoFile.mockResolvedValue({
+        storageKey: 'uploads/comment-photo.jpg',
         url: '/uploads/comment-photo.jpg',
         filePath: '/public/uploads/comment-photo.jpg',
       });
@@ -481,46 +569,53 @@ describe('POST /api/posts/[postId]/comments', () => {
         postId: 'clh0000000000000000000001',
         authorId: 'user_123',
         text: 'Look at this!',
-        photoUrl: '/uploads/comment-photo.jpg',
+        photoStorageKey: 'uploads/comment-photo.jpg',
         createdAt: new Date('2024-01-01'),
         author: {
           id: 'user_123',
           name: 'Test User',
-          avatarUrl: null,
+          avatarStorageKey: null,
         },
       } as any);
 
       const formData = new FormData();
       formData.append('payload', JSON.stringify({ text: 'Look at this!' }));
-      
+
       // Create a mock File
-      const mockFile = new File(['photo content'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = new File(['photo content'], 'photo.jpg', {
+        type: 'image/jpeg',
+      });
       formData.append('photo', mockFile);
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const response = await POST(request, mockContext);
 
       expect(response.status).toBe(201);
       const data = await parseResponseJSON(response);
-      expect(data.comment.photoUrl).toBe('/uploads/comment-photo.jpg');
+      expect(data.comment.photoUrl).toBe(
+        'https://signed.example/uploads/comment-photo.jpg'
+      );
       expect(mockSavePhotoFile).toHaveBeenCalledTimes(1);
       expect(prismaMock.comment.create).toHaveBeenCalledWith({
         data: {
           postId: 'clh0000000000000000000001',
           authorId: 'user_123',
           text: 'Look at this!',
-          photoUrl: '/uploads/comment-photo.jpg',
+          photoStorageKey: 'uploads/comment-photo.jpg',
         },
         include: {
           author: {
             select: {
               id: true,
               name: true,
-              avatarUrl: true,
+              avatarStorageKey: true,
             },
           },
         },
@@ -528,7 +623,9 @@ describe('POST /api/posts/[postId]/comments', () => {
     });
 
     it('returns comment with author information', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       prismaMock.comment.create.mockResolvedValue({
         id: 'clh0000000000000000000101',
         postId: 'clh0000000000000000000001',
@@ -539,17 +636,21 @@ describe('POST /api/posts/[postId]/comments', () => {
         author: {
           id: 'user_456',
           name: 'Another User',
-          avatarUrl: '/avatar.jpg',
+          avatarUrl: null,
+          avatarStorageKey: 'avatar.jpg',
         },
       } as any);
 
       const formData = new FormData();
       formData.append('payload', JSON.stringify({ text: 'Nice!' }));
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -558,7 +659,7 @@ describe('POST /api/posts/[postId]/comments', () => {
       expect(data.comment.author).toEqual({
         id: 'user_456',
         name: 'Another User',
-        avatarUrl: '/avatar.jpg',
+        avatarUrl: 'https://signed.example/avatar.jpg',
       });
       expect(data.comment.reactions).toEqual([]);
     });
@@ -571,10 +672,13 @@ describe('POST /api/posts/[postId]/comments', () => {
       const formData = new FormData();
       formData.append('payload', JSON.stringify({ text: 'Great!' }));
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -584,16 +688,21 @@ describe('POST /api/posts/[postId]/comments', () => {
     });
 
     it('handles errors during comment creation', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       prismaMock.comment.create.mockRejectedValue(new Error('Create error'));
 
       const formData = new FormData();
       formData.append('payload', JSON.stringify({ text: 'Great!' }));
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -603,18 +712,25 @@ describe('POST /api/posts/[postId]/comments', () => {
     });
 
     it('handles errors during photo upload', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       mockSavePhotoFile.mockRejectedValue(new Error('Upload error'));
 
       const formData = new FormData();
       formData.append('payload', JSON.stringify({ text: 'Great!' }));
-      const mockFile = new File(['photo content'], 'photo.jpg', { type: 'image/jpeg' });
+      const mockFile = new File(['photo content'], 'photo.jpg', {
+        type: 'image/jpeg',
+      });
       formData.append('photo', mockFile);
 
-      const request = new NextRequest('http://localhost/api/posts/clh0000000000000000000001/comments', {
-        method: 'POST',
-        body: formData,
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/clh0000000000000000000001/comments',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
       const response = await POST(request, mockContext);
 

@@ -1,13 +1,30 @@
-import { getPostCommentsPage, getPostCookedEventsPage, getPostDetail } from '@/lib/posts';
-import { prismaMock, resetPrismaMock } from '../../integration/helpers/mock-prisma';
+import {
+  getPostCommentsPage,
+  getPostCookedEventsPage,
+  getPostDetail,
+} from '@/lib/posts';
+import {
+  prismaMock,
+  resetPrismaMock,
+} from '../../integration/helpers/mock-prisma';
+
+const mockResolveUrl = jest.fn(async (key?: string | null) => key ?? null);
 
 jest.mock('@/lib/prisma', () => ({
   prisma: require('../../integration/helpers/mock-prisma').prismaMock,
 }));
 
+jest.mock('@/lib/uploads', () => ({
+  createSignedUrlResolver: jest.fn(() => mockResolveUrl),
+}));
+
 describe('Posts Utilities', () => {
   beforeEach(() => {
     resetPrismaMock();
+    mockResolveUrl.mockReset();
+    mockResolveUrl.mockImplementation(
+      async (key?: string | null) => key ?? null
+    );
   });
 
   describe('getPostDetail', () => {
@@ -31,14 +48,18 @@ describe('Posts Utilities', () => {
         caption: null,
         createdAt,
         updatedAt,
-        mainPhotoUrl: null,
-        author: { id: 'user_1', name: 'Alice', avatarUrl: '/avatar.jpg' },
+        mainPhotoStorageKey: null,
+        author: {
+          id: 'user_1',
+          name: 'Alice',
+          avatarStorageKey: '/avatar.jpg',
+        },
         editor: { id: 'user_2', name: 'Bob' },
         lastEditNote: 'Tweaked recipe',
         lastEditAt,
         photos: [
-          { id: 'photo_1', url: '/p1.jpg' },
-          { id: 'photo_2', url: '/p2.jpg' },
+          { id: 'photo_1', storageKey: '/p1.jpg' },
+          { id: 'photo_2', storageKey: '/p2.jpg' },
         ],
         recipeDetails: {
           origin: 'Italy',
@@ -65,16 +86,16 @@ describe('Posts Utilities', () => {
         {
           id: 'comment_2',
           text: 'Looks great',
-          photoUrl: null,
+          photoStorageKey: null,
           createdAt: new Date('2024-01-05T12:00:00Z'),
-          author: { id: 'user_3', name: 'Carol', avatarUrl: null },
+          author: { id: 'user_3', name: 'Carol', avatarStorageKey: null },
         },
         {
           id: 'comment_1',
           text: 'Nice!',
-          photoUrl: '/photo.png',
+          photoStorageKey: '/photo.png',
           createdAt: new Date('2024-01-04T12:00:00Z'),
-          author: { id: 'user_4', name: 'Dave', avatarUrl: '/dave.png' },
+          author: { id: 'user_4', name: 'Dave', avatarStorageKey: '/dave.png' },
         },
       ];
       prismaMock.comment.findMany.mockResolvedValue(commentRecords as any);
@@ -85,14 +106,14 @@ describe('Posts Utilities', () => {
           rating: 5,
           note: 'Great',
           createdAt: new Date('2024-01-06T12:00:00Z'),
-          user: { id: 'user_5', name: 'Eve', avatarUrl: null },
+          user: { id: 'user_5', name: 'Eve', avatarStorageKey: null },
         },
         {
           id: 'cooked_2',
           rating: 4,
           note: null,
           createdAt: new Date('2024-01-07T12:00:00Z'),
-          user: { id: 'user_6', name: 'Frank', avatarUrl: '/frank.jpg' },
+          user: { id: 'user_6', name: 'Frank', avatarStorageKey: '/frank.jpg' },
         },
       ];
       prismaMock.cookedEvent.findMany.mockResolvedValue(cookedRecords as any);
@@ -103,12 +124,16 @@ describe('Posts Utilities', () => {
             {
               targetId: 'comment_1',
               emoji: '👍',
-              user: { id: 'user_7', name: 'Grace', avatarUrl: null },
+              user: { id: 'user_7', name: 'Grace', avatarStorageKey: null },
             },
             {
               targetId: 'comment_1',
               emoji: '👍',
-              user: { id: 'user_8', name: 'Henry', avatarUrl: '/henry.png' },
+              user: {
+                id: 'user_8',
+                name: 'Henry',
+                avatarStorageKey: '/henry.png',
+              },
             },
           ]) as any;
         }
@@ -116,17 +141,17 @@ describe('Posts Utilities', () => {
           {
             id: 'reaction_1',
             emoji: '❤️',
-            user: { id: 'user_9', name: 'Ivy', avatarUrl: '/ivy.jpg' },
+            user: { id: 'user_9', name: 'Ivy', avatarStorageKey: '/ivy.jpg' },
           },
           {
             id: 'reaction_2',
             emoji: '❤️',
-            user: { id: 'user_10', name: 'Jack', avatarUrl: null },
+            user: { id: 'user_10', name: 'Jack', avatarStorageKey: null },
           },
           {
             id: 'reaction_3',
             emoji: '🔥',
-            user: { id: 'user_11', name: 'Kyle', avatarUrl: null },
+            user: { id: 'user_11', name: 'Kyle', avatarStorageKey: null },
           },
         ] as any;
       });
@@ -186,7 +211,10 @@ describe('Posts Utilities', () => {
           users: [{ id: 'user_11', name: 'Kyle', avatarUrl: null }],
         },
       ]);
-      expect(result?.cookedStats).toEqual({ timesCooked: 2, averageRating: 4.5 });
+      expect(result?.cookedStats).toEqual({
+        timesCooked: 2,
+        averageRating: 4.5,
+      });
 
       expect(result?.comments).toEqual([
         {
@@ -233,7 +261,10 @@ describe('Posts Utilities', () => {
           user: { id: 'user_6', name: 'Frank', avatarUrl: '/frank.jpg' },
         },
       ]);
-      expect(result?.recentCookedPage).toEqual({ hasMore: false, nextOffset: 2 });
+      expect(result?.recentCookedPage).toEqual({
+        hasMore: false,
+        nextOffset: 2,
+      });
     });
   });
 
@@ -258,9 +289,13 @@ describe('Posts Utilities', () => {
       const records = Array.from({ length: 51 }, (_, index) => ({
         id: `comment_${index}`,
         text: `Comment ${index}`,
-        photoUrl: null,
+        photoStorageKey: null,
         createdAt: new Date(2024, 0, 51 - index),
-        author: { id: `user_${index}`, name: `User ${index}`, avatarUrl: null },
+        author: {
+          id: `user_${index}`,
+          name: `User ${index}`,
+          avatarStorageKey: null,
+        },
       }));
 
       prismaMock.comment.findMany.mockResolvedValue(records as any);
@@ -268,7 +303,7 @@ describe('Posts Utilities', () => {
         {
           targetId: 'comment_0',
           emoji: '😀',
-          user: { id: 'user_r', name: 'React User', avatarUrl: null },
+          user: { id: 'user_r', name: 'React User', avatarStorageKey: null },
         },
       ] as any);
 
@@ -317,14 +352,14 @@ describe('Posts Utilities', () => {
           rating: 3,
           note: null,
           createdAt: new Date('2024-02-02T12:00:00Z'),
-          user: { id: 'user_b', name: 'Bob', avatarUrl: null },
+          user: { id: 'user_b', name: 'Bob', avatarStorageKey: null },
         },
         {
           id: 'cook_1',
           rating: 4,
           note: 'Nice',
           createdAt: new Date('2024-02-01T12:00:00Z'),
-          user: { id: 'user_a', name: 'Alice', avatarUrl: '/a.jpg' },
+          user: { id: 'user_a', name: 'Alice', avatarStorageKey: '/a.jpg' },
         },
       ];
 

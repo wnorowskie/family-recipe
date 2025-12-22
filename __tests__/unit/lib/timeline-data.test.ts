@@ -1,9 +1,9 @@
 /**
  * Unit tests for timeline data aggregation
- * 
+ *
  * Coverage target: ≥75%
  * Tests: Comprehensive coverage of getTimelineFeed()
- * 
+ *
  * Functions tested:
  * - getTimelineFeed() - Aggregates timeline events from multiple sources
  */
@@ -11,14 +11,59 @@
 import { getTimelineFeed } from '@/lib/timeline-data';
 import { prismaMock } from '../../integration/helpers/mock-prisma';
 
+const mockResolveUrl = jest.fn(async (key?: string | null) => key ?? null);
+
+const withAvatarStorage = (entity: any) => {
+  if (!entity) {
+    return entity;
+  }
+  return {
+    ...entity,
+    avatarStorageKey: entity.avatarStorageKey ?? entity.avatarUrl ?? null,
+  };
+};
+
+const withPostStorage = (post: any) => ({
+  ...post,
+  mainPhotoStorageKey: post?.mainPhotoStorageKey ?? post?.mainPhotoUrl ?? null,
+  author: withAvatarStorage(post?.author ?? null),
+  editor: withAvatarStorage(post?.editor ?? null),
+});
+
+const withCommentStorage = (comment: any) => ({
+  ...comment,
+  author: withAvatarStorage(comment.author),
+  post: withPostStorage(comment.post),
+});
+
+const withReactionStorage = (reaction: any) => ({
+  ...reaction,
+  user: withAvatarStorage(reaction.user),
+  post: reaction.post ? withPostStorage(reaction.post) : reaction.post,
+});
+
+const withCookedStorage = (entry: any) => ({
+  ...entry,
+  user: withAvatarStorage(entry.user),
+  post: withPostStorage(entry.post),
+});
+
 // Mock prisma
 jest.mock('@/lib/prisma', () => ({
   prisma: require('../../integration/helpers/mock-prisma').prismaMock,
 }));
 
+jest.mock('@/lib/uploads', () => ({
+  createSignedUrlResolver: jest.fn(() => mockResolveUrl),
+}));
+
 describe('Timeline Data Aggregation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockResolveUrl.mockReset();
+    mockResolveUrl.mockImplementation(
+      async (key?: string | null) => key ?? null
+    );
   });
 
   describe('getTimelineFeed - Empty Results', () => {
@@ -53,7 +98,7 @@ describe('Timeline Data Aggregation', () => {
 
   describe('getTimelineFeed - Post Events', () => {
     it('returns post_created events', async () => {
-      const mockPost = {
+      const mockPost = withPostStorage({
         id: 'post_1',
         title: 'Chocolate Cake',
         mainPhotoUrl: '/uploads/cake.jpg',
@@ -63,9 +108,11 @@ describe('Timeline Data Aggregation', () => {
           name: 'Alice',
           avatarUrl: '/avatar.jpg',
         },
-      };
+      });
 
-      prismaMock.post.findMany.mockResolvedValueOnce([mockPost] as any).mockResolvedValue([]);
+      prismaMock.post.findMany
+        .mockResolvedValueOnce([mockPost] as any)
+        .mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
       prismaMock.reaction.findMany.mockResolvedValue([]);
       prismaMock.cookedEvent.findMany.mockResolvedValue([]);
@@ -91,7 +138,7 @@ describe('Timeline Data Aggregation', () => {
     });
 
     it('handles posts without photos', async () => {
-      const mockPost = {
+      const mockPost = withPostStorage({
         id: 'post_1',
         title: 'Recipe',
         mainPhotoUrl: null,
@@ -101,9 +148,11 @@ describe('Timeline Data Aggregation', () => {
           name: 'Alice',
           avatarUrl: null,
         },
-      };
+      });
 
-      prismaMock.post.findMany.mockResolvedValueOnce([mockPost] as any).mockResolvedValue([]);
+      prismaMock.post.findMany
+        .mockResolvedValueOnce([mockPost] as any)
+        .mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
       prismaMock.reaction.findMany.mockResolvedValue([]);
       prismaMock.cookedEvent.findMany.mockResolvedValue([]);
@@ -117,7 +166,7 @@ describe('Timeline Data Aggregation', () => {
 
   describe('getTimelineFeed - Comment Events', () => {
     it('returns comment_added events', async () => {
-      const mockComment = {
+      const mockComment = withCommentStorage({
         id: 'comment_1',
         text: 'This looks delicious!',
         createdAt: new Date('2024-01-01T11:00:00.000Z'),
@@ -131,7 +180,7 @@ describe('Timeline Data Aggregation', () => {
           title: 'Chocolate Cake',
           mainPhotoUrl: '/cake.jpg',
         },
-      };
+      });
 
       prismaMock.post.findMany.mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([mockComment] as any);
@@ -182,7 +231,7 @@ describe('Timeline Data Aggregation', () => {
 
   describe('getTimelineFeed - Reaction Events', () => {
     it('returns reaction_added events', async () => {
-      const mockReaction = {
+      const mockReaction = withReactionStorage({
         id: 'reaction_1',
         emoji: '❤️',
         createdAt: new Date('2024-01-01T12:00:00.000Z'),
@@ -196,7 +245,7 @@ describe('Timeline Data Aggregation', () => {
           title: 'Chocolate Cake',
           mainPhotoUrl: null,
         },
-      };
+      });
 
       prismaMock.post.findMany.mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
@@ -227,7 +276,7 @@ describe('Timeline Data Aggregation', () => {
     });
 
     it('filters out reactions with null post', async () => {
-      const mockReaction = {
+      const mockReaction = withReactionStorage({
         id: 'reaction_1',
         emoji: '👍',
         createdAt: new Date('2024-01-01T12:00:00.000Z'),
@@ -237,7 +286,7 @@ describe('Timeline Data Aggregation', () => {
           avatarUrl: null,
         },
         post: null,
-      };
+      });
 
       prismaMock.post.findMany.mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
@@ -270,7 +319,7 @@ describe('Timeline Data Aggregation', () => {
 
   describe('getTimelineFeed - Cooked Events', () => {
     it('returns cooked_logged events with rating and note', async () => {
-      const mockCooked = {
+      const mockCooked = withCookedStorage({
         id: 'cooked_1',
         rating: 5,
         note: 'Turned out amazing!',
@@ -285,7 +334,7 @@ describe('Timeline Data Aggregation', () => {
           title: 'Chocolate Cake',
           mainPhotoUrl: '/cake.jpg',
         },
-      };
+      });
 
       prismaMock.post.findMany.mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
@@ -317,7 +366,7 @@ describe('Timeline Data Aggregation', () => {
     });
 
     it('handles cooked events without rating', async () => {
-      const mockCooked = {
+      const mockCooked = withCookedStorage({
         id: 'cooked_1',
         rating: null,
         note: 'Just made it',
@@ -332,7 +381,7 @@ describe('Timeline Data Aggregation', () => {
           title: 'Chocolate Cake',
           mainPhotoUrl: null,
         },
-      };
+      });
 
       prismaMock.post.findMany.mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
@@ -348,7 +397,7 @@ describe('Timeline Data Aggregation', () => {
     });
 
     it('handles cooked events without note', async () => {
-      const mockCooked = {
+      const mockCooked = withCookedStorage({
         id: 'cooked_1',
         rating: 4,
         note: null,
@@ -363,7 +412,7 @@ describe('Timeline Data Aggregation', () => {
           title: 'Chocolate Cake',
           mainPhotoUrl: null,
         },
-      };
+      });
 
       prismaMock.post.findMany.mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
@@ -384,7 +433,7 @@ describe('Timeline Data Aggregation', () => {
       const createdAt = new Date('2024-01-01T10:00:00.000Z');
       const editedAt = new Date('2024-01-01T14:00:00.000Z');
 
-      const mockEditedPost = {
+      const mockEditedPost = withPostStorage({
         id: 'post_1',
         title: 'Chocolate Cake (Updated)',
         mainPhotoUrl: '/cake.jpg',
@@ -401,7 +450,7 @@ describe('Timeline Data Aggregation', () => {
           name: 'Alice',
           avatarUrl: null,
         },
-      };
+      });
 
       prismaMock.post.findMany
         .mockResolvedValueOnce([])
@@ -437,7 +486,7 @@ describe('Timeline Data Aggregation', () => {
       const createdAt = new Date('2024-01-01T10:00:00.000Z');
       const editedAt = new Date('2024-01-01T14:00:00.000Z');
 
-      const mockEditedPost = {
+      const mockEditedPost = withPostStorage({
         id: 'post_1',
         title: 'Recipe',
         mainPhotoUrl: null,
@@ -450,7 +499,7 @@ describe('Timeline Data Aggregation', () => {
           name: 'Alice',
           avatarUrl: null,
         },
-      };
+      });
 
       prismaMock.post.findMany
         .mockResolvedValueOnce([])
@@ -469,7 +518,7 @@ describe('Timeline Data Aggregation', () => {
     });
 
     it('skips edit events when lastEditAt is null', async () => {
-      const mockPost = {
+      const mockPost = withPostStorage({
         id: 'post_1',
         title: 'Recipe',
         mainPhotoUrl: null,
@@ -482,7 +531,7 @@ describe('Timeline Data Aggregation', () => {
           name: 'Alice',
           avatarUrl: null,
         },
-      };
+      });
 
       prismaMock.post.findMany
         .mockResolvedValueOnce([])
@@ -499,7 +548,7 @@ describe('Timeline Data Aggregation', () => {
     it('skips edit events when lastEditAt equals createdAt', async () => {
       const timestamp = new Date('2024-01-01T10:00:00.000Z');
 
-      const mockPost = {
+      const mockPost = withPostStorage({
         id: 'post_1',
         title: 'Recipe',
         mainPhotoUrl: null,
@@ -512,7 +561,7 @@ describe('Timeline Data Aggregation', () => {
           name: 'Alice',
           avatarUrl: null,
         },
-      };
+      });
 
       prismaMock.post.findMany
         .mockResolvedValueOnce([])
@@ -530,7 +579,7 @@ describe('Timeline Data Aggregation', () => {
       const createdAt = new Date('2024-01-01T10:00:00.000Z');
       const editedAt = new Date('2024-01-01T14:00:00.000Z');
 
-      const mockPost = {
+      const mockPost = withPostStorage({
         id: 'post_1',
         title: 'Recipe',
         mainPhotoUrl: null,
@@ -539,7 +588,7 @@ describe('Timeline Data Aggregation', () => {
         lastEditNote: null,
         editor: null,
         author: null,
-      };
+      });
 
       prismaMock.post.findMany
         .mockResolvedValueOnce([])
@@ -556,7 +605,7 @@ describe('Timeline Data Aggregation', () => {
 
   describe('getTimelineFeed - Sorting', () => {
     it('sorts all events by timestamp descending', async () => {
-      const mockPost = {
+      const mockPost = withPostStorage({
         id: 'post_1',
         title: 'Post',
         mainPhotoUrl: null,
@@ -566,9 +615,9 @@ describe('Timeline Data Aggregation', () => {
           name: 'Alice',
           avatarUrl: null,
         },
-      };
+      });
 
-      const mockComment = {
+      const mockComment = withCommentStorage({
         id: 'comment_1',
         text: 'Comment',
         createdAt: new Date('2024-01-01T12:00:00.000Z'),
@@ -582,9 +631,9 @@ describe('Timeline Data Aggregation', () => {
           title: 'Post',
           mainPhotoUrl: null,
         },
-      };
+      });
 
-      const mockCooked = {
+      const mockCooked = withCookedStorage({
         id: 'cooked_1',
         rating: 5,
         note: null,
@@ -599,9 +648,11 @@ describe('Timeline Data Aggregation', () => {
           title: 'Post',
           mainPhotoUrl: null,
         },
-      };
+      });
 
-      prismaMock.post.findMany.mockResolvedValueOnce([mockPost] as any).mockResolvedValue([]);
+      prismaMock.post.findMany
+        .mockResolvedValueOnce([mockPost] as any)
+        .mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([mockComment] as any);
       prismaMock.reaction.findMany.mockResolvedValue([]);
       prismaMock.cookedEvent.findMany.mockResolvedValue([mockCooked] as any);
@@ -626,7 +677,9 @@ describe('Timeline Data Aggregation', () => {
           id: `post_${i}`,
           title: `Post ${i}`,
           mainPhotoUrl: null,
-          createdAt: new Date(`2024-01-${String(i + 1).padStart(2, '0')}T10:00:00.000Z`),
+          createdAt: new Date(
+            `2024-01-${String(i + 1).padStart(2, '0')}T10:00:00.000Z`
+          ),
           author: {
             id: 'user_1',
             name: 'Alice',
@@ -634,7 +687,9 @@ describe('Timeline Data Aggregation', () => {
           },
         }));
 
-      prismaMock.post.findMany.mockResolvedValueOnce(posts as any).mockResolvedValue([]);
+      prismaMock.post.findMany
+        .mockResolvedValueOnce(posts as any)
+        .mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
       prismaMock.reaction.findMany.mockResolvedValue([]);
       prismaMock.cookedEvent.findMany.mockResolvedValue([]);
@@ -656,7 +711,9 @@ describe('Timeline Data Aggregation', () => {
           id: `post_${i}`,
           title: `Post ${i}`,
           mainPhotoUrl: null,
-          createdAt: new Date(`2024-01-${String(i + 1).padStart(2, '0')}T10:00:00.000Z`),
+          createdAt: new Date(
+            `2024-01-${String(i + 1).padStart(2, '0')}T10:00:00.000Z`
+          ),
           author: {
             id: 'user_1',
             name: 'Alice',
@@ -664,7 +721,9 @@ describe('Timeline Data Aggregation', () => {
           },
         }));
 
-      prismaMock.post.findMany.mockResolvedValueOnce(posts as any).mockResolvedValue([]);
+      prismaMock.post.findMany
+        .mockResolvedValueOnce(posts as any)
+        .mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
       prismaMock.reaction.findMany.mockResolvedValue([]);
       prismaMock.cookedEvent.findMany.mockResolvedValue([]);
@@ -695,7 +754,9 @@ describe('Timeline Data Aggregation', () => {
           },
         }));
 
-      prismaMock.post.findMany.mockResolvedValueOnce(posts as any).mockResolvedValue([]);
+      prismaMock.post.findMany
+        .mockResolvedValueOnce(posts as any)
+        .mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
       prismaMock.reaction.findMany.mockResolvedValue([]);
       prismaMock.cookedEvent.findMany.mockResolvedValue([]);
@@ -724,7 +785,9 @@ describe('Timeline Data Aggregation', () => {
           },
         }));
 
-      prismaMock.post.findMany.mockResolvedValueOnce(posts as any).mockResolvedValue([]);
+      prismaMock.post.findMany
+        .mockResolvedValueOnce(posts as any)
+        .mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
       prismaMock.reaction.findMany.mockResolvedValue([]);
       prismaMock.cookedEvent.findMany.mockResolvedValue([]);
@@ -756,40 +819,42 @@ describe('Timeline Data Aggregation', () => {
 
   describe('getTimelineFeed - Mixed Events', () => {
     it('combines all event types in single timeline', async () => {
-      const mockPost = {
+      const mockPost = withPostStorage({
         id: 'post_1',
         title: 'Post',
         mainPhotoUrl: null,
         createdAt: new Date('2024-01-01T10:00:00.000Z'),
         author: { id: 'user_1', name: 'Alice', avatarUrl: null },
-      };
+      });
 
-      const mockComment = {
+      const mockComment = withCommentStorage({
         id: 'comment_1',
         text: 'Comment',
         createdAt: new Date('2024-01-01T11:00:00.000Z'),
         author: { id: 'user_2', name: 'Bob', avatarUrl: null },
         post: { id: 'post_1', title: 'Post', mainPhotoUrl: null },
-      };
+      });
 
-      const mockReaction = {
+      const mockReaction = withReactionStorage({
         id: 'reaction_1',
         emoji: '❤️',
         createdAt: new Date('2024-01-01T12:00:00.000Z'),
         user: { id: 'user_3', name: 'Charlie', avatarUrl: null },
         post: { id: 'post_1', title: 'Post', mainPhotoUrl: null },
-      };
+      });
 
-      const mockCooked = {
+      const mockCooked = withCookedStorage({
         id: 'cooked_1',
         rating: 5,
         note: 'Great!',
         createdAt: new Date('2024-01-01T13:00:00.000Z'),
         user: { id: 'user_4', name: 'Diana', avatarUrl: null },
         post: { id: 'post_1', title: 'Post', mainPhotoUrl: null },
-      };
+      });
 
-      prismaMock.post.findMany.mockResolvedValueOnce([mockPost] as any).mockResolvedValue([]);
+      prismaMock.post.findMany
+        .mockResolvedValueOnce([mockPost] as any)
+        .mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([mockComment] as any);
       prismaMock.reaction.findMany.mockResolvedValue([mockReaction] as any);
       prismaMock.cookedEvent.findMany.mockResolvedValue([mockCooked] as any);

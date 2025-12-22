@@ -6,7 +6,13 @@ import { signToken } from '@/lib/jwt';
 import { setSessionCookie } from '@/lib/session';
 import { logError, logInfo, logWarn } from '@/lib/logger';
 import { loginLimiter, applyRateLimit } from '@/lib/rateLimit';
-import { parseRequestBody, invalidCredentialsError, forbiddenError, internalError } from '@/lib/apiErrors';
+import {
+  parseRequestBody,
+  invalidCredentialsError,
+  forbiddenError,
+  internalError,
+} from '@/lib/apiErrors';
+import { getSignedUploadUrl } from '@/lib/uploads';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +28,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     const body = await request.json();
     const bodyValidation = parseRequestBody(body, loginSchema);
-    
+
     if (!bodyValidation.success) {
       return bodyValidation.error;
     }
@@ -42,7 +48,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
-      logWarn('auth.login.invalid_credentials', { emailOrUsername, reason: 'user_not_found' });
+      logWarn('auth.login.invalid_credentials', {
+        emailOrUsername,
+        reason: 'user_not_found',
+      });
       return invalidCredentialsError();
     }
 
@@ -50,7 +59,10 @@ export async function POST(request: NextRequest) {
     const isValidPassword = await verifyPassword(password, user.passwordHash);
 
     if (!isValidPassword) {
-      logWarn('auth.login.invalid_credentials', { emailOrUsername, reason: 'bad_password' });
+      logWarn('auth.login.invalid_credentials', {
+        emailOrUsername,
+        reason: 'bad_password',
+      });
       return invalidCredentialsError();
     }
 
@@ -80,13 +92,15 @@ export async function POST(request: NextRequest) {
     });
 
     // Create response with session cookie
+    const avatarUrl = await getSignedUploadUrl(user.avatarStorageKey);
+
     const response = NextResponse.json(
       {
         user: {
           id: user.id,
           name: user.name,
           emailOrUsername: user.emailOrUsername,
-          avatarUrl: user.avatarUrl,
+          avatarUrl,
           role: membership.role,
           familySpaceId: membership.familySpaceId,
           familySpaceName: membership.familySpace.name,

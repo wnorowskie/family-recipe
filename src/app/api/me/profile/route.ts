@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { withAuth } from '@/lib/apiAuth';
 import { prisma } from '@/lib/prisma';
-import { isFileLike, savePhotoFile } from '@/lib/uploads';
+import { getSignedUploadUrl, isFileLike, savePhotoFile } from '@/lib/uploads';
 import { updateProfileSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
 import { validationError, conflictError, internalError } from '@/lib/apiErrors';
@@ -30,7 +30,7 @@ export const PATCH = withAuth(async (request, user) => {
     if (isFileLike(avatarFile) && avatarFile.size > 0) {
       try {
         const saved = await savePhotoFile(avatarFile);
-        avatarUpdate = saved.url;
+        avatarUpdate = saved.storageKey;
       } catch (error) {
         const code = error instanceof Error ? error.message : 'UPLOAD_FAILED';
         return NextResponse.json(
@@ -45,14 +45,14 @@ export const PATCH = withAuth(async (request, user) => {
     const data: {
       name: string;
       emailOrUsername: string;
-      avatarUrl?: string | null;
+      avatarStorageKey?: string | null;
     } = {
       name: parsed.data.name,
       emailOrUsername: parsed.data.emailOrUsername,
     };
 
     if (typeof avatarUpdate !== 'undefined') {
-      data.avatarUrl = avatarUpdate;
+      data.avatarStorageKey = avatarUpdate;
     }
 
     const updatedUser = await prisma.user.update({
@@ -62,11 +62,23 @@ export const PATCH = withAuth(async (request, user) => {
         id: true,
         name: true,
         emailOrUsername: true,
-        avatarUrl: true,
+        avatarStorageKey: true,
       },
     });
 
-    return NextResponse.json({ user: updatedUser }, { status: 200 });
+    const avatarUrl = await getSignedUploadUrl(updatedUser.avatarStorageKey);
+
+    return NextResponse.json(
+      {
+        user: {
+          id: updatedUser.id,
+          name: updatedUser.name,
+          emailOrUsername: updatedUser.emailOrUsername,
+          avatarUrl,
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&

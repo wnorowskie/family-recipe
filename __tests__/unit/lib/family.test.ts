@@ -11,6 +11,8 @@
 import { getFamilyMembers, removeFamilyMember } from '@/lib/family';
 import { prisma } from '@/lib/prisma';
 
+const mockResolveUrl = jest.fn(async (key?: string | null) => key ?? null);
+
 // Mock Prisma client
 jest.mock('@/lib/prisma', () => ({
   prisma: {
@@ -20,6 +22,10 @@ jest.mock('@/lib/prisma', () => ({
       delete: jest.fn(),
     },
   },
+}));
+
+jest.mock('@/lib/uploads', () => ({
+  createSignedUrlResolver: jest.fn(() => mockResolveUrl),
 }));
 
 const mockFindMany = prisma.familyMembership.findMany as jest.MockedFunction<
@@ -35,6 +41,10 @@ const mockDelete = prisma.familyMembership.delete as jest.MockedFunction<
 describe('Family Utilities', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockResolveUrl.mockClear();
+    mockResolveUrl.mockImplementation(
+      async (key?: string | null) => key ?? null
+    );
   });
 
   describe('getFamilyMembers()', () => {
@@ -55,7 +65,7 @@ describe('Family Utilities', () => {
               id: true,
               name: true,
               emailOrUsername: true,
-              avatarUrl: true,
+              avatarStorageKey: true,
               posts: { select: { id: true } },
             },
           },
@@ -77,6 +87,7 @@ describe('Family Utilities', () => {
             name: 'Alice Owner',
             emailOrUsername: 'alice@example.com',
             avatarUrl: 'https://example.com/avatar1.jpg',
+            avatarStorageKey: 'https://example.com/avatar1.jpg',
             posts: [{ id: 'post_1' }, { id: 'post_2' }, { id: 'post_3' }],
           },
         } as any,
@@ -114,6 +125,7 @@ describe('Family Utilities', () => {
             name: 'Alice Owner',
             emailOrUsername: 'alice@example.com',
             avatarUrl: 'https://example.com/avatar1.jpg',
+            avatarStorageKey: 'https://example.com/avatar1.jpg',
             posts: [{ id: 'post_1' }, { id: 'post_2' }],
           },
         },
@@ -128,6 +140,7 @@ describe('Family Utilities', () => {
             name: 'Bob Member',
             emailOrUsername: 'bob@example.com',
             avatarUrl: null,
+            avatarStorageKey: null,
             posts: [{ id: 'post_3' }],
           },
         },
@@ -142,6 +155,7 @@ describe('Family Utilities', () => {
             name: 'Carol Member',
             emailOrUsername: 'carol@example.com',
             avatarUrl: 'https://example.com/avatar3.jpg',
+            avatarStorageKey: 'https://example.com/avatar3.jpg',
             posts: [],
           },
         },
@@ -196,6 +210,7 @@ describe('Family Utilities', () => {
             name: 'No Avatar User',
             emailOrUsername: 'noavatar@example.com',
             avatarUrl: null,
+            avatarStorageKey: null,
             posts: [],
           },
         } as any,
@@ -232,7 +247,9 @@ describe('Family Utilities', () => {
 
     it('handles members with many posts', async () => {
       const mockDate = new Date('2025-01-15T10:00:00Z');
-      const manyPosts = Array.from({ length: 50 }, (_, i) => ({ id: `post_${i + 1}` }));
+      const manyPosts = Array.from({ length: 50 }, (_, i) => ({
+        id: `post_${i + 1}`,
+      }));
 
       mockFindMany.mockResolvedValue([
         {
@@ -317,7 +334,9 @@ describe('Family Utilities', () => {
     it('handles Prisma query errors', async () => {
       mockFindMany.mockRejectedValue(new Error('Database connection failed'));
 
-      await expect(getFamilyMembers(familySpaceId)).rejects.toThrow('Database connection failed');
+      await expect(getFamilyMembers(familySpaceId)).rejects.toThrow(
+        'Database connection failed'
+      );
     });
   });
 
@@ -350,9 +369,9 @@ describe('Family Utilities', () => {
         role: 'owner',
       } as any);
 
-      await expect(removeFamilyMember(familySpaceId, targetUserId)).rejects.toThrow(
-        'CANNOT_REMOVE_OWNER'
-      );
+      await expect(
+        removeFamilyMember(familySpaceId, targetUserId)
+      ).rejects.toThrow('CANNOT_REMOVE_OWNER');
 
       expect(mockDelete).not.toHaveBeenCalled();
     });
@@ -421,9 +440,9 @@ describe('Family Utilities', () => {
     it('handles Prisma findFirst errors', async () => {
       mockFindFirst.mockRejectedValue(new Error('Database query failed'));
 
-      await expect(removeFamilyMember(familySpaceId, targetUserId)).rejects.toThrow(
-        'Database query failed'
-      );
+      await expect(
+        removeFamilyMember(familySpaceId, targetUserId)
+      ).rejects.toThrow('Database query failed');
     });
 
     it('handles Prisma delete errors', async () => {
@@ -434,9 +453,9 @@ describe('Family Utilities', () => {
 
       mockDelete.mockRejectedValue(new Error('Cascade delete failed'));
 
-      await expect(removeFamilyMember(familySpaceId, targetUserId)).rejects.toThrow(
-        'Cascade delete failed'
-      );
+      await expect(
+        removeFamilyMember(familySpaceId, targetUserId)
+      ).rejects.toThrow('Cascade delete failed');
     });
   });
 
@@ -468,7 +487,9 @@ describe('Family Utilities', () => {
       expect(typeof member.membershipId).toBe('string');
       expect(typeof member.name).toBe('string');
       expect(typeof member.emailOrUsername).toBe('string');
-      expect(member.avatarUrl === null || typeof member.avatarUrl === 'string').toBe(true);
+      expect(
+        member.avatarUrl === null || typeof member.avatarUrl === 'string'
+      ).toBe(true);
       expect(typeof member.role).toBe('string');
       expect(typeof member.joinedAt).toBe('string');
       expect(typeof member.postCount).toBe('number');

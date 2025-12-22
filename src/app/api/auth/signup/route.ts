@@ -12,6 +12,7 @@ import {
   internalError,
 } from '@/lib/apiErrors';
 import { ensureFamilySpace, getEnvMasterKeyHash } from '@/lib/masterKey';
+import { getSignedUploadUrl } from '@/lib/uploads';
 
 export async function POST(request: NextRequest) {
   try {
@@ -108,13 +109,15 @@ export async function POST(request: NextRequest) {
     });
 
     // Return user profile with session cookie
+    const avatarUrl = await getSignedUploadUrl(result.user.avatarStorageKey);
+
     const response = NextResponse.json(
       {
         user: {
           id: result.user.id,
           name: result.user.name,
           emailOrUsername: result.user.emailOrUsername,
-          avatarUrl: result.user.avatarUrl,
+          avatarUrl,
           role: result.membership.role,
           familySpaceId: result.membership.familySpaceId,
         },
