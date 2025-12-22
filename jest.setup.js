@@ -62,3 +62,14 @@ if (process.env.ALLOW_TEST_LOGS !== 'true') {
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
 }
+
+// Provide a CommonJS-friendly glob stub for Jest's coverage reporter (our overrides use ESM glob)
+try {
+  const { createRequire } = require('module');
+  const requireFromHere = createRequire(__filename);
+  const globStub = requireFromHere('./__tests__/helpers/glob-default.js');
+  const resolvedGlob = requireFromHere.resolve('glob');
+  require.cache[resolvedGlob] = { exports: globStub };
+} catch (error) {
+  // If resolving glob fails, ignore; coverage will still work in environments with a CJS glob.
+}

@@ -27,6 +27,7 @@ model User {
   reactions         Reaction[]
   cookedEvents      CookedEvent[]
   favorites         Favorite[]
+  feedbackSubmissions FeedbackSubmission[]
 
   @@map("users")
 }
@@ -42,6 +43,7 @@ model FamilySpace {
   // Relations
   memberships     FamilyMembership[]
   posts           Post[]
+  feedbackSubmissions FeedbackSubmission[]
 
   @@map("family_spaces")
 }
@@ -236,4 +238,24 @@ model Favorite {
   @@map("favorites")
   @@index([userId])
   @@index([postId])
+}
+
+model FeedbackSubmission {
+  id            String   @id @default(cuid())
+  userId        String?  @map("user_id")
+  familySpaceId String?  @map("family_space_id")
+  contactEmail  String?  @map("contact_email")
+  category      String   // 'bug' | 'suggestion'
+  message       String
+  pageUrl       String?  @map("page_url")
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  familySpace FamilySpace? @relation(fields: [familySpaceId], references: [id], onDelete: SetNull)
+
+  @@map("feedback_submissions")
+  @@index([familySpaceId])
+  @@index([userId])
+  @@index([createdAt])
 }

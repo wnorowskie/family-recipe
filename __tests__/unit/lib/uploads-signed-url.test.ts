@@ -4,8 +4,14 @@
  * This validates that the signed URL format matches Google Cloud Storage expectations.
  */
 
+import { generateKeyPairSync } from 'crypto';
 import { generateSignedUrlV4 } from '@/lib/uploads';
-import { createHash } from 'crypto';
+
+const ORIGINAL_FETCH = global.fetch;
+
+afterEach(() => {
+  global.fetch = ORIGINAL_FETCH;
+});
 
 describe('GCS Signed URL Generation', () => {
   it('generates signed URLs with correct path-style format', async () => {
@@ -92,5 +98,27 @@ describe('GCS Signed URL Generation', () => {
     // The canonical request should have been hashed
     // We can verify the structure indirectly
     expect(lines.length).toBe(4);
+  });
+
+  it('signs with a provided private key and skips IAM fetches', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const privateKeyPem = privateKey
+      .export({ type: 'pkcs8', format: 'pem' })
+      .toString();
+
+    const fetchSpy = jest.fn();
+    global.fetch = fetchSpy as any;
+
+    const signedUrl = await generateSignedUrlV4({
+      bucket: 'private-bucket',
+      objectKey: 'photo.jpg',
+      expiresInSeconds: 900,
+      accessToken: 'unused-token',
+      serviceAccountEmail: 'svc@example.com',
+      privateKey: privateKeyPem,
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(signedUrl).toContain('X-Goog-Signature=');
   });
 });

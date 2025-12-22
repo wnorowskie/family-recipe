@@ -195,3 +195,13 @@ export const reactionLimiter = new RateLimiter({
   windowMs: 60 * 1000, // 1 minute
   maxCacheSize: 500,
 });
+
+/**
+ * Feedback submissions: 10 submissions per user/email per hour
+ */
+export const feedbackLimiter = new RateLimiter({
+  uniqueName: 'feedback',
+  limit: 10,
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxCacheSize: 500,
+});

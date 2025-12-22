@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import FeedbackWidget from '@/components/feedback/FeedbackWidget';
 
 export const metadata: Metadata = {
   title: 'Family Recipe',
@@ -13,7 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <FeedbackWidget />
+      </body>
     </html>
   );
 }
