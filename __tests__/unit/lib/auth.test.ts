@@ -9,6 +9,8 @@
 
 import { hashPassword, verifyPassword } from '@/lib/auth';
 
+const BCRYPT_PREFIX = /^\$2[ab]\$/;
+
 describe('Authentication Helpers', () => {
   describe('hashPassword()', () => {
     it('should generate a bcrypt hash', async () => {
@@ -16,7 +18,7 @@ describe('Authentication Helpers', () => {
       const hash = await hashPassword(password);
 
       // Bcrypt hashes start with $2b$ (bcrypt identifier)
-      expect(hash).toMatch(/^\$2b\$/);
+      expect(hash).toMatch(BCRYPT_PREFIX);
       // Bcrypt hashes are 60 characters long
       expect(hash).toHaveLength(60);
     });
@@ -39,15 +41,14 @@ describe('Authentication Helpers', () => {
 
       // Even with the same password, salts should make hashes different
       expect(hash1).not.toBe(hash2);
-      // But both should be valid bcrypt hashes
-      expect(hash1).toMatch(/^\$2b\$/);
-      expect(hash2).toMatch(/^\$2b\$/);
+      expect(hash1).toMatch(BCRYPT_PREFIX);
+      expect(hash2).toMatch(BCRYPT_PREFIX);
     });
 
     it('should hash empty string without error', async () => {
       const hash = await hashPassword('');
 
-      expect(hash).toMatch(/^\$2b\$/);
+      expect(hash).toMatch(BCRYPT_PREFIX);
       expect(hash).toHaveLength(60);
     });
 
@@ -56,7 +57,7 @@ describe('Authentication Helpers', () => {
       const longPassword = 'a'.repeat(100);
       const hash = await hashPassword(longPassword);
 
-      expect(hash).toMatch(/^\$2b\$/);
+      expect(hash).toMatch(BCRYPT_PREFIX);
       expect(hash).toHaveLength(60);
     });
 
@@ -64,7 +65,7 @@ describe('Authentication Helpers', () => {
       const specialPassword = '!@#$%^&*()_+-=[]{}|;:,.<>?';
       const hash = await hashPassword(specialPassword);
 
-      expect(hash).toMatch(/^\$2b\$/);
+      expect(hash).toMatch(BCRYPT_PREFIX);
       expect(hash).toHaveLength(60);
     });
 
@@ -72,7 +73,7 @@ describe('Authentication Helpers', () => {
       const unicodePassword = '密码测试🔒';
       const hash = await hashPassword(unicodePassword);
 
-      expect(hash).toMatch(/^\$2b\$/);
+      expect(hash).toMatch(BCRYPT_PREFIX);
       expect(hash).toHaveLength(60);
     });
   });
