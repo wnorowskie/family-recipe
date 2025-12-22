@@ -68,5 +68,5 @@ jobs:
             --add-cloudsql-instances "$INSTANCE_CONNECTION_NAME" \
             --set-secrets DATABASE_URL=${DATABASE_URL_SECRET}:latest,JWT_SECRET=${JWT_SECRET_NAME}:latest,FAMILY_MASTER_KEY=${FAMILY_MASTER_KEY_SECRET_NAME}:latest \
             --set-env-vars PRISMA_SCHEMA=${PRISMA_SCHEMA},UPLOADS_BUCKET=${UPLOADS_BUCKET},UPLOADS_BASE_URL=${UPLOADS_BASE_URL} \
-            --ingress internal-and-cloud-load-balancing \
+            --ingress all \
             --no-allow-unauthenticated
