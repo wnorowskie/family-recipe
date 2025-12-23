@@ -72,6 +72,10 @@ module "cloud_run_infra" {
   wif_provider_id             = var.wif_provider_id
   github_repository           = var.github_repository
   github_ref                  = var.github_ref
+
+  # Recipe Importer integration (use variables to avoid circular dependency)
+  recipe_importer_url                   = var.recipe_importer_url
+  recipe_importer_service_account_email = var.recipe_importer_service_account_email
 }
 
 module "cloud_run_importer" {

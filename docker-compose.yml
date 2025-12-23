@@ -31,6 +31,9 @@ services:
       PRISMA_SCHEMA: prisma/schema.postgres.node.prisma
       NEXT_TELEMETRY_DISABLED: 1
       FAMILY_MASTER_KEY: ${FAMILY_MASTER_KEY:?Set FAMILY_MASTER_KEY in your .env for docker-compose}
+      RECIPE_IMPORTER_URL: http://recipe-url-importer:8000
+      RECIPE_IMPORTER_STATIC_TOKEN: dev-local-token
+      RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL: local
     ports:
       - '3000:3000'
     volumes:
@@ -52,6 +55,22 @@ services:
   #     ENVIRONMENT: development
   #   ports:
   #     - '8000:8000'
+
+  recipe-url-importer:
+    build:
+      context: .
+      dockerfile: apps/recipe-url-importer/Dockerfile
+    environment:
+      IMPORTER_MAX_HTML_BYTES: 3000000
+      IMPORTER_FETCH_TIMEOUT_SECONDS: 8
+      IMPORTER_CONNECT_TIMEOUT_SECONDS: 2
+      IMPORTER_READ_TIMEOUT_SECONDS: 5
+      IMPORTER_ENABLE_HEADLESS: 'false'
+      IMPORTER_CACHE_TTL_SECONDS: 604800
+      IMPORTER_RATE_LIMIT_IP_PER_MIN: 20
+      IMPORTER_RATE_LIMIT_DOMAIN_PER_MIN: 60
+    ports:
+      - '8001:8000'
 
 volumes:
   postgres-data:
