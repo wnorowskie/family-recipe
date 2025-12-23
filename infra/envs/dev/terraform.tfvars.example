@@ -35,3 +35,6 @@ wif_pool_id                = "github-pool"
 wif_provider_id            = "github-provider"
 github_repository          = "wnorowskie/family-recipe"
 github_ref                 = "refs/heads/develop"
+
+# Monitoring
+alert_notification_email   = "ericwnorowski@gmail.com"

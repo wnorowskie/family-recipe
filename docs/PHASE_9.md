@@ -26,15 +26,8 @@ This is a living checklist for follow-ups after the first production deployment.
   - [✓] Add password reset flow.
   - [✓] Add email change flow.
   - [✓] Add account deletion flow.
-- [ ] Add notifications for users
-  - [ ] In-app notification center (UI + DB model).
+- [✓] Add notifications for users
+  - [✓] In-app notification center (UI + DB model).
 - [ ] Monitoring on Google Cloud
   - [ ] Set up uptime checks/log-based alerts for elevated 5xx, latency, and auth/signup failures.
   - [ ] Create dashboard(s) for traffic, errors, storage, and DB health.
-- [ ] FastAPI adoption path (infra + toggle)
-  - [ ] Finalize deploy target (Cloud Run) and CI/CD workflow for FastAPI service.
-  - [ ] Add frontend env toggle to select FastAPI vs monolith API, with safe default/fallback.
-  - [ ] Run parity smoke tests before enabling in prod.
-- [ ] Custom domain
-  - [ ] Pick domain and registrar/host (TBD); set DNS to hosting provider.
-  - [ ] Configure HTTPS and redirects; update app URLs/envs and any hardcoded links.
