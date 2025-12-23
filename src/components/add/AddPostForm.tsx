@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { ingredientUnitOptions } from '@/lib/ingredients';
 import { MAX_PHOTO_COUNT } from '@/lib/postPayload';
 import { type RecipeIngredientUnit } from '@/lib/validation';
+import { mapImporterResponseToPrefill } from './importerMapping';
 
 const courseOptions = [
   { value: 'breakfast', label: 'Breakfast' },
@@ -104,7 +105,10 @@ function createRecipeState(): RecipeState {
 }
 
 function generateLocalId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
     return crypto.randomUUID();
   }
 
@@ -152,7 +156,9 @@ function minutesToHourMinuteParts(totalMinutes: number | null | undefined) {
   };
 }
 
-function buildInitialState(initialData?: PostFormInitialData): PostFormSnapshot {
+function buildInitialState(
+  initialData?: PostFormInitialData
+): PostFormSnapshot {
   if (!initialData) {
     return {
       title: '',
@@ -180,7 +186,9 @@ function buildInitialState(initialData?: PostFormInitialData): PostFormSnapshot 
       origin: recipeDetails?.origin ?? '',
       totalTimeHours: timeParts.hours,
       totalTimeMinutes: timeParts.minutes,
-      servings: recipeDetails?.servings ? recipeDetails.servings.toString() : '',
+      servings: recipeDetails?.servings
+        ? recipeDetails.servings.toString()
+        : '',
       difficulty: recipeDetails?.difficulty ?? '',
     },
     selectedCourses,
@@ -219,7 +227,11 @@ interface PostFormProps {
   initialData?: PostFormInitialData;
 }
 
-export default function AddPostForm({ mode = 'create', postId, initialData }: PostFormProps) {
+export default function AddPostForm({
+  mode = 'create',
+  postId,
+  initialData,
+}: PostFormProps) {
   const router = useRouter();
   const isEditMode = mode === 'edit';
 
@@ -227,23 +239,40 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
     throw new Error('Edit mode requires both postId and initialData');
   }
 
-  const initialSnapshot = useMemo(() => buildInitialState(initialData), [initialData]);
+  const initialSnapshot = useMemo(
+    () => buildInitialState(initialData),
+    [initialData]
+  );
 
   const [title, setTitle] = useState(() => initialSnapshot.title);
   const [caption, setCaption] = useState(() => initialSnapshot.caption);
-  const [photos, setPhotos] = useState<PhotoAttachment[]>(() => initialSnapshot.photos);
+  const [photos, setPhotos] = useState<PhotoAttachment[]>(
+    () => initialSnapshot.photos
+  );
   const [recipeOpen, setRecipeOpen] = useState(initialSnapshot.recipeOpen);
-  const [recipe, setRecipe] = useState<RecipeState>(() => initialSnapshot.recipe);
-  const [selectedCourses, setSelectedCourses] = useState<string[]>(() => initialSnapshot.selectedCourses);
-  const [ingredients, setIngredients] = useState<IngredientRow[]>(() => initialSnapshot.ingredients);
+  const [recipe, setRecipe] = useState<RecipeState>(
+    () => initialSnapshot.recipe
+  );
+  const [selectedCourses, setSelectedCourses] = useState<string[]>(
+    () => initialSnapshot.selectedCourses
+  );
+  const [ingredients, setIngredients] = useState<IngredientRow[]>(
+    () => initialSnapshot.ingredients
+  );
   const [steps, setSteps] = useState<StepRow[]>(() => initialSnapshot.steps);
   const [tags, setTags] = useState<string[]>(() => initialSnapshot.tags);
-  const [availableTags, setAvailableTags] = useState<Record<string, { id: string; name: string }[]>>({});
+  const [availableTags, setAvailableTags] = useState<
+    Record<string, { id: string; name: string }[]>
+  >({});
   const [tagsLoading, setTagsLoading] = useState(true);
   const [tagsError, setTagsError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [changeNote, setChangeNote] = useState('');
+  const [importUrl, setImportUrl] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importWarning, setImportWarning] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -270,7 +299,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
         }
       } catch (error) {
         if (isMounted) {
-          setTagsError(error instanceof Error ? error.message : 'Unable to load tags');
+          setTagsError(
+            error instanceof Error ? error.message : 'Unable to load tags'
+          );
         }
       } finally {
         if (isMounted) {
@@ -400,10 +431,7 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
     });
   }
 
-  function handleRecipeChange(
-    field: keyof RecipeState,
-    value: string
-  ): void {
+  function handleRecipeChange(field: keyof RecipeState, value: string): void {
     setRecipe((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -444,7 +472,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
   }
 
   function removeIngredientRow(id: string) {
-    setIngredients((prev) => (prev.length > 1 ? prev.filter((ingredient) => ingredient.id !== id) : prev));
+    setIngredients((prev) =>
+      prev.length > 1 ? prev.filter((ingredient) => ingredient.id !== id) : prev
+    );
   }
 
   function handleStepChange(id: string, text: string) {
@@ -463,7 +493,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
   }
 
   function removeStepRow(id: string) {
-    setSteps((prev) => (prev.length > 1 ? prev.filter((step) => step.id !== id) : prev));
+    setSteps((prev) =>
+      prev.length > 1 ? prev.filter((step) => step.id !== id) : prev
+    );
   }
 
   function toggleTagSelection(tagName: string) {
@@ -480,6 +512,96 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
       setFormError(null);
       return [...prev, tagName];
     });
+  }
+
+  function applyImportedRecipe(
+    prefill: ReturnType<typeof mapImporterResponseToPrefill>
+  ) {
+    setRecipeOpen(true);
+    if (prefill.title) {
+      setTitle(prefill.title);
+    }
+
+    setRecipe({
+      origin: prefill.origin || '',
+      totalTimeHours: prefill.totalTimeHours,
+      totalTimeMinutes: prefill.totalTimeMinutes,
+      servings: prefill.servings,
+      difficulty: '',
+    });
+
+    const mappedIngredients =
+      prefill.ingredients.length > 0
+        ? prefill.ingredients.map((ingredient) => ({
+            ...ingredient,
+            id: generateLocalId(),
+          }))
+        : [createIngredientRow()];
+
+    const mappedSteps =
+      prefill.steps.length > 0
+        ? prefill.steps.map((step) => ({
+            ...step,
+            id: generateLocalId(),
+          }))
+        : [createStepRow()];
+
+    setIngredients(mappedIngredients);
+    setSteps(mappedSteps);
+
+    if (prefill.lowConfidence) {
+      setImportWarning(
+        'Imported with low confidence — please review and edit.'
+      );
+    } else {
+      setImportWarning(null);
+    }
+  }
+
+  async function handleImportRecipe() {
+    const normalizedUrl = importUrl.trim();
+    if (!normalizedUrl) {
+      setImportError('Enter a URL to import');
+      return;
+    }
+
+    const hasExistingData = recipeHasAnyData || title.trim().length > 0;
+    if (hasExistingData) {
+      const proceed = window.confirm(
+        'Import will overwrite existing recipe details. Continue?'
+      );
+      if (!proceed) {
+        return;
+      }
+    }
+
+    setIsImporting(true);
+    setImportError(null);
+    setImportWarning(null);
+
+    try {
+      const response = await fetch('/api/recipes/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ url: normalizedUrl }),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message = data?.error?.message || 'Unable to import recipe.';
+        throw new Error(message);
+      }
+
+      const prefill = mapImporterResponseToPrefill(data);
+      applyImportedRecipe(prefill);
+    } catch (error) {
+      setImportError(
+        error instanceof Error ? error.message : 'Unable to import recipe.'
+      );
+    } finally {
+      setIsImporting(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -511,7 +633,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
       if (quantityValue) {
         parsedQuantity = Number(quantityValue);
         if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
-          setFormError(`Ingredient ${index + 1} quantity must be a positive number`);
+          setFormError(
+            `Ingredient ${index + 1} quantity must be a positive number`
+          );
           return;
         }
       }
@@ -527,8 +651,13 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
       .map((step) => step.text.trim())
       .filter((text) => text.length > 0);
 
-    if (recipeHasAnyData && (!sanitizedIngredients.length || !sanitizedSteps.length)) {
-      setFormError('Add at least one ingredient and one step to include recipe details.');
+    if (
+      recipeHasAnyData &&
+      (!sanitizedIngredients.length || !sanitizedSteps.length)
+    ) {
+      setFormError(
+        'Add at least one ingredient and one step to include recipe details.'
+      );
       return;
     }
 
@@ -612,7 +741,10 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
           ingredients: sanitizedIngredients.map((ingredient) => ({
             name: ingredient.name,
             unit: ingredient.unit,
-            quantity: typeof ingredient.quantity === 'number' ? ingredient.quantity : undefined,
+            quantity:
+              typeof ingredient.quantity === 'number'
+                ? ingredient.quantity
+                : undefined,
           })),
           steps: sanitizedSteps.map((text) => ({ text })),
           totalTime: totalTimeNumber > 0 ? totalTimeNumber : undefined,
@@ -655,7 +787,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        const message = data?.error?.message || (isEditMode ? 'Failed to update post' : 'Failed to create post');
+        const message =
+          data?.error?.message ||
+          (isEditMode ? 'Failed to update post' : 'Failed to create post');
         throw new Error(message);
       }
 
@@ -743,9 +877,7 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700">
-              Photos
-            </label>
+            <label className="text-sm font-medium text-gray-700">Photos</label>
             {coverPhotoId && (
               <span className="text-xs text-gray-500">
                 First photo is used as cover
@@ -770,8 +902,12 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
           {photos.length > 0 && (
             <div className="grid grid-cols-3 gap-3">
               {photos.map((photo, index) => {
-                const photoSrc = photo.kind === 'existing' ? photo.url : photo.preview;
-                const photoAlt = photo.kind === 'existing' ? title || 'Post photo' : photo.file.name;
+                const photoSrc =
+                  photo.kind === 'existing' ? photo.url : photo.preview;
+                const photoAlt =
+                  photo.kind === 'existing'
+                    ? title || 'Post photo'
+                    : photo.file.name;
                 return (
                   <div
                     key={photo.id}
@@ -787,42 +923,42 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
                         unoptimized
                       />
                     </div>
-                  <div className="absolute top-2 left-2">
-                    {index === 0 && (
-                      <span className="bg-white text-xs font-semibold px-2 py-0.5 rounded-full text-gray-800">
-                        Cover
-                      </span>
-                    )}
+                    <div className="absolute top-2 left-2">
+                      {index === 0 && (
+                        <span className="bg-white text-xs font-semibold px-2 py-0.5 rounded-full text-gray-800">
+                          Cover
+                        </span>
+                      )}
+                    </div>
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(photo.id, 'left')}
+                        className="bg-white/90 rounded-full p-1 text-xs text-gray-700 disabled:opacity-30"
+                        disabled={index === 0}
+                        aria-label="Move photo left"
+                      >
+                        ◀
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(photo.id, 'right')}
+                        className="bg-white/90 rounded-full p-1 text-xs text-gray-700 disabled:opacity-30"
+                        disabled={index === photos.length - 1}
+                        aria-label="Move photo right"
+                      >
+                        ▶
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(photo.id)}
+                        className="bg-white/90 rounded-full p-1 text-xs text-red-600"
+                        aria-label="Remove photo"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
-                  <div className="absolute top-2 right-2 flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => movePhoto(photo.id, 'left')}
-                      className="bg-white/90 rounded-full p-1 text-xs text-gray-700 disabled:opacity-30"
-                      disabled={index === 0}
-                      aria-label="Move photo left"
-                    >
-                      ◀
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => movePhoto(photo.id, 'right')}
-                      className="bg-white/90 rounded-full p-1 text-xs text-gray-700 disabled:opacity-30"
-                      disabled={index === photos.length - 1}
-                      aria-label="Move photo right"
-                    >
-                      ▶
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(photo.id)}
-                      className="bg-white/90 rounded-full p-1 text-xs text-red-600"
-                      aria-label="Remove photo"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
                 );
               })}
             </div>
@@ -850,6 +986,35 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
         </button>
         {recipeOpen && (
           <div className="border-t border-gray-100 px-6 py-6 space-y-4">
+            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <input
+                  type="url"
+                  className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  placeholder="Paste a recipe URL to import"
+                  value={importUrl}
+                  onChange={(event) => setImportUrl(event.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={handleImportRecipe}
+                  disabled={isImporting}
+                  className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {isImporting ? 'Importing…' : 'Import from URL'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Import will overwrite existing recipe details.
+              </p>
+              {importError && (
+                <p className="text-sm text-red-600">{importError}</p>
+              )}
+              {importWarning && (
+                <p className="text-sm text-amber-700">{importWarning}</p>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">
@@ -860,7 +1025,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
                   className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
                   placeholder="Family story or origin"
                   value={recipe.origin}
-                  onChange={(event) => handleRecipeChange('origin', event.target.value)}
+                  onChange={(event) =>
+                    handleRecipeChange('origin', event.target.value)
+                  }
                 />
               </div>
               <div className="space-y-1">
@@ -871,7 +1038,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
                   <select
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
                     value={recipe.totalTimeHours}
-                    onChange={(event) => handleRecipeChange('totalTimeHours', event.target.value)}
+                    onChange={(event) =>
+                      handleRecipeChange('totalTimeHours', event.target.value)
+                    }
                   >
                     {HOUR_OPTIONS.map((hour) => (
                       <option key={hour} value={hour}>
@@ -882,7 +1051,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
                   <select
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
                     value={recipe.totalTimeMinutes}
-                    onChange={(event) => handleRecipeChange('totalTimeMinutes', event.target.value)}
+                    onChange={(event) =>
+                      handleRecipeChange('totalTimeMinutes', event.target.value)
+                    }
                   >
                     {MINUTE_OPTIONS.map((minute) => (
                       <option key={minute} value={minute}>
@@ -899,7 +1070,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
                 <select
                   className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
                   value={recipe.servings}
-                  onChange={(event) => handleRecipeChange('servings', event.target.value)}
+                  onChange={(event) =>
+                    handleRecipeChange('servings', event.target.value)
+                  }
                 >
                   <option value="">Select servings</option>
                   {SERVING_OPTIONS.map((count) => (
@@ -921,7 +1094,8 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
                 <div className="flex flex-wrap gap-2">
                   {courseOptions.map((option) => {
                     const selected = selectedCourses.includes(option.value);
-                    const disabled = !selected && selectedCourses.length >= MAX_COURSES;
+                    const disabled =
+                      !selected && selectedCourses.length >= MAX_COURSES;
                     return (
                       <button
                         key={option.value}
@@ -947,7 +1121,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
                 <select
                   className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
                   value={recipe.difficulty}
-                  onChange={(event) => handleRecipeChange('difficulty', event.target.value)}
+                  onChange={(event) =>
+                    handleRecipeChange('difficulty', event.target.value)
+                  }
                 >
                   {difficultyOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -973,7 +1149,10 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
               </div>
               <div className="space-y-3">
                 {ingredients.map((ingredient, index) => (
-                  <div key={ingredient.id} className="rounded-xl border border-gray-200 p-3 space-y-3">
+                  <div
+                    key={ingredient.id}
+                    className="rounded-xl border border-gray-200 p-3 space-y-3"
+                  >
                     <div className="flex items-center justify-between text-xs text-gray-500">
                       <span>Ingredient {index + 1}</span>
                       {ingredients.length > 1 && (
@@ -993,7 +1172,13 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
                           className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
                           placeholder="Ingredient name"
                           value={ingredient.name}
-                          onChange={(event) => handleIngredientChange(ingredient.id, 'name', event.target.value)}
+                          onChange={(event) =>
+                            handleIngredientChange(
+                              ingredient.id,
+                              'name',
+                              event.target.value
+                            )
+                          }
                         />
                       </div>
                       <div>
@@ -1003,14 +1188,26 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
                           className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
                           placeholder="Qty"
                           value={ingredient.quantity}
-                          onChange={(event) => handleIngredientChange(ingredient.id, 'quantity', event.target.value)}
+                          onChange={(event) =>
+                            handleIngredientChange(
+                              ingredient.id,
+                              'quantity',
+                              event.target.value
+                            )
+                          }
                         />
                       </div>
                       <div>
                         <select
                           className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
                           value={ingredient.unit}
-                          onChange={(event) => handleIngredientChange(ingredient.id, 'unit', event.target.value)}
+                          onChange={(event) =>
+                            handleIngredientChange(
+                              ingredient.id,
+                              'unit',
+                              event.target.value
+                            )
+                          }
                         >
                           {ingredientUnitOptions.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -1027,7 +1224,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700">Steps</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Steps
+                </label>
                 <button
                   type="button"
                   className="text-sm font-semibold text-gray-900"
@@ -1038,7 +1237,10 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
               </div>
               <div className="space-y-3">
                 {steps.map((step, index) => (
-                  <div key={step.id} className="rounded-xl border border-gray-200 p-3 space-y-2">
+                  <div
+                    key={step.id}
+                    className="rounded-xl border border-gray-200 p-3 space-y-2"
+                  >
                     <div className="flex items-center justify-between text-xs text-gray-500">
                       <span>Step {index + 1}</span>
                       {steps.length > 1 && (
@@ -1056,7 +1258,9 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
                       placeholder="Describe this step"
                       rows={3}
                       value={step.text}
-                      onChange={(event) => handleStepChange(step.id, event.target.value)}
+                      onChange={(event) =>
+                        handleStepChange(step.id, event.target.value)
+                      }
                     />
                   </div>
                 ))}
@@ -1065,8 +1269,12 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700">Tags</label>
-                <span className="text-xs text-gray-500">{tags.length}/{MAX_TAGS} selected</span>
+                <label className="text-sm font-medium text-gray-700">
+                  Tags
+                </label>
+                <span className="text-xs text-gray-500">
+                  {tags.length}/{MAX_TAGS} selected
+                </span>
               </div>
               {tagsLoading ? (
                 <p className="text-sm text-gray-500">Loading tags…</p>
@@ -1074,34 +1282,37 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
                 <p className="text-sm text-red-600">{tagsError}</p>
               ) : (
                 <div className="space-y-4">
-                  {Object.entries(availableTags).map(([groupName, groupTags]) => (
-                    <div key={groupName} className="space-y-2">
-                      <p className="text-xs font-semibold uppercase text-gray-500">
-                        {groupName.replace(/-/g, ' ')}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {groupTags.map((tag) => {
-                          const selected = tags.includes(tag.name);
-                          const disabled = !selected && tags.length >= MAX_TAGS;
-                          return (
-                            <button
-                              key={tag.id}
-                              type="button"
-                              onClick={() => toggleTagSelection(tag.name)}
-                              disabled={disabled}
-                              className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
-                                selected
-                                  ? 'bg-gray-900 text-white border-gray-900'
-                                  : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                              } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                            >
-                              #{tag.name}
-                            </button>
-                          );
-                        })}
+                  {Object.entries(availableTags).map(
+                    ([groupName, groupTags]) => (
+                      <div key={groupName} className="space-y-2">
+                        <p className="text-xs font-semibold uppercase text-gray-500">
+                          {groupName.replace(/-/g, ' ')}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {groupTags.map((tag) => {
+                            const selected = tags.includes(tag.name);
+                            const disabled =
+                              !selected && tags.length >= MAX_TAGS;
+                            return (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                onClick={() => toggleTagSelection(tag.name)}
+                                disabled={disabled}
+                                className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
+                                  selected
+                                    ? 'bg-gray-900 text-white border-gray-900'
+                                    : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                                } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                              >
+                                #{tag.name}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
               )}
             </div>
@@ -1112,7 +1323,10 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
       {isEditMode && (
         <section className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
           <div className="space-y-1">
-            <label htmlFor="change-note" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="change-note"
+              className="text-sm font-medium text-gray-700"
+            >
               Change note (optional)
             </label>
             <textarea
@@ -1148,8 +1362,8 @@ export default function AddPostForm({ mode = 'create', postId, initialData }: Po
               ? 'Saving…'
               : 'Sharing…'
             : isEditMode
-            ? 'Save changes'
-            : 'Share with family'}
+              ? 'Save changes'
+              : 'Share with family'}
         </button>
         <button
           type="button"

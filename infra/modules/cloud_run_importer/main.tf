@@ -51,6 +51,36 @@ resource "google_cloud_run_v2_service" "importer" {
         value = var.service_name
       }
 
+      env {
+        name  = "IMPORTER_CACHE_TTL_SECONDS"
+        value = tostring(var.cache_ttl_seconds)
+      }
+
+      env {
+        name  = "IMPORTER_FETCH_TIMEOUT_SECONDS"
+        value = tostring(var.fetch_timeout_seconds)
+      }
+
+      env {
+        name  = "IMPORTER_CONNECT_TIMEOUT_SECONDS"
+        value = tostring(var.connect_timeout_seconds)
+      }
+
+      env {
+        name  = "IMPORTER_READ_TIMEOUT_SECONDS"
+        value = tostring(var.read_timeout_seconds)
+      }
+
+      env {
+        name  = "IMPORTER_RATE_LIMIT_IP_PER_MIN"
+        value = tostring(var.rate_limit_ip_per_min)
+      }
+
+      env {
+        name  = "IMPORTER_RATE_LIMIT_DOMAIN_PER_MIN"
+        value = tostring(var.rate_limit_domain_per_min)
+      }
+
       resources {
         limits = {
           cpu    = var.cpu_limit

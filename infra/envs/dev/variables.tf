@@ -237,6 +237,19 @@ variable "alert_notification_email" {
   type        = string
 }
 
+# Recipe Importer integration (for main app to call importer)
+variable "recipe_importer_url" {
+  description = "URL of the Recipe Importer Cloud Run service"
+  type        = string
+  default     = ""
+}
+
+variable "recipe_importer_service_account_email" {
+  description = "Service account email for authenticating to Recipe Importer"
+  type        = string
+  default     = ""
+}
+
 # Recipe URL Importer
 variable "importer_service_name" {
   description = "Cloud Run service name for the recipe importer"

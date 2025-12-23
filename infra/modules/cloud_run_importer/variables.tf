@@ -61,3 +61,39 @@ variable "enable_headless" {
   type        = bool
   default     = false
 }
+
+variable "cache_ttl_seconds" {
+  description = "Cache TTL in seconds"
+  type        = number
+  default     = 604800  # 7 days
+}
+
+variable "fetch_timeout_seconds" {
+  description = "Total fetch timeout in seconds"
+  type        = number
+  default     = 8
+}
+
+variable "connect_timeout_seconds" {
+  description = "Connection timeout in seconds"
+  type        = number
+  default     = 2
+}
+
+variable "read_timeout_seconds" {
+  description = "Read timeout in seconds"
+  type        = number
+  default     = 5
+}
+
+variable "rate_limit_ip_per_min" {
+  description = "Rate limit per IP per minute"
+  type        = number
+  default     = 20
+}
+
+variable "rate_limit_domain_per_min" {
+  description = "Rate limit per domain per minute"
+  type        = number
+  default     = 60
+}
