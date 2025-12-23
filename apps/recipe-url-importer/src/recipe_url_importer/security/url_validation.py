@@ -4,8 +4,6 @@ import ipaddress
 import socket
 from urllib.parse import urlsplit, urlunsplit
 
-from fastapi import status
-
 from ..config import Settings
 from ..exceptions import BlockedHostError, InvalidUrlError
 

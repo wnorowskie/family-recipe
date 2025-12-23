@@ -49,7 +49,8 @@ async def request_context_middleware(request: Request, call_next):
     error: str | None = None
     try:
         response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
+        if response is not None:
+            response.headers["X-Request-ID"] = request_id
         return response
     except Exception as exc:
         error = exc.__class__.__name__

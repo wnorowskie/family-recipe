@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from recipe_url_importer.parse.confidence import compute_confidence
 from recipe_url_importer.parse.heuristic import extract_with_heuristics
 from recipe_url_importer.parse.jsonld import extract_from_jsonld

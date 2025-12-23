@@ -25,7 +25,7 @@ def compute_confidence(recipe: RecipeDraft, strategy: str) -> Tuple[float, List[
     if recipe.title:
         score += 0.05
 
-    bonus_meta = 0
+    bonus_meta = 0.0
     for field in [recipe.image_url, recipe.servings, recipe.prep_time_minutes, recipe.cook_time_minutes, recipe.total_time_minutes]:
         if field:
             bonus_meta += 0.02
