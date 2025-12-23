@@ -32,8 +32,13 @@ jest.mock('@/lib/posts', () => ({
   getPostCookedEventsPage: jest.fn(),
 }));
 
+jest.mock('@/lib/notifications', () => ({
+  createCookedNotification: jest.fn(),
+}));
+
 import { getCurrentUser } from '@/lib/session';
 import { getPostCookedEventsPage } from '@/lib/posts';
+import { createCookedNotification } from '@/lib/notifications';
 
 const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
   typeof getCurrentUser
@@ -41,6 +46,10 @@ const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
 const mockGetPostCookedEventsPage =
   getPostCookedEventsPage as jest.MockedFunction<
     typeof getPostCookedEventsPage
+  >;
+const mockCreateCookedNotification =
+  createCookedNotification as jest.MockedFunction<
+    typeof createCookedNotification
   >;
 
 // Helper to parse response JSON
@@ -69,6 +78,7 @@ describe('POST /api/posts/[postId]/cooked', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetCurrentUser.mockResolvedValue(mockUser);
+    mockCreateCookedNotification.mockResolvedValue(undefined);
   });
 
   describe('Authentication', () => {
@@ -142,7 +152,10 @@ describe('POST /api/posts/[postId]/cooked', () => {
     });
 
     it('accepts valid rating (1-5)', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'post_123',
+        authorId: 'author_123',
+      } as any);
       prismaMock.cookedEvent.create.mockResolvedValue({
         id: 'cooked_123',
         postId: 'post_123',
@@ -172,6 +185,15 @@ describe('POST /api/posts/[postId]/cooked', () => {
       const response = await POST(request, mockContext);
 
       expect(response.status).toBe(201);
+      expect(mockCreateCookedNotification).toHaveBeenCalledWith({
+        familySpaceId: 'family_123',
+        postId: 'post_123',
+        recipientId: 'author_123',
+        actorId: 'user_123',
+        cookedEventId: 'cooked_123',
+        note: null,
+        rating: 5,
+      });
       expect(prismaMock.cookedEvent.create).toHaveBeenCalledWith({
         data: {
           postId: 'post_123',
@@ -183,7 +205,10 @@ describe('POST /api/posts/[postId]/cooked', () => {
     });
 
     it('accepts optional note', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'post_123',
+        authorId: 'author_123',
+      } as any);
       prismaMock.cookedEvent.create.mockResolvedValue({
         id: 'cooked_123',
         postId: 'post_123',
@@ -213,6 +238,15 @@ describe('POST /api/posts/[postId]/cooked', () => {
       const response = await POST(request, mockContext);
 
       expect(response.status).toBe(201);
+      expect(mockCreateCookedNotification).toHaveBeenCalledWith({
+        familySpaceId: 'family_123',
+        postId: 'post_123',
+        recipientId: 'author_123',
+        actorId: 'user_123',
+        cookedEventId: 'cooked_123',
+        note: 'Delicious!',
+        rating: 4,
+      });
       expect(prismaMock.cookedEvent.create).toHaveBeenCalledWith({
         data: {
           postId: 'post_123',
@@ -306,7 +340,7 @@ describe('POST /api/posts/[postId]/cooked', () => {
           id: 'post_other',
           familySpaceId: 'family_123',
         },
-        select: { id: true },
+        select: { id: true, authorId: true },
       });
       expect(prismaMock.cookedEvent.create).not.toHaveBeenCalled();
     });
@@ -314,7 +348,10 @@ describe('POST /api/posts/[postId]/cooked', () => {
 
   describe('Success Cases', () => {
     it('creates cooked event successfully', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'post_123',
+        authorId: 'author_123',
+      } as any);
       prismaMock.cookedEvent.create.mockResolvedValue({
         id: 'cooked_123',
         postId: 'post_123',
@@ -364,7 +401,10 @@ describe('POST /api/posts/[postId]/cooked', () => {
     });
 
     it('allows multiple cooked events per user/post', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'post_123',
+        authorId: 'author_123',
+      } as any);
       prismaMock.cookedEvent.create.mockResolvedValueOnce({
         id: 'cooked_1',
         postId: 'post_123',

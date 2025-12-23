@@ -4,6 +4,7 @@ import { reactionSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { reactionLimiter, applyRateLimit } from '@/lib/rateLimit';
+import { upsertReactionNotification } from '@/lib/notifications';
 import {
   parseRequestBody,
   notFoundError,
@@ -86,17 +87,22 @@ export const POST = withAuth(async (request, user) => {
     }
 
     const { targetType, targetId, emoji } = bodyValidation.data;
+    let targetPost: {
+      id: string;
+      authorId: string | null;
+      familySpaceId: string;
+    } | null = null;
 
     if (targetType === 'post') {
-      const post = await prisma.post.findFirst({
+      targetPost = await prisma.post.findFirst({
         where: {
           id: targetId,
           familySpaceId: user.familySpaceId,
         },
-        select: { id: true },
+        select: { id: true, authorId: true, familySpaceId: true },
       });
 
-      if (!post) {
+      if (!targetPost) {
         return notFoundError('Post not found');
       }
     } else {
@@ -136,6 +142,15 @@ export const POST = withAuth(async (request, user) => {
     }
 
     const summary = await buildReactionSummary(targetType, targetId);
+
+    if (targetType === 'post' && targetPost?.authorId) {
+      await upsertReactionNotification({
+        familySpaceId: targetPost.familySpaceId,
+        postId: targetPost.id,
+        recipientId: targetPost.authorId,
+        actorId: user.id,
+      });
+    }
 
     return NextResponse.json({
       reactions: summary,

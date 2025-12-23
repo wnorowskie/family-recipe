@@ -248,6 +248,18 @@ export const timelineQuerySchema = paginationSchema;
 
 export type TimelineQueryParams = z.infer<typeof timelineQuerySchema>;
 
+// Notifications query params
+export const notificationsQuerySchema = paginationSchema;
+
+export type NotificationsQueryParams = z.infer<typeof notificationsQuerySchema>;
+
+export const markNotificationsSchema = z.object({
+  ids: z
+    .array(z.string().cuid('Invalid notification ID'))
+    .max(50, 'Too many notifications to mark at once')
+    .optional(),
+});
+
 // Recipe filters query params (based on /api/recipes implementation)
 const MAX_TIME_MINUTES = 12 * 60; // 12 hours
 const MAX_SERVINGS = 50;
