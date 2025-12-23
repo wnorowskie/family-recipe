@@ -230,3 +230,9 @@ variable "github_ref" {
   type        = string
   default     = "refs/heads/develop"
 }
+
+# Monitoring
+variable "alert_notification_email" {
+  description = "Email address for monitoring alert notifications"
+  type        = string
+}

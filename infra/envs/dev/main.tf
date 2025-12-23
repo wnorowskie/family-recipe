@@ -73,3 +73,20 @@ module "cloud_run_infra" {
   github_repository           = var.github_repository
   github_ref                  = var.github_ref
 }
+
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  project_id              = var.project_id
+  region                  = var.region
+  cloud_run_service_name  = var.cloud_run_service_name
+  cloud_run_service_uri   = module.cloud_run_infra.cloud_run_service_uri
+  cloud_sql_instance_name = var.db_instance_name
+  notification_email      = var.alert_notification_email
+  environment             = "dev"
+
+  # Optional: override default thresholds
+  uptime_check_period = "900s" # 15 minutes
+
+  depends_on = [module.cloud_run_infra]
+}

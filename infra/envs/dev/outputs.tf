@@ -53,3 +53,16 @@ output "wif_pool_name" {
 output "wif_provider_name" {
   value = module.cloud_run_infra.wif_provider_name
 }
+
+# Monitoring outputs
+output "monitoring_dashboard_id" {
+  value = module.monitoring.dashboard_id
+}
+
+output "monitoring_notification_channel_id" {
+  value = module.monitoring.notification_channel_id
+}
+
+output "monitoring_uptime_check_id" {
+  value = module.monitoring.uptime_check_id
+}
