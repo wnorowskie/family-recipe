@@ -122,6 +122,24 @@ locals {
   cloud_run_host = replace(var.cloud_run_service_uri, "https://", "")
 }
 
+# Service account for authenticated uptime checks (only created if needed)
+resource "google_service_account" "uptime_checker" {
+  count        = var.uptime_check_authenticated ? 1 : 0
+  project      = var.project_id
+  account_id   = "uptime-checker-${var.environment}"
+  display_name = "Uptime Check Service Account (${var.environment})"
+}
+
+# Grant the uptime checker service account permission to invoke Cloud Run
+resource "google_cloud_run_v2_service_iam_member" "uptime_checker_invoker" {
+  count    = var.uptime_check_authenticated ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = var.cloud_run_service_name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.uptime_checker[0].email}"
+}
+
 resource "google_monitoring_uptime_check_config" "health_check" {
   project      = var.project_id
   display_name = "Family Recipe - Health Check (${var.environment})"
@@ -133,6 +151,14 @@ resource "google_monitoring_uptime_check_config" "health_check" {
     port         = 443
     use_ssl      = true
     validate_ssl = true
+
+    # Use OIDC authentication if the service requires it
+    dynamic "service_agent_authentication" {
+      for_each = var.uptime_check_authenticated ? [1] : []
+      content {
+        type = "OIDC_TOKEN"
+      }
+    }
   }
 
   monitored_resource {

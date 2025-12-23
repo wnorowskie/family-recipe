@@ -75,3 +75,9 @@ variable "uptime_check_period" {
   type        = string
   default     = "900s" # 15 minutes
 }
+
+variable "uptime_check_authenticated" {
+  description = "Whether the uptime check requires authentication (for IAM-protected Cloud Run services)"
+  type        = bool
+  default     = false
+}
