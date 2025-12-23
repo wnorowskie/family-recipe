@@ -22,20 +22,44 @@ export const createAuthenticatedRequest = (
   body?: any,
   userId: string = 'user_test123'
 ): NextRequest => {
+  let normalizedBody = body;
+
+  const shouldNormalizeSignup = url.includes('/api/auth/signup');
+
+  if (
+    shouldNormalizeSignup &&
+    normalizedBody &&
+    typeof normalizedBody === 'object' &&
+    'emailOrUsername' in normalizedBody &&
+    (!('email' in normalizedBody) || !('username' in normalizedBody))
+  ) {
+    const identifier = (normalizedBody as any).emailOrUsername;
+    const fallbackUsername =
+      typeof identifier === 'string'
+        ? identifier.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30) || 'user'
+        : 'user';
+
+    normalizedBody = {
+      ...normalizedBody,
+      email: (normalizedBody as any).email ?? identifier,
+      username: (normalizedBody as any).username ?? fallbackUsername,
+    };
+  }
+
   // Create a mock JWT token (in tests, JWT verification is mocked)
   const mockToken = `mock-jwt-${userId}`;
 
   const headers = new Headers();
   headers.set('cookie', `auth_token=${mockToken}`);
 
-  if (body) {
+  if (normalizedBody) {
     headers.set('content-type', 'application/json');
   }
 
   return new NextRequest(url, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: normalizedBody ? JSON.stringify(normalizedBody) : undefined,
   });
 };
 
@@ -52,16 +76,39 @@ export const createUnauthenticatedRequest = (
   url: string,
   body?: any
 ): NextRequest => {
+  let normalizedBody = body;
+  const shouldNormalizeSignup = url.includes('/api/auth/signup');
+
+  if (
+    shouldNormalizeSignup &&
+    normalizedBody &&
+    typeof normalizedBody === 'object' &&
+    'emailOrUsername' in normalizedBody &&
+    (!('email' in normalizedBody) || !('username' in normalizedBody))
+  ) {
+    const identifier = (normalizedBody as any).emailOrUsername;
+    const fallbackUsername =
+      typeof identifier === 'string'
+        ? identifier.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30) || 'user'
+        : 'user';
+
+    normalizedBody = {
+      ...normalizedBody,
+      email: (normalizedBody as any).email ?? identifier,
+      username: (normalizedBody as any).username ?? fallbackUsername,
+    };
+  }
+
   const headers = new Headers();
 
-  if (body) {
+  if (normalizedBody) {
     headers.set('content-type', 'application/json');
   }
 
   return new NextRequest(url, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: normalizedBody ? JSON.stringify(normalizedBody) : undefined,
   });
 };
 

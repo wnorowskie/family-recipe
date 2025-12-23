@@ -7,6 +7,8 @@ interface FamilyMemberSummary {
   userId: string;
   membershipId: string;
   name: string;
+  email: string;
+  username: string;
   emailOrUsername: string;
   avatarUrl: string | null;
   role: string;
@@ -70,7 +72,10 @@ export default function FamilyMembersAdmin({
             member.role !== 'owner' &&
             member.userId !== currentUserId;
           return (
-            <article key={member.userId} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <article
+              key={member.userId}
+              className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
+            >
               <div className="flex items-center gap-4">
                 {member.avatarUrl ? (
                   <div className="relative h-12 w-12 overflow-hidden rounded-full">
@@ -90,9 +95,16 @@ export default function FamilyMembersAdmin({
                 )}
                 <div>
                   <p className="font-semibold text-gray-900">{member.name}</p>
-                  <p className="text-sm text-gray-500">{member.emailOrUsername}</p>
+                  <p className="text-sm text-gray-500">
+                    @{member.username} · {member.email}
+                  </p>
                   <p className="text-xs text-gray-400">
-                    Joined {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(member.joinedAt))}
+                    Joined{' '}
+                    {new Intl.DateTimeFormat('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    }).format(new Date(member.joinedAt))}
                     {' · '}Posts {member.postCount}
                   </p>
                 </div>
@@ -103,8 +115,8 @@ export default function FamilyMembersAdmin({
                     member.role === 'owner'
                       ? 'bg-amber-100 text-amber-800'
                       : member.role === 'admin'
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-gray-100 text-gray-600'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-600'
                   }`}
                 >
                   {member.role}
@@ -124,7 +136,9 @@ export default function FamilyMembersAdmin({
           );
         })}
         {members.length === 0 && (
-          <p className="p-6 text-center text-sm text-gray-500">No members found.</p>
+          <p className="p-6 text-center text-sm text-gray-500">
+            No members found.
+          </p>
         )}
       </div>
     </div>

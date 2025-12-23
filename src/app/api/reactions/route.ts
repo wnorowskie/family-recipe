@@ -33,7 +33,7 @@ async function buildReactionSummary(targetType: TargetType, targetId: string) {
 
   const resolveUrl = createSignedUrlResolver();
   const enrichedReactions = await Promise.all(
-    reactions.map(async (reaction) => ({
+    reactions.map(async (reaction: any) => ({
       emoji: reaction.emoji,
       user: {
         id: reaction.user.id,

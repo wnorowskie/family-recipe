@@ -27,7 +27,9 @@ jest.mock('@/lib/rateLimit', () => ({
 
 import { getCurrentUser } from '@/lib/session';
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
+>;
 
 // Helper to parse response JSON
 const parseResponseJSON = async (response: Response) => {
@@ -38,6 +40,8 @@ const parseResponseJSON = async (response: Response) => {
 describe('DELETE /api/comments/[commentId]', () => {
   const mockMemberUser = {
     id: 'user_123',
+    email: 'member@example.com',
+    username: 'member',
     emailOrUsername: 'member@example.com',
     name: 'Member User',
     familySpaceId: 'family_123',
@@ -48,6 +52,8 @@ describe('DELETE /api/comments/[commentId]', () => {
 
   const mockOwnerUser = {
     id: 'owner_123',
+    email: 'owner@example.com',
+    username: 'owner',
     emailOrUsername: 'owner@example.com',
     name: 'Owner User',
     familySpaceId: 'family_123',
@@ -58,6 +64,8 @@ describe('DELETE /api/comments/[commentId]', () => {
 
   const mockAdminUser = {
     id: 'admin_123',
+    email: 'admin@example.com',
+    username: 'admin',
     emailOrUsername: 'admin@example.com',
     name: 'Admin User',
     familySpaceId: 'family_123',
@@ -79,9 +87,12 @@ describe('DELETE /api/comments/[commentId]', () => {
     it('requires authentication', async () => {
       mockGetCurrentUser.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/comments/clh0000000000000000000101', {
-        method: 'DELETE',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/comments/clh0000000000000000000101',
+        {
+          method: 'DELETE',
+        }
+      );
 
       const response = await DELETE(request, mockContext);
 
@@ -111,11 +122,16 @@ describe('DELETE /api/comments/[commentId]', () => {
     it('returns 404 for non-existent comment', async () => {
       prismaMock.comment.findUnique.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/comments/clh0000000000000000000999', {
-        method: 'DELETE',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/comments/clh0000000000000000000999',
+        {
+          method: 'DELETE',
+        }
+      );
 
-      const response = await DELETE(request, { params: { commentId: 'clh0000000000000000000999' } });
+      const response = await DELETE(request, {
+        params: { commentId: 'clh0000000000000000000999' },
+      });
 
       expect(response.status).toBe(404);
       const data = await parseResponseJSON(response);
@@ -132,9 +148,12 @@ describe('DELETE /api/comments/[commentId]', () => {
         },
       } as any);
 
-      const request = new NextRequest('http://localhost/api/comments/clh0000000000000000000101', {
-        method: 'DELETE',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/comments/clh0000000000000000000101',
+        {
+          method: 'DELETE',
+        }
+      );
 
       const response = await DELETE(request, mockContext);
 
@@ -154,9 +173,12 @@ describe('DELETE /api/comments/[commentId]', () => {
       } as any);
       prismaMock.comment.delete.mockResolvedValue({} as any);
 
-      const request = new NextRequest('http://localhost/api/comments/clh0000000000000000000101', {
-        method: 'DELETE',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/comments/clh0000000000000000000101',
+        {
+          method: 'DELETE',
+        }
+      );
 
       const response = await DELETE(request, mockContext);
 
@@ -177,9 +199,12 @@ describe('DELETE /api/comments/[commentId]', () => {
       } as any);
       prismaMock.comment.delete.mockResolvedValue({} as any);
 
-      const request = new NextRequest('http://localhost/api/comments/clh0000000000000000000101', {
-        method: 'DELETE',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/comments/clh0000000000000000000101',
+        {
+          method: 'DELETE',
+        }
+      );
 
       const response = await DELETE(request, mockContext);
 
@@ -200,9 +225,12 @@ describe('DELETE /api/comments/[commentId]', () => {
       } as any);
       prismaMock.comment.delete.mockResolvedValue({} as any);
 
-      const request = new NextRequest('http://localhost/api/comments/clh0000000000000000000101', {
-        method: 'DELETE',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/comments/clh0000000000000000000101',
+        {
+          method: 'DELETE',
+        }
+      );
 
       const response = await DELETE(request, mockContext);
 
@@ -221,9 +249,12 @@ describe('DELETE /api/comments/[commentId]', () => {
         },
       } as any);
 
-      const request = new NextRequest('http://localhost/api/comments/clh0000000000000000000101', {
-        method: 'DELETE',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/comments/clh0000000000000000000101',
+        {
+          method: 'DELETE',
+        }
+      );
 
       const response = await DELETE(request, mockContext);
 
@@ -245,9 +276,12 @@ describe('DELETE /api/comments/[commentId]', () => {
       } as any);
       prismaMock.comment.delete.mockResolvedValue({} as any);
 
-      const request = new NextRequest('http://localhost/api/comments/clh0000000000000000000101', {
-        method: 'DELETE',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/comments/clh0000000000000000000101',
+        {
+          method: 'DELETE',
+        }
+      );
 
       const response = await DELETE(request, mockContext);
 
@@ -266,11 +300,16 @@ describe('DELETE /api/comments/[commentId]', () => {
       } as any);
       prismaMock.comment.delete.mockResolvedValue({} as any);
 
-      const request = new NextRequest('http://localhost/api/comments/clh0000000000000000000456', {
-        method: 'DELETE',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/comments/clh0000000000000000000456',
+        {
+          method: 'DELETE',
+        }
+      );
 
-      const response = await DELETE(request, { params: { commentId: 'clh0000000000000000000456' } });
+      const response = await DELETE(request, {
+        params: { commentId: 'clh0000000000000000000456' },
+      });
 
       expect(response.status).toBe(204);
       expect(prismaMock.comment.delete).toHaveBeenCalledWith({
@@ -282,11 +321,16 @@ describe('DELETE /api/comments/[commentId]', () => {
 
   describe('Error Handling', () => {
     it('handles database errors during comment lookup', async () => {
-      prismaMock.comment.findUnique.mockRejectedValue(new Error('Database error'));
+      prismaMock.comment.findUnique.mockRejectedValue(
+        new Error('Database error')
+      );
 
-      const request = new NextRequest('http://localhost/api/comments/clh0000000000000000000101', {
-        method: 'DELETE',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/comments/clh0000000000000000000101',
+        {
+          method: 'DELETE',
+        }
+      );
 
       const response = await DELETE(request, mockContext);
 
@@ -305,9 +349,12 @@ describe('DELETE /api/comments/[commentId]', () => {
       } as any);
       prismaMock.comment.delete.mockRejectedValue(new Error('Delete error'));
 
-      const request = new NextRequest('http://localhost/api/comments/clh0000000000000000000101', {
-        method: 'DELETE',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/comments/clh0000000000000000000101',
+        {
+          method: 'DELETE',
+        }
+      );
 
       const response = await DELETE(request, mockContext);
 

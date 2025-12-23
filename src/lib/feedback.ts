@@ -50,7 +50,7 @@ export async function getFeedbackForFamily(
         select: {
           id: true,
           name: true,
-          emailOrUsername: true,
+          email: true,
         },
       },
     },
@@ -62,14 +62,17 @@ export async function getFeedbackForFamily(
   const hasMore = records.length > limit;
   const items: FeedbackListItem[] = records
     .slice(0, limit)
-    .map((submission) => ({
+    .map((submission: any) => ({
       id: submission.id,
       category: submission.category as 'bug' | 'suggestion',
       message: submission.message,
       contactEmail: submission.contactEmail,
       userId: submission.userId,
       userName: submission.user?.name ?? null,
-      userEmail: submission.user?.emailOrUsername ?? null,
+      userEmail:
+        submission.user?.email ??
+        (submission.user as any)?.emailOrUsername ??
+        null,
       familySpaceId: submission.familySpaceId,
       pageUrl: submission.pageUrl,
       userAgent: submission.userAgent,

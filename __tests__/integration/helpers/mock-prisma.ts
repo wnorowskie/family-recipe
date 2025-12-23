@@ -18,4 +18,8 @@ export const prismaMock = mockDeep<PrismaClient>();
  */
 export const resetPrismaMock = () => {
   mockReset(prismaMock);
+  // Provide a sane default so tests that stub findUnique still work when the code calls findFirst
+  prismaMock.user.findFirst.mockImplementation((args: any) =>
+    prismaMock.user.findUnique(args as any)
+  );
 };

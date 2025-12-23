@@ -281,7 +281,7 @@ export async function getPostDetail(
     resolveUrl(post.mainPhotoStorageKey),
     resolveUrl(post.author.avatarStorageKey),
     Promise.all(
-      post.photos.map(async (photo) => ({
+      post.photos.map(async (photo: any) => ({
         id: photo.id,
         url: (await resolveUrl(photo.storageKey)) ?? '',
       }))
@@ -347,7 +347,7 @@ export async function getPostDetail(
     ]);
 
   const reactionsWithAvatars = await Promise.all(
-    postReactions.map(async (reaction) => ({
+    postReactions.map(async (reaction: any) => ({
       emoji: reaction.emoji,
       user: {
         id: reaction.user.id,
@@ -359,7 +359,7 @@ export async function getPostDetail(
 
   const reactionSummaryMap = reactionsWithAvatars.reduce<
     Map<string, { count: number; users: ReactionUserSummary[] }>
-  >((acc, reaction) => {
+  >((acc: any, reaction: any) => {
     const entry = acc.get(reaction.emoji) ?? { count: 0, users: [] };
     entry.count += 1;
     entry.users.push(reaction.user);
@@ -373,7 +373,7 @@ export async function getPostDetail(
   };
 
   const reactionSummary = Array.from(reactionSummaryMap.entries()).map(
-    ([emoji, data]) => ({
+    ([emoji, data]: any) => ({
       emoji,
       count: data.count,
       users: data.users,
@@ -417,7 +417,7 @@ export async function getPostDetail(
           difficulty: post.recipeDetails.difficulty ?? null,
         }
       : null,
-    tags: post.tags.map((entry) => entry.tag.name),
+    tags: post.tags.map((entry: any) => entry.tag.name),
     reactionSummary,
     cookedStats,
     comments: commentPage.comments,
@@ -533,7 +533,7 @@ async function attachReactionsToComments(
   });
 
   const reactionsWithAvatars = await Promise.all(
-    reactions.map(async (reaction) => ({
+    reactions.map(async (reaction: any) => ({
       targetId: reaction.targetId,
       emoji: reaction.emoji,
       user: {
@@ -546,9 +546,9 @@ async function attachReactionsToComments(
 
   const reactionMap = reactionsWithAvatars.reduce<
     Record<string, PostDetailComment['reactions']>
-  >((acc, reaction) => {
+  >((acc: any, reaction: any) => {
     const list = acc[reaction.targetId] ?? [];
-    let entry = list.find((item) => item.emoji === reaction.emoji);
+    let entry = list.find((item: any) => item.emoji === reaction.emoji);
 
     if (!entry) {
       entry = { emoji: reaction.emoji, count: 0, users: [] };
@@ -562,7 +562,7 @@ async function attachReactionsToComments(
   }, {});
 
   const commentPayloads = await Promise.all(
-    records.map(async (record) => ({
+    records.map(async (record: any) => ({
       id: record.id,
       text: record.text,
       photoUrl: await resolveUrl(record.photoStorageKey),
@@ -620,7 +620,7 @@ export async function getPostCookedEventsPage(
 
   const resolveUrl = createSignedUrlResolver();
   const entries: PostCookedEntry[] = await Promise.all(
-    pageRecords.map(async (record) => ({
+    pageRecords.map(async (record: any) => ({
       id: record.id,
       rating: record.rating,
       note: record.note,

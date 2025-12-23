@@ -5,15 +5,25 @@ import { prisma } from '@/lib/prisma';
 import { getSignedUploadUrl, isFileLike, savePhotoFile } from '@/lib/uploads';
 import { updateProfileSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
-import { validationError, conflictError, internalError } from '@/lib/apiErrors';
+import {
+  validationError,
+  conflictError,
+  internalError,
+  invalidCredentialsError,
+  notFoundError,
+} from '@/lib/apiErrors';
+import { verifyPassword } from '@/lib/auth';
+import { clearSessionCookie } from '@/lib/session';
 
 export const PATCH = withAuth(async (request, user) => {
   try {
     const formData = await request.formData();
     const rawPayload = {
       name: formData.get('name'),
-      emailOrUsername: formData.get('emailOrUsername'),
+      email: formData.get('email'),
+      username: formData.get('username'),
     };
+    const currentPassword = formData.get('currentPassword');
 
     const parsed = updateProfileSchema.safeParse(rawPayload);
 
@@ -21,6 +31,42 @@ export const PATCH = withAuth(async (request, user) => {
       return validationError(
         parsed.error.errors[0]?.message ?? 'Invalid input'
       );
+    }
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        username: true,
+        passwordHash: true,
+      },
+    });
+
+    if (!currentUser) {
+      return notFoundError('User not found');
+    }
+
+    const emailChanged = parsed.data.email !== currentUser.email;
+    const usernameChanged = parsed.data.username !== currentUser.username;
+    const requiresPassword = emailChanged || usernameChanged;
+
+    if (requiresPassword) {
+      if (!currentPassword || typeof currentPassword !== 'string') {
+        return validationError(
+          'Current password is required to change email or username'
+        );
+      }
+
+      const matches = await verifyPassword(
+        currentPassword,
+        currentUser.passwordHash
+      );
+
+      if (!matches) {
+        return invalidCredentialsError('Incorrect current password');
+      }
     }
 
     let avatarUpdate: string | null | undefined;
@@ -44,11 +90,13 @@ export const PATCH = withAuth(async (request, user) => {
 
     const data: {
       name: string;
-      emailOrUsername: string;
+      email: string;
+      username: string;
       avatarStorageKey?: string | null;
     } = {
       name: parsed.data.name,
-      emailOrUsername: parsed.data.emailOrUsername,
+      email: parsed.data.email.trim(),
+      username: parsed.data.username.trim(),
     };
 
     if (typeof avatarUpdate !== 'undefined') {
@@ -61,30 +109,38 @@ export const PATCH = withAuth(async (request, user) => {
       select: {
         id: true,
         name: true,
-        emailOrUsername: true,
+        email: true,
+        username: true,
         avatarStorageKey: true,
       },
     });
 
     const avatarUrl = await getSignedUploadUrl(updatedUser.avatarStorageKey);
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         user: {
           id: updatedUser.id,
           name: updatedUser.name,
-          emailOrUsername: updatedUser.emailOrUsername,
+          email: updatedUser.email,
+          username: updatedUser.username,
+          emailOrUsername: updatedUser.email,
           avatarUrl,
         },
       },
       { status: 200 }
     );
+
+    if (requiresPassword) {
+      clearSessionCookie(response);
+    }
+
+    return response;
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002'
-    ) {
-      return conflictError('That email or username is already in use');
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        return conflictError('That email or username is already in use');
+      }
     }
 
     logError('profile.update.error', error);

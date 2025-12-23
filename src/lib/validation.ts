@@ -2,7 +2,19 @@ import { z } from 'zod';
 
 export const signupSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
-  emailOrUsername: z.string().min(1, 'Email or username is required').max(100),
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .max(200, 'Email must be 200 characters or fewer')
+    .email('Enter a valid email'),
+  username: z
+    .string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be 30 characters or fewer')
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      'Username can only contain letters, numbers, and underscores'
+    ),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   familyMasterKey: z.string().min(1, 'Family Master Key is required'),
   rememberMe: z.boolean().optional().default(false),
@@ -148,7 +160,19 @@ export type CookedEventInput = z.infer<typeof cookedEventSchema>;
 
 export const updateProfileSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
-  emailOrUsername: z.string().min(1, 'Email or username is required').max(100),
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .max(200, 'Email must be 200 characters or fewer')
+    .email('Enter a valid email'),
+  username: z
+    .string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be 30 characters or fewer')
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      'Username can only contain letters, numbers, and underscores'
+    ),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
@@ -159,6 +183,30 @@ export const changePasswordSchema = z.object({
 });
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+export const resetPasswordSchema = z.object({
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .max(200, 'Email must be 200 characters or fewer')
+    .email('Enter a valid email'),
+  masterKey: z.string().min(1, 'Master key is required'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const deleteAccountSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  confirmation: z
+    .string()
+    .transform((val) => val.trim())
+    .refine((val) => val.toUpperCase() === 'DELETE', {
+      message: 'Confirmation must be DELETE',
+    }),
+});
+
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
 
 export const feedbackSubmissionSchema = z.object({
   category: z.enum(['bug', 'suggestion']),

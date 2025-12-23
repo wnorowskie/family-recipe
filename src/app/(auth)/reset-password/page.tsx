@@ -3,26 +3,25 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function SignupPage() {
+export default function ResetPasswordPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: '',
     email: '',
-    username: '',
-    password: '',
-    familyMasterKey: '',
-    rememberMe: false,
+    masterKey: '',
+    newPassword: '',
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/signup', {
+      const response = await fetch('/api/auth/reset', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -31,16 +30,18 @@ export default function SignupPage() {
         body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        setError(data.error?.message || 'Something went wrong');
+        setError(data?.error?.message || 'Unable to reset password');
         setIsLoading(false);
         return;
       }
 
-      // Success - force a hard reload to ensure cookie is sent with next request
-      window.location.href = '/timeline';
+      setSuccess('Password updated. Please log in with your new password.');
+      setFormData({ email: '', masterKey: '', newPassword: '' });
+      setIsLoading(false);
+      setTimeout(() => router.push('/login'), 1200);
     } catch (err) {
       setError('Failed to connect to the server');
       setIsLoading(false);
@@ -53,7 +54,7 @@ export default function SignupPage() {
         <h1 className="text-center text-3xl font-bold text-gray-900 mb-2">
           Family Recipe
         </h1>
-        <h2 className="text-center text-xl text-gray-600">Create Account</h2>
+        <h2 className="text-center text-xl text-gray-600">Reset Password</h2>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -64,27 +65,11 @@ export default function SignupPage() {
                 {error}
               </div>
             )}
-
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Your name"
-              />
-            </div>
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+                {success}
+              </div>
+            )}
 
             <div>
               <label
@@ -109,89 +94,45 @@ export default function SignupPage() {
 
             <div>
               <label
-                htmlFor="username"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Username
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                required
-                minLength={3}
-                maxLength={30}
-                value={formData.username}
-                onChange={(e) =>
-                  setFormData({ ...formData, username: e.target.value })
-                }
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="family_handle"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="At least 8 characters"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="familyMasterKey"
+                htmlFor="masterKey"
                 className="block text-sm font-medium text-gray-700"
               >
                 Family Master Key
               </label>
               <input
-                id="familyMasterKey"
-                name="familyMasterKey"
+                id="masterKey"
+                name="masterKey"
                 type="password"
                 required
-                value={formData.familyMasterKey}
+                value={formData.masterKey}
                 onChange={(e) =>
-                  setFormData({ ...formData, familyMasterKey: e.target.value })
+                  setFormData({ ...formData, masterKey: e.target.value })
                 }
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Ask your family admin"
+                placeholder="Enter the family master key"
               />
-              <p className="mt-1 text-xs text-gray-500">
-                You need the family master key to join
-              </p>
             </div>
 
-            <div className="flex items-center">
-              <input
-                id="rememberMe"
-                name="rememberMe"
-                type="checkbox"
-                checked={formData.rememberMe}
-                onChange={(e) =>
-                  setFormData({ ...formData, rememberMe: e.target.checked })
-                }
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
+            <div>
               <label
-                htmlFor="rememberMe"
-                className="ml-2 block text-sm text-gray-700"
+                htmlFor="newPassword"
+                className="block text-sm font-medium text-gray-700"
               >
-                Remember me for 30 days
+                New password
               </label>
+              <input
+                id="newPassword"
+                name="newPassword"
+                type="password"
+                required
+                value={formData.newPassword}
+                minLength={8}
+                onChange={(e) =>
+                  setFormData({ ...formData, newPassword: e.target.value })
+                }
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="At least 8 characters"
+              />
             </div>
 
             <button
@@ -199,13 +140,13 @@ export default function SignupPage() {
               disabled={isLoading}
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Creating Account...' : 'Create Account'}
+              {isLoading ? 'Updating…' : 'Reset password'}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
-              Already have an account?{' '}
+              Remembered it?{' '}
               <a
                 href="/login"
                 className="font-medium text-blue-600 hover:text-blue-500"

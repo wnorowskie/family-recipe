@@ -68,6 +68,8 @@ const parseResponseJSON = async (response: Response) => {
 describe('GET /api/posts/[postId]/comments', () => {
   const mockUser = {
     id: 'user_123',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     name: 'Test User',
     familySpaceId: 'family_123',
@@ -319,6 +321,8 @@ describe('GET /api/posts/[postId]/comments', () => {
 describe('POST /api/posts/[postId]/comments', () => {
   const mockUser = {
     id: 'user_123',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     name: 'Test User',
     familySpaceId: 'family_123',

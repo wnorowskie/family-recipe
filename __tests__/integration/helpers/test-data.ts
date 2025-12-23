@@ -17,15 +17,24 @@ import {
 /**
  * Create a mock user with default values
  */
-export const createMockUser = (overrides: Partial<User> = {}): User => ({
+export const createMockUser = (
+  overrides: Partial<User> & { emailOrUsername?: string } = {}
+): User & { emailOrUsername?: string } => ({
   id: 'user_test123',
-  emailOrUsername: 'test@example.com',
+  email: 'test@example.com',
+  username: 'testuser',
   name: 'Test User',
   passwordHash: '$2b$10$hashedPasswordExample123456789',
   avatarStorageKey: null,
   createdAt: new Date('2024-01-01T00:00:00Z'),
   updatedAt: new Date('2024-01-01T00:00:00Z'),
   ...overrides,
+  emailOrUsername:
+    (overrides as any).email ??
+    (overrides as any).username ??
+    overrides.emailOrUsername ??
+    overrides.email ??
+    'test@example.com',
 });
 
 /**

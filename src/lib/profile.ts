@@ -59,7 +59,7 @@ export async function getUserPostsForProfile(
 
   const hasMore = posts.length > limit;
   const slice = hasMore ? posts.slice(0, limit) : posts;
-  const postIds = slice.map((post) => post.id);
+  const postIds = slice.map((post: any) => post.id);
 
   let cookedStatsMap: Record<
     string,
@@ -80,20 +80,31 @@ export async function getUserPostsForProfile(
       },
     });
 
-    cookedStatsMap = cookedGroups.reduce<
-      Record<string, { timesCooked: number; averageRating: number | null }>
-    >((acc, group) => {
-      acc[group.postId] = {
-        timesCooked: group._count._all,
-        averageRating: group._avg.rating,
-      };
-      return acc;
-    }, {});
+    const cookedGroupsArray = cookedGroups as any[];
+    cookedStatsMap = cookedGroupsArray.reduce(
+      (
+        acc: Record<
+          string,
+          { timesCooked: number; averageRating: number | null }
+        >,
+        group: any
+      ) => {
+        acc[group.postId] = {
+          timesCooked: group._count._all,
+          averageRating: group._avg.rating,
+        };
+        return acc;
+      },
+      {} as Record<
+        string,
+        { timesCooked: number; averageRating: number | null }
+      >
+    );
   }
 
   const resolveUrl = createSignedUrlResolver();
   const items: ProfilePostListItem[] = await Promise.all(
-    slice.map(async (post) => {
+    slice.map(async (post: any) => {
       const stats = cookedStatsMap[post.id] ?? {
         timesCooked: 0,
         averageRating: null,
@@ -146,7 +157,7 @@ export async function getUserCookedHistory(
 
   const resolveUrl = createSignedUrlResolver();
   const items: ProfileCookedItem[] = await Promise.all(
-    slice.map(async (entry) => ({
+    slice.map(async (entry: any) => ({
       id: entry.id,
       createdAt: entry.createdAt.toISOString(),
       rating: entry.rating,
@@ -202,7 +213,7 @@ export async function getUserFavorites(
 
   const resolveUrl = createSignedUrlResolver();
   const items: ProfileFavoriteItem[] = await Promise.all(
-    slice.map(async (favorite) => ({
+    slice.map(async (favorite: any) => ({
       id: favorite.id,
       createdAt: favorite.createdAt.toISOString(),
       post: {

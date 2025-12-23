@@ -356,7 +356,8 @@ describe('Session Management', () => {
       const mockUser = {
         id: 'user_123',
         name: 'John Doe',
-        emailOrUsername: 'john@example.com',
+        email: 'john@example.com',
+        username: 'johnny',
         avatarStorageKey: 'avatars/john.jpg',
         memberships: [
           {
@@ -392,6 +393,8 @@ describe('Session Management', () => {
       expect(result).toEqual({
         id: 'user_123',
         name: 'John Doe',
+        email: 'john@example.com',
+        username: 'johnny',
         emailOrUsername: 'john@example.com',
         avatarUrl: 'https://example.com/avatar.jpg',
         role: 'member',
@@ -429,7 +432,8 @@ describe('Session Management', () => {
       const mockUser = {
         id: 'user_123',
         name: 'No Membership User',
-        emailOrUsername: 'nomember@example.com',
+        email: 'nomember@example.com',
+        username: 'nomember',
         avatarStorageKey: null,
         memberships: [],
       };
@@ -455,8 +459,9 @@ describe('Session Management', () => {
       const mockUser = {
         id: 'user_789',
         name: 'Avatar-less User',
-        emailOrUsername: 'noavatar@example.com',
-        avatarUrl: null,
+        email: 'noavatar@example.com',
+        username: 'noavatar',
+        avatarStorageKey: null,
         memberships: [
           {
             role: 'owner',
@@ -494,8 +499,9 @@ describe('Session Management', () => {
         const mockUser = {
           id: `user_${role}`,
           name: `${role} User`,
-          emailOrUsername: `${role}@example.com`,
-          avatarUrl: null,
+          email: `${role}@example.com`,
+          username: `${role}user`,
+          avatarStorageKey: null,
           memberships: [
             {
               role,
@@ -563,8 +569,9 @@ describe('Session Management', () => {
       const mockUser = {
         id: 'user_flow',
         name: 'Flow User',
-        emailOrUsername: 'flow@example.com',
-        avatarUrl: null,
+        email: 'flow@example.com',
+        username: 'flowuser',
+        avatarStorageKey: null,
         memberships: [
           {
             role: 'member',
@@ -586,6 +593,8 @@ describe('Session Management', () => {
       expect(user).toEqual({
         id: 'user_flow',
         name: 'Flow User',
+        email: 'flow@example.com',
+        username: 'flowuser',
         emailOrUsername: 'flow@example.com',
         avatarUrl: null,
         role: 'member',

@@ -322,7 +322,7 @@ export const PUT = withAuth(
 
       const requestedPhotoOrder = photoOrderResult.data;
       const effectivePhotoOrder: PhotoOrderEntry[] = requestedPhotoOrder ?? [
-        ...existingPost.photos.map((photo) => ({
+        ...existingPost.photos.map((photo: any) => ({
           type: 'existing' as const,
           id: photo.id,
         })),
@@ -360,7 +360,7 @@ export const PUT = withAuth(
       }
 
       const existingPhotoMap = new Map(
-        existingPost.photos.map((photo) => [photo.id, photo])
+        existingPost.photos.map((photo: any) => [photo.id, photo])
       );
       const seenExisting = new Set<string>();
       const seenNewIndexes = new Set<number>();
@@ -380,7 +380,7 @@ export const PUT = withAuth(
             );
           }
           seenExisting.add(entry.id);
-          const photo = existingPhotoMap.get(entry.id);
+          const photo = existingPhotoMap.get(entry.id) as any;
           if (!photo) {
             return NextResponse.json(
               {
@@ -491,8 +491,8 @@ export const PUT = withAuth(
       }
 
       const removedPhotoIds = existingPost.photos
-        .filter((photo) => !keepExistingIds.includes(photo.id))
-        .map((photo) => photo.id);
+        .filter((photo: any) => !keepExistingIds.includes(photo.id))
+        .map((photo: any) => photo.id);
 
       await prisma.$transaction(async (tx) => {
         await tx.post.update({
@@ -738,11 +738,13 @@ export const DELETE = withAuth(
       });
 
       const photoStorageKeys = existingPost.photos.map(
-        (photo) => photo.storageKey
+        (photo: any) => photo.storageKey
       );
       const commentPhotoStorageKeys = existingPost.comments
-        .map((comment) => comment.photoStorageKey)
-        .filter((key): key is string => Boolean(key));
+        .map((comment: any) => comment.photoStorageKey)
+        .filter((key: string | null | undefined): key is string =>
+          Boolean(key)
+        );
 
       await deleteUploadedFiles([
         ...photoStorageKeys,

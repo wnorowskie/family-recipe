@@ -50,7 +50,10 @@ export async function getCurrentUser(request: NextRequest) {
     return {
       id: user.id,
       name: user.name,
-      emailOrUsername: user.emailOrUsername,
+      email: user.email,
+      username: user.username,
+      // Backward compatibility for older consumers
+      emailOrUsername: user.email,
       avatarUrl,
       role: membership.role,
       familySpaceId: membership.familySpaceId,
