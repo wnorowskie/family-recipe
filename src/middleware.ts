@@ -17,6 +17,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/add') ||
     pathname.startsWith('/profile') ||
     pathname.startsWith('/family-members') ||
+    pathname.startsWith('/notifications') ||
     pathname.startsWith('/posts');
 
   // If user is logged in and trying to access auth pages, redirect to timeline
@@ -43,6 +44,7 @@ export const config = {
     '/add/:path*',
     '/profile/:path*',
     '/family-members/:path*',
+    '/notifications/:path*',
     '/posts/:path*',
   ],
 };

@@ -22,10 +22,10 @@ This is a living checklist for follow-ups after the first production deployment.
 
 ## TODO Tasks
 
-- [ ] Improve user account management flows
-  - [ ] Add password reset flow.
-  - [ ] Add email change flow.
-  - [ ] Add account deletion flow.
+- [✓] Improve user account management flows
+  - [✓] Add password reset flow.
+  - [✓] Add email change flow.
+  - [✓] Add account deletion flow.
 - [ ] Add notifications for users
   - [ ] In-app notification center (UI + DB model).
 - [ ] Monitoring on Google Cloud

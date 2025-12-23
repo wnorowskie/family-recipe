@@ -193,3 +193,43 @@ export const createMockFullRecipe = () => {
 
   return { post, recipe, photos, tags };
 };
+
+/**
+ * Create a mock notification
+ */
+export type MockNotification = {
+  id: string;
+  familySpaceId: string;
+  recipientId: string;
+  actorId: string;
+  type: string;
+  postId: string;
+  commentId: string | null;
+  cookedEventId: string | null;
+  emojiCountsJson: string | null;
+  totalCount: number | null;
+  metadataJson: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  readAt: Date | null;
+};
+
+export const createMockNotification = (
+  overrides: Partial<MockNotification> = {}
+): MockNotification => ({
+  id: 'notification_test123',
+  familySpaceId: 'family_test123',
+  recipientId: 'user_test123',
+  actorId: 'user_other123',
+  type: 'comment',
+  postId: 'post_test123',
+  commentId: null,
+  cookedEventId: null,
+  emojiCountsJson: null,
+  totalCount: null,
+  metadataJson: null,
+  createdAt: new Date('2024-01-01T00:00:00Z'),
+  updatedAt: new Date('2024-01-01T00:00:00Z'),
+  readAt: null,
+  ...overrides,
+});

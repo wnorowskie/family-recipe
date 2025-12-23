@@ -42,9 +42,14 @@ jest.mock('@/lib/uploads', () => ({
   createSignedUrlResolver: jest.fn(() => mockResolveUrl),
 }));
 
+jest.mock('@/lib/notifications', () => ({
+  createCommentNotification: jest.fn(),
+}));
+
 import { getCurrentUser } from '@/lib/session';
 import { getPostCommentsPage } from '@/lib/posts';
 import { savePhotoFile, getSignedUploadUrl } from '@/lib/uploads';
+import { createCommentNotification } from '@/lib/notifications';
 
 const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
   typeof getCurrentUser
@@ -58,6 +63,10 @@ const mockSavePhotoFile = savePhotoFile as jest.MockedFunction<
 const mockGetSignedUploadUrl = getSignedUploadUrl as jest.MockedFunction<
   typeof getSignedUploadUrl
 >;
+const mockCreateCommentNotification =
+  createCommentNotification as jest.MockedFunction<
+    typeof createCommentNotification
+  >;
 
 // Helper to parse response JSON
 const parseResponseJSON = async (response: Response) => {
@@ -93,6 +102,7 @@ describe('GET /api/posts/[postId]/comments', () => {
     mockResolveUrl.mockImplementation(async (key?: string | null) =>
       key ? `https://signed.example/${key}` : null
     );
+    mockCreateCommentNotification.mockResolvedValue(undefined);
   });
 
   describe('Authentication', () => {
@@ -170,7 +180,7 @@ describe('GET /api/posts/[postId]/comments', () => {
           id: 'clh0000000000000000000002',
           familySpaceId: 'family_123',
         },
-        select: { id: true },
+        select: { id: true, authorId: true },
       });
     });
   });
@@ -497,7 +507,7 @@ describe('POST /api/posts/[postId]/comments', () => {
           id: 'clh0000000000000000000002',
           familySpaceId: 'family_123',
         },
-        select: { id: true },
+        select: { id: true, authorId: true },
       });
       expect(prismaMock.comment.create).not.toHaveBeenCalled();
     });
@@ -507,6 +517,7 @@ describe('POST /api/posts/[postId]/comments', () => {
     it('creates comment successfully', async () => {
       prismaMock.post.findFirst.mockResolvedValue({
         id: 'clh0000000000000000000001',
+        authorId: 'author_123',
       } as any);
       prismaMock.comment.create.mockResolvedValue({
         id: 'clh0000000000000000000101',
@@ -540,6 +551,14 @@ describe('POST /api/posts/[postId]/comments', () => {
       expect(data.comment.id).toBe('clh0000000000000000000101');
       expect(data.comment.text).toBe('Great recipe!');
       expect(data.comment.photoUrl).toBeNull();
+      expect(createCommentNotification).toHaveBeenCalledWith({
+        familySpaceId: 'family_123',
+        postId: 'clh0000000000000000000001',
+        recipientId: 'author_123',
+        actorId: 'user_123',
+        commentId: 'clh0000000000000000000101',
+        commentText: 'Great recipe!',
+      });
       expect(prismaMock.comment.create).toHaveBeenCalledWith({
         data: {
           postId: 'clh0000000000000000000001',

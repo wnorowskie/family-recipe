@@ -28,11 +28,20 @@ jest.mock('@/lib/rateLimit', () => ({
   applyRateLimit: jest.fn(() => null),
 }));
 
+jest.mock('@/lib/notifications', () => ({
+  upsertReactionNotification: jest.fn(),
+}));
+
 import { getCurrentUser } from '@/lib/session';
+import { upsertReactionNotification } from '@/lib/notifications';
 
 const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
   typeof getCurrentUser
 >;
+const mockUpsertReactionNotification =
+  upsertReactionNotification as jest.MockedFunction<
+    typeof upsertReactionNotification
+  >;
 
 // Helper to parse response JSON
 const parseResponseJSON = async (response: Response) => {
@@ -56,6 +65,7 @@ describe('POST /api/reactions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetCurrentUser.mockResolvedValue(mockUser);
+    mockUpsertReactionNotification.mockResolvedValue(undefined);
   });
 
   describe('Authentication', () => {
@@ -246,7 +256,7 @@ describe('POST /api/reactions', () => {
           id: 'clh0000000000000000000002',
           familySpaceId: 'family_123',
         },
-        select: { id: true },
+        select: { id: true, authorId: true, familySpaceId: true },
       });
       expect(prismaMock.reaction.create).not.toHaveBeenCalled();
     });
@@ -302,6 +312,8 @@ describe('POST /api/reactions', () => {
     it('creates reaction for post', async () => {
       prismaMock.post.findFirst.mockResolvedValue({
         id: 'clh0000000000000000000001',
+        authorId: 'author_123',
+        familySpaceId: 'family_123',
       } as any);
       prismaMock.reaction.findFirst.mockResolvedValue(null);
       prismaMock.reaction.create.mockResolvedValue({
@@ -340,6 +352,12 @@ describe('POST /api/reactions', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
+      expect(mockUpsertReactionNotification).toHaveBeenCalledWith({
+        familySpaceId: 'family_123',
+        postId: 'clh0000000000000000000001',
+        recipientId: 'author_123',
+        actorId: 'user_123',
+      });
       const data = await parseResponseJSON(response);
       expect(data.reactions).toHaveLength(1);
       expect(data.reactions[0]).toEqual({
