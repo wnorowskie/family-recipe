@@ -99,3 +99,13 @@ resource "google_cloud_run_v2_service" "importer" {
 # IAM: Require authentication (no unauthenticated access)
 # This is achieved by NOT granting roles/run.invoker to allUsers.
 # Only principals with roles/run.invoker can invoke the service.
+
+resource "google_cloud_run_v2_service_iam_member" "invokers" {
+  for_each = toset(var.invoker_members)
+
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.importer.name
+  role     = "roles/run.invoker"
+  member   = each.value
+}

@@ -25,6 +25,12 @@ variable "runtime_service_account_email" {
   type        = string
 }
 
+variable "invoker_members" {
+  description = "List of IAM members allowed to invoke the importer (e.g., service accounts)"
+  type        = list(string)
+  default     = []
+}
+
 variable "min_instance_count" {
   description = "Minimum number of instances to keep warm"
   type        = number

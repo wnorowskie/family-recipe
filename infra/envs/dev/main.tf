@@ -86,6 +86,7 @@ module "cloud_run_importer" {
   service_name                  = var.importer_service_name
   artifact_registry_repo_id     = var.importer_artifact_registry_repo_id
   runtime_service_account_email = module.cloud_run_infra.runtime_service_account_email
+  invoker_members               = ["serviceAccount:${module.cloud_run_infra.runtime_service_account_email}"]
   min_instance_count            = var.importer_min_instance_count
   max_instance_count            = var.importer_max_instance_count
   max_html_bytes                = var.importer_max_html_bytes
