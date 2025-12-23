@@ -65,7 +65,7 @@ variable "enable_headless" {
 variable "cache_ttl_seconds" {
   description = "Cache TTL in seconds"
   type        = number
-  default     = 604800  # 7 days
+  default     = 604800 # 7 days
 }
 
 variable "fetch_timeout_seconds" {
