@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       return bodyValidation.error;
     }
 
-    const { name, emailOrUsername, password, familyMasterKey, rememberMe } =
+    const { name, email, username, password, familyMasterKey, rememberMe } =
       bodyValidation.data;
 
     // Load master key hash from env and ensure FamilySpace exists/synced
@@ -41,12 +41,14 @@ export async function POST(request: NextRequest) {
     const familySpace = await ensureFamilySpace(masterKeyHash);
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { emailOrUsername },
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: email.trim() }, { username: username.trim() }],
+      },
     });
 
     if (existingUser) {
-      logWarn('auth.signup.user_exists', { emailOrUsername });
+      logWarn('auth.signup.user_exists', { email, username });
       return badRequestError(
         'A user with this email or username already exists'
       );
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
     const isValidKey = await verifyPassword(familyMasterKey, masterKeyHash);
 
     if (!isValidKey) {
-      logWarn('auth.signup.invalid_master_key', { emailOrUsername });
+      logWarn('auth.signup.invalid_master_key', { email, username });
       return badRequestError('Invalid Family Master Key');
     }
 
@@ -71,11 +73,12 @@ export async function POST(request: NextRequest) {
     const role = existingMembersCount === 0 ? 'owner' : 'member';
 
     // Create user and membership in a transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: typeof prisma) => {
       const user = await tx.user.create({
         data: {
           name,
-          emailOrUsername,
+          email: email.trim(),
+          username: username.trim(),
           passwordHash,
         },
       });
@@ -105,7 +108,8 @@ export async function POST(request: NextRequest) {
       userId: result.user.id,
       familySpaceId: result.membership.familySpaceId,
       role: result.membership.role,
-      emailOrUsername: result.user.emailOrUsername,
+      email: result.user.email,
+      username: result.user.username,
     });
 
     // Return user profile with session cookie
@@ -116,7 +120,9 @@ export async function POST(request: NextRequest) {
         user: {
           id: result.user.id,
           name: result.user.name,
-          emailOrUsername: result.user.emailOrUsername,
+          email: result.user.email,
+          username: result.user.username,
+          emailOrUsername: result.user.email, // backward compatibility
           avatarUrl,
           role: result.membership.role,
           familySpaceId: result.membership.familySpaceId,

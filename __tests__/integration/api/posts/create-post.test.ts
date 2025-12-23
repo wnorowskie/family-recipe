@@ -86,6 +86,8 @@ describe('POST /api/posts', () => {
   const mockUser = {
     id: 'user_123',
     name: 'Test User',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     avatarUrl: null,
     role: 'member',

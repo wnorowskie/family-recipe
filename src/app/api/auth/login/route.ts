@@ -34,10 +34,13 @@ export async function POST(request: NextRequest) {
     }
 
     const { emailOrUsername, password, rememberMe } = bodyValidation.data;
+    const identifier = emailOrUsername.trim();
 
     // Find user
-    const user = await prisma.user.findUnique({
-      where: { emailOrUsername },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: identifier }, { username: identifier }],
+      },
       include: {
         memberships: {
           include: {
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       logWarn('auth.login.invalid_credentials', {
-        emailOrUsername,
+        emailOrUsername: identifier,
         reason: 'user_not_found',
       });
       return invalidCredentialsError();
@@ -60,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     if (!isValidPassword) {
       logWarn('auth.login.invalid_credentials', {
-        emailOrUsername,
+        emailOrUsername: identifier,
         reason: 'bad_password',
       });
       return invalidCredentialsError();
@@ -68,7 +71,10 @@ export async function POST(request: NextRequest) {
 
     // Check if user has a family membership
     if (user.memberships.length === 0) {
-      logWarn('auth.login.no_membership', { emailOrUsername, userId: user.id });
+      logWarn('auth.login.no_membership', {
+        emailOrUsername: identifier,
+        userId: user.id,
+      });
       return forbiddenError('User is not a member of any family space');
     }
 
@@ -88,7 +94,8 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       familySpaceId: membership.familySpaceId,
       role: membership.role,
-      emailOrUsername: user.emailOrUsername,
+      email: user.email,
+      username: user.username,
     });
 
     // Create response with session cookie
@@ -99,7 +106,9 @@ export async function POST(request: NextRequest) {
         user: {
           id: user.id,
           name: user.name,
-          emailOrUsername: user.emailOrUsername,
+          email: user.email,
+          username: user.username,
+          emailOrUsername: user.email, // backward compatibility
           avatarUrl,
           role: membership.role,
           familySpaceId: membership.familySpaceId,

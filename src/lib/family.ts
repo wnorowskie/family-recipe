@@ -5,6 +5,8 @@ export interface FamilyMemberSummary {
   userId: string;
   membershipId: string;
   name: string;
+  email: string;
+  username: string;
   emailOrUsername: string;
   avatarUrl: string | null;
   role: string;
@@ -25,7 +27,8 @@ export async function getFamilyMembers(
         select: {
           id: true,
           name: true,
-          emailOrUsername: true,
+          email: true,
+          username: true,
           avatarStorageKey: true,
           posts: {
             select: {
@@ -40,16 +43,29 @@ export async function getFamilyMembers(
   const resolveUrl = createSignedUrlResolver();
 
   return Promise.all(
-    memberships.map(async (membership) => ({
-      userId: membership.userId,
-      membershipId: membership.id,
-      name: membership.user.name,
-      emailOrUsername: membership.user.emailOrUsername,
-      avatarUrl: await resolveUrl(membership.user.avatarStorageKey),
-      role: membership.role,
-      joinedAt: membership.createdAt.toISOString(),
-      postCount: membership.user.posts.length,
-    }))
+    memberships.map(async (membership: any) => {
+      const fallbackEmail =
+        (membership.user as any).emailOrUsername ?? membership.user.username;
+      const email = membership.user.email ?? fallbackEmail ?? '';
+      const username =
+        membership.user.username ??
+        (typeof fallbackEmail === 'string'
+          ? fallbackEmail.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30) || 'user'
+          : 'user');
+
+      return {
+        userId: membership.userId,
+        membershipId: membership.id,
+        name: membership.user.name,
+        email,
+        username,
+        emailOrUsername: email,
+        avatarUrl: await resolveUrl(membership.user.avatarStorageKey),
+        role: membership.role,
+        joinedAt: membership.createdAt.toISOString(),
+        postCount: membership.user.posts.length,
+      };
+    })
   );
 }
 

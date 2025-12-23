@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     const { category, message, email, pageUrl } = parsed.data;
     const user = await getCurrentUser(request);
-    const contactEmail = email?.trim() || (user ? user.emailOrUsername : null);
+    const contactEmail = email?.trim() || (user ? user.email : null);
 
     if (!user && !contactEmail) {
       return validationError('Email is required when not signed in');

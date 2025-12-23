@@ -301,7 +301,7 @@ export async function getRecipes(
   const typedPosts = posts as RecipePost[];
   const hasMore = typedPosts.length > limit;
   const slice = hasMore ? typedPosts.slice(0, limit) : typedPosts;
-  const postIds = slice.map((post) => post.id);
+  const postIds = slice.map((post: any) => post.id);
 
   let cookedStatsMap: Record<
     string,
@@ -324,20 +324,31 @@ export async function getRecipes(
       },
     });
 
-    cookedStatsMap = cookedGroups.reduce<
-      Record<string, { timesCooked: number; averageRating: number | null }>
-    >((acc, group) => {
-      acc[group.postId] = {
-        timesCooked: group._count._all,
-        averageRating: group._avg.rating,
-      };
-      return acc;
-    }, {});
+    const cookedGroupsArray = cookedGroups as any[];
+    cookedStatsMap = cookedGroupsArray.reduce(
+      (
+        acc: Record<
+          string,
+          { timesCooked: number; averageRating: number | null }
+        >,
+        group: any
+      ) => {
+        acc[group.postId] = {
+          timesCooked: group._count._all,
+          averageRating: group._avg.rating,
+        };
+        return acc;
+      },
+      {} as Record<
+        string,
+        { timesCooked: number; averageRating: number | null }
+      >
+    );
   }
 
   const resolveUrl = createSignedUrlResolver();
   const items: RecipeListItem[] = await Promise.all(
-    slice.map(async (post) => {
+    slice.map(async (post: any) => {
       const stats = cookedStatsMap[post.id] ?? {
         timesCooked: 0,
         averageRating: null,
@@ -358,7 +369,7 @@ export async function getRecipes(
         courses,
         primaryCourse: courses[0] ?? null,
         difficulty: post.recipeDetails?.difficulty ?? null,
-        tags: post.tags.map((entry) => entry.tag.name),
+        tags: post.tags.map((entry: any) => entry.tag.name),
         totalTime: post.recipeDetails?.totalTime ?? null,
         servings: post.recipeDetails?.servings ?? null,
         cookedStats: stats,

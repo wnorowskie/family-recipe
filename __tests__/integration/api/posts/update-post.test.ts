@@ -56,16 +56,26 @@ import { savePhotoFile } from '@/lib/uploads';
 import { getPostDetail } from '@/lib/posts';
 import { revalidatePath } from 'next/cache';
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
-const mockSavePhotoFile = savePhotoFile as jest.MockedFunction<typeof savePhotoFile>;
-const mockGetPostDetail = getPostDetail as jest.MockedFunction<typeof getPostDetail>;
-const mockRevalidatePath = revalidatePath as jest.MockedFunction<typeof revalidatePath>;
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
+>;
+const mockSavePhotoFile = savePhotoFile as jest.MockedFunction<
+  typeof savePhotoFile
+>;
+const mockGetPostDetail = getPostDetail as jest.MockedFunction<
+  typeof getPostDetail
+>;
+const mockRevalidatePath = revalidatePath as jest.MockedFunction<
+  typeof revalidatePath
+>;
 
 describe('PUT /api/posts/[postId]', () => {
   // Mock authenticated users
   const mockAuthor = {
     id: 'user_author',
     name: 'Post Author',
+    email: 'author@example.com',
+    username: 'author',
     emailOrUsername: 'author@example.com',
     avatarUrl: null,
     role: 'member',
@@ -76,6 +86,8 @@ describe('PUT /api/posts/[postId]', () => {
   const mockOwner = {
     id: 'user_owner',
     name: 'Family Owner',
+    email: 'owner@example.com',
+    username: 'owner',
     emailOrUsername: 'owner@example.com',
     avatarUrl: null,
     role: 'owner',
@@ -86,6 +98,8 @@ describe('PUT /api/posts/[postId]', () => {
   const mockOtherMember = {
     id: 'user_other',
     name: 'Other Member',
+    email: 'other@example.com',
+    username: 'other',
     emailOrUsername: 'other@example.com',
     avatarUrl: null,
     role: 'member',
@@ -193,7 +207,7 @@ describe('PUT /api/posts/[postId]', () => {
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
       prismaMock.post.update.mockResolvedValue(existingPost);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
-      
+
       const updatedPostDetail = { ...existingPost, title: 'Updated Title' };
       mockGetPostDetail.mockResolvedValue(updatedPostDetail as any);
 
@@ -223,7 +237,7 @@ describe('PUT /api/posts/[postId]', () => {
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
       prismaMock.post.update.mockResolvedValue(existingPost);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
-      
+
       const updatedPostDetail = { ...existingPost, title: 'Updated by Owner' };
       mockGetPostDetail.mockResolvedValue(updatedPostDetail as any);
 
@@ -338,8 +352,9 @@ describe('PUT /api/posts/[postId]', () => {
     });
 
     it('rejects more than 10 photos', async () => {
-      const photos = Array.from({ length: 11 }, (_, i) =>
-        new File(['photo'], `photo${i}.jpg`, { type: 'image/jpeg' })
+      const photos = Array.from(
+        { length: 11 },
+        (_, i) => new File(['photo'], `photo${i}.jpg`, { type: 'image/jpeg' })
       );
 
       const request = createFormDataRequest(
@@ -372,13 +387,16 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
-      
+
       // Mock transaction
       prismaMock.$transaction.mockImplementation(async (callback: any) => {
         return await callback(prismaMock);
       });
-      
-      prismaMock.post.update.mockResolvedValue({ ...existingPost, title: 'Updated Title' });
+
+      prismaMock.post.update.mockResolvedValue({
+        ...existingPost,
+        title: 'Updated Title',
+      });
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
 
       const updatedPostDetail = {
@@ -422,11 +440,11 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
-      
+
       prismaMock.$transaction.mockImplementation(async (callback: any) => {
         return await callback(prismaMock);
       });
-      
+
       prismaMock.post.update.mockResolvedValue(existingPost);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
       mockGetPostDetail.mockResolvedValue(existingPost as any);
@@ -459,11 +477,11 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
-      
+
       prismaMock.$transaction.mockImplementation(async (callback: any) => {
         return await callback(prismaMock);
       });
-      
+
       prismaMock.post.update.mockResolvedValue(existingPost);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
       mockGetPostDetail.mockResolvedValue(existingPost as any);
@@ -496,11 +514,11 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
-      
+
       prismaMock.$transaction.mockImplementation(async (callback: any) => {
         return await callback(prismaMock);
       });
-      
+
       prismaMock.post.update.mockResolvedValue(existingPost);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
       mockGetPostDetail.mockResolvedValue(existingPost as any);
@@ -531,7 +549,9 @@ describe('PUT /api/posts/[postId]', () => {
           id: 'recipe_123',
           postId: 'post_123',
           origin: 'Grandma',
-          ingredients: JSON.stringify([{ name: 'Flour', quantity: 2, unit: 'cup' }]),
+          ingredients: JSON.stringify([
+            { name: 'Flour', quantity: 2, unit: 'cup' },
+          ]),
           steps: JSON.stringify([{ text: 'Mix' }]),
           totalTime: 30,
           servings: 4,
@@ -542,13 +562,15 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
-      
+
       prismaMock.$transaction.mockImplementation(async (callback: any) => {
         return await callback(prismaMock);
       });
-      
+
       prismaMock.post.update.mockResolvedValue(existingPost);
-      prismaMock.recipeDetails.update.mockResolvedValue(existingPost.recipeDetails);
+      prismaMock.recipeDetails.update.mockResolvedValue(
+        existingPost.recipeDetails
+      );
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
       mockGetPostDetail.mockResolvedValue(existingPost as any);
 
@@ -593,15 +615,21 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
-      
+
       prismaMock.$transaction.mockImplementation(async (callback: any) => {
         return await callback(prismaMock);
       });
-      
-      prismaMock.post.update.mockResolvedValue({ ...existingPost, hasRecipeDetails: true });
+
+      prismaMock.post.update.mockResolvedValue({
+        ...existingPost,
+        hasRecipeDetails: true,
+      });
       prismaMock.recipeDetails.create.mockResolvedValue({} as any);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
-      mockGetPostDetail.mockResolvedValue({ ...existingPost, hasRecipeDetails: true } as any);
+      mockGetPostDetail.mockResolvedValue({
+        ...existingPost,
+        hasRecipeDetails: true,
+      } as any);
 
       const request = createFormDataRequest({
         title: 'Now a Recipe',
@@ -647,15 +675,21 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
-      
+
       prismaMock.$transaction.mockImplementation(async (callback: any) => {
         return await callback(prismaMock);
       });
-      
-      prismaMock.post.update.mockResolvedValue({ ...existingPost, hasRecipeDetails: false });
+
+      prismaMock.post.update.mockResolvedValue({
+        ...existingPost,
+        hasRecipeDetails: false,
+      });
       prismaMock.recipeDetails.delete.mockResolvedValue({} as any);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
-      mockGetPostDetail.mockResolvedValue({ ...existingPost, hasRecipeDetails: false } as any);
+      mockGetPostDetail.mockResolvedValue({
+        ...existingPost,
+        hasRecipeDetails: false,
+      } as any);
 
       const request = createFormDataRequest({
         title: 'Just a Basic Post Now',
@@ -685,17 +719,20 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       const mockTags = [
-        { ...createMockTag({ id: 'tag_1', name: 'vegetarian' }), type: null } as any,
+        {
+          ...createMockTag({ id: 'tag_1', name: 'vegetarian' }),
+          type: null,
+        } as any,
         { ...createMockTag({ id: 'tag_2', name: 'quick' }), type: null } as any,
       ];
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
       prismaMock.tag.findMany.mockResolvedValue(mockTags);
-      
+
       prismaMock.$transaction.mockImplementation(async (callback: any) => {
         return await callback(prismaMock);
       });
-      
+
       prismaMock.post.update.mockResolvedValue(existingPost);
       prismaMock.postTag.deleteMany.mockResolvedValue({ count: 0 });
       prismaMock.postTag.createMany.mockResolvedValue({ count: 2 });
@@ -737,10 +774,13 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
-      
+
       // Only return 1 tag when 2 were requested
       prismaMock.tag.findMany.mockResolvedValue([
-        { ...createMockTag({ id: 'tag_1', name: 'vegetarian' }), type: null } as any,
+        {
+          ...createMockTag({ id: 'tag_1', name: 'vegetarian' }),
+          type: null,
+        } as any,
       ]);
 
       const request = createFormDataRequest({
@@ -805,7 +845,11 @@ describe('PUT /api/posts/[postId]', () => {
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
       mockSavePhotoFile.mockRejectedValue(new Error('FILE_TOO_LARGE'));
 
-      const photos = [new File(['x'.repeat(9 * 1024 * 1024)], 'large.jpg', { type: 'image/jpeg' })];
+      const photos = [
+        new File(['x'.repeat(9 * 1024 * 1024)], 'large.jpg', {
+          type: 'image/jpeg',
+        }),
+      ];
 
       const request = createFormDataRequest(
         {
@@ -833,8 +877,10 @@ describe('PUT /api/posts/[postId]', () => {
       } as any;
 
       prismaMock.post.findFirst.mockResolvedValue(existingPost);
-      
-      prismaMock.$transaction.mockRejectedValue(new Error('Database connection failed'));
+
+      prismaMock.$transaction.mockRejectedValue(
+        new Error('Database connection failed')
+      );
 
       const request = createFormDataRequest({
         title: 'Updated Title',

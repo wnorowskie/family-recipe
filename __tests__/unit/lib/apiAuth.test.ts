@@ -7,10 +7,14 @@ jest.mock('@/lib/session', () => ({
   getCurrentUser: jest.fn(),
 }));
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
+>;
 
 // Helper to create mock NextRequest
-function createMockRequest(url = 'http://localhost:3000/api/test'): NextRequest {
+function createMockRequest(
+  url = 'http://localhost:3000/api/test'
+): NextRequest {
   return new NextRequest(url, { method: 'GET' });
 }
 
@@ -18,6 +22,8 @@ function createMockRequest(url = 'http://localhost:3000/api/test'): NextRequest 
 type FullUser = {
   id: string;
   name: string;
+  email: string;
+  username: string;
   emailOrUsername: string;
   avatarUrl: string | null;
   role: string;
@@ -30,6 +36,8 @@ function createMockUser(overrides?: Partial<FullUser>): FullUser {
   return {
     id: 'user-123',
     name: 'Test User',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     avatarUrl: null,
     familySpaceId: 'family-456',
@@ -120,7 +128,9 @@ describe('withAuth', () => {
       });
       mockGetCurrentUser.mockResolvedValue(user);
 
-      const handler = jest.fn().mockResolvedValue(NextResponse.json({ ok: true }));
+      const handler = jest
+        .fn()
+        .mockResolvedValue(NextResponse.json({ ok: true }));
       const wrappedHandler = withAuth(handler);
       const request = createMockRequest();
 
@@ -319,7 +329,9 @@ describe('withRole', () => {
       });
       mockGetCurrentUser.mockResolvedValue(user);
 
-      const handler = jest.fn().mockResolvedValue(NextResponse.json({ ok: true }));
+      const handler = jest
+        .fn()
+        .mockResolvedValue(NextResponse.json({ ok: true }));
       const wrappedHandler = withRole(['owner'], handler);
       const request = createMockRequest();
 

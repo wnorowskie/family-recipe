@@ -43,7 +43,9 @@ import { POST, DELETE } from '@/app/api/posts/[postId]/favorite/route';
 import { prismaMock } from '../../helpers/mock-prisma';
 import { getCurrentUser } from '@/lib/session';
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
+>;
 
 // Helper to parse JSON response
 async function parseResponseJSON(response: Response) {
@@ -55,6 +57,8 @@ describe('POST/DELETE /api/posts/[postId]/favorite', () => {
   const mockUser = {
     id: 'user_123',
     name: 'Test User',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     avatarUrl: null,
     familySpaceId: 'family_123',
@@ -66,9 +70,12 @@ describe('POST/DELETE /api/posts/[postId]/favorite', () => {
     params: { postId: 'post_123' },
   };
 
-  const mockRequest = new Request('http://localhost/api/posts/post_123/favorite', {
-    method: 'POST',
-  }) as any;
+  const mockRequest = new Request(
+    'http://localhost/api/posts/post_123/favorite',
+    {
+      method: 'POST',
+    }
+  ) as any;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -170,7 +177,9 @@ describe('POST/DELETE /api/posts/[postId]/favorite', () => {
 
     describe('Error Handling', () => {
       it('handles database errors gracefully', async () => {
-        prismaMock.post.findFirst.mockRejectedValue(new Error('Database error'));
+        prismaMock.post.findFirst.mockRejectedValue(
+          new Error('Database error')
+        );
 
         const response = await POST(mockRequest, mockContext);
 
@@ -182,7 +191,9 @@ describe('POST/DELETE /api/posts/[postId]/favorite', () => {
 
       it('handles upsert errors gracefully', async () => {
         prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
-        prismaMock.favorite.upsert.mockRejectedValue(new Error('Upsert failed'));
+        prismaMock.favorite.upsert.mockRejectedValue(
+          new Error('Upsert failed')
+        );
 
         const response = await POST(mockRequest, mockContext);
 
@@ -266,7 +277,9 @@ describe('POST/DELETE /api/posts/[postId]/favorite', () => {
 
     describe('Error Handling', () => {
       it('handles database errors gracefully', async () => {
-        prismaMock.post.findFirst.mockRejectedValue(new Error('Database error'));
+        prismaMock.post.findFirst.mockRejectedValue(
+          new Error('Database error')
+        );
 
         const response = await DELETE(mockRequest, mockContext);
 
@@ -278,7 +291,9 @@ describe('POST/DELETE /api/posts/[postId]/favorite', () => {
 
       it('handles delete errors gracefully', async () => {
         prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
-        prismaMock.favorite.deleteMany.mockRejectedValue(new Error('Delete failed'));
+        prismaMock.favorite.deleteMany.mockRejectedValue(
+          new Error('Delete failed')
+        );
 
         const response = await DELETE(mockRequest, mockContext);
 

@@ -6,7 +6,8 @@ type Category = 'bug' | 'suggestion';
 
 interface CurrentUser {
   id: string;
-  emailOrUsername: string;
+  email: string;
+  username: string;
 }
 
 interface ToastState {
@@ -38,10 +39,11 @@ export default function FeedbackWidget() {
         if (isActive && data?.user) {
           const nextUser: CurrentUser = {
             id: data.user.id,
-            emailOrUsername: data.user.emailOrUsername,
+            email: data.user.email,
+            username: data.user.username,
           };
           setUser(nextUser);
-          setEmail((prev) => prev || nextUser.emailOrUsername || '');
+          setEmail((prev) => prev || nextUser.email || '');
         }
       } catch {
         // Ignore – unauthenticated is expected on auth pages

@@ -35,10 +35,13 @@ jest.mock('@/lib/posts', () => ({
 import { getCurrentUser } from '@/lib/session';
 import { getPostCookedEventsPage } from '@/lib/posts';
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
-const mockGetPostCookedEventsPage = getPostCookedEventsPage as jest.MockedFunction<
-  typeof getPostCookedEventsPage
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
 >;
+const mockGetPostCookedEventsPage =
+  getPostCookedEventsPage as jest.MockedFunction<
+    typeof getPostCookedEventsPage
+  >;
 
 // Helper to parse response JSON
 const parseResponseJSON = async (response: Response) => {
@@ -49,6 +52,8 @@ const parseResponseJSON = async (response: Response) => {
 describe('POST /api/posts/[postId]/cooked', () => {
   const mockUser = {
     id: 'user_123',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     name: 'Test User',
     familySpaceId: 'family_123',
@@ -70,10 +75,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
     it('requires authentication', async () => {
       mockGetCurrentUser.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -100,10 +108,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
     });
 
     it('validates rating range - rejects rating < 1', async () => {
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 0 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 0 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -114,10 +125,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
     });
 
     it('validates rating range - rejects rating > 5', async () => {
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 6 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 6 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -147,10 +161,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -185,10 +202,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 4, note: 'Delicious!' }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 4, note: 'Delicious!' }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -223,10 +243,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ note: 'Made this today' }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ note: 'Made this today' }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -246,10 +269,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
     it('returns 404 for non-existent post', async () => {
       prismaMock.post.findFirst.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/posts/post_999/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_999/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, { params: { postId: 'post_999' } });
 
@@ -262,12 +288,17 @@ describe('POST /api/posts/[postId]/cooked', () => {
     it('returns 404 for post in different family', async () => {
       prismaMock.post.findFirst.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/posts/post_other/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_other/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
-      const response = await POST(request, { params: { postId: 'post_other' } });
+      const response = await POST(request, {
+        params: { postId: 'post_other' },
+      });
 
       expect(response.status).toBe(404);
       expect(prismaMock.post.findFirst).toHaveBeenCalledWith({
@@ -314,10 +345,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5, note: 'Amazing recipe!' }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5, note: 'Amazing recipe!' }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -349,10 +383,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request1 = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5, note: 'First time' }),
-      });
+      const request1 = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5, note: 'First time' }),
+        }
+      );
 
       const response1 = await POST(request1, mockContext);
       expect(response1.status).toBe(201);
@@ -376,10 +413,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request2 = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 4, note: 'Second time' }),
-      });
+      const request2 = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 4, note: 'Second time' }),
+        }
+      );
 
       const response2 = await POST(request2, mockContext);
       expect(response2.status).toBe(201);
@@ -429,10 +469,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 2,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -454,10 +497,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
     it('handles database errors during post lookup', async () => {
       prismaMock.post.findFirst.mockRejectedValue(new Error('Database error'));
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -468,12 +514,17 @@ describe('POST /api/posts/[postId]/cooked', () => {
 
     it('handles database errors during cooked event creation', async () => {
       prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
-      prismaMock.cookedEvent.create.mockRejectedValue(new Error('Database error'));
+      prismaMock.cookedEvent.create.mockRejectedValue(
+        new Error('Database error')
+      );
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -492,12 +543,17 @@ describe('POST /api/posts/[postId]/cooked', () => {
         note: null,
         createdAt: new Date(),
       });
-      prismaMock.cookedEvent.aggregate.mockRejectedValue(new Error('Aggregate error'));
+      prismaMock.cookedEvent.aggregate.mockRejectedValue(
+        new Error('Aggregate error')
+      );
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 

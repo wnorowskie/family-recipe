@@ -4,7 +4,13 @@ import { prisma } from '@/lib/prisma';
 import { changePasswordSchema } from '@/lib/validation';
 import { hashPassword, verifyPassword } from '@/lib/auth';
 import { logError, logWarn } from '@/lib/logger';
-import { parseRequestBody, notFoundError, invalidCredentialsError, internalError } from '@/lib/apiErrors';
+import {
+  parseRequestBody,
+  notFoundError,
+  invalidCredentialsError,
+  internalError,
+} from '@/lib/apiErrors';
+import { clearSessionCookie } from '@/lib/session';
 
 export const POST = withAuth(async (request, user) => {
   try {
@@ -44,7 +50,9 @@ export const POST = withAuth(async (request, user) => {
       },
     });
 
-    return NextResponse.json({ status: 'updated' }, { status: 200 });
+    const response = NextResponse.json({ status: 'updated' }, { status: 200 });
+    clearSessionCookie(response);
+    return response;
   } catch (error) {
     logError('profile.password.error', error, { userId: user.id });
     return internalError('Unable to update password');

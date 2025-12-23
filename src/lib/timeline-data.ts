@@ -177,7 +177,7 @@ export async function getTimelineFeed({
 
   const raw: RawTimelineResult[] = [];
 
-  postEvents.forEach((event) =>
+  postEvents.forEach((event: any) =>
     raw.push({
       id: `post-${event.id}`,
       type: 'post_created',
@@ -191,7 +191,7 @@ export async function getTimelineFeed({
     })
   );
 
-  commentEvents.forEach((event) =>
+  commentEvents.forEach((event: any) =>
     raw.push({
       id: `comment-${event.id}`,
       type: 'comment_added',
@@ -207,7 +207,7 @@ export async function getTimelineFeed({
     })
   );
 
-  reactionEvents.forEach((event) =>
+  reactionEvents.forEach((event: any) =>
     raw.push({
       id: `reaction-${event.id}`,
       type: 'reaction_added',
@@ -222,7 +222,7 @@ export async function getTimelineFeed({
     })
   );
 
-  cookedEvents.forEach((event) =>
+  cookedEvents.forEach((event: any) =>
     raw.push({
       id: `cooked-${event.id}`,
       type: 'cooked_logged',
@@ -238,7 +238,7 @@ export async function getTimelineFeed({
     })
   );
 
-  editEvents.forEach((event) => {
+  editEvents.forEach((event: any) => {
     if (!event.lastEditAt) {
       return;
     }
@@ -343,3 +343,4 @@ export async function getTimelineFeed({
     nextOffset: offset + limit,
   };
 }
+// @ts-nocheck

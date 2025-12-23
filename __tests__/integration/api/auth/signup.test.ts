@@ -348,7 +348,8 @@ describe('POST /api/auth/signup', () => {
       expect(mockUserCreate).toHaveBeenCalledWith({
         data: {
           name: validSignupData.name,
-          emailOrUsername: validSignupData.emailOrUsername,
+          email: validSignupData.emailOrUsername,
+          username: 'johnexamplecom',
           passwordHash: '$2b$10$hashedPassword',
         },
       });
@@ -629,7 +630,9 @@ describe('POST /api/auth/signup', () => {
       expect(data.user).toEqual({
         id: newUser.id,
         name: newUser.name,
-        emailOrUsername: newUser.emailOrUsername,
+        email: newUser.email,
+        username: newUser.username,
+        emailOrUsername: newUser.email,
         avatarUrl: null,
         role: membership.role,
         familySpaceId: membership.familySpaceId,

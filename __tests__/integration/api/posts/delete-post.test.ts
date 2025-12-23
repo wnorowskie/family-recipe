@@ -73,6 +73,8 @@ describe('DELETE /api/posts/[postId]', () => {
   const mockAuthor = {
     id: 'user_author',
     name: 'Author User',
+    email: 'author@example.com',
+    username: 'author',
     emailOrUsername: 'author@example.com',
     avatarUrl: null,
     familySpaceId: 'family_123',
@@ -83,6 +85,8 @@ describe('DELETE /api/posts/[postId]', () => {
   const mockOwner = {
     id: 'user_owner',
     name: 'Owner User',
+    email: 'owner@example.com',
+    username: 'owner',
     emailOrUsername: 'owner@example.com',
     avatarUrl: null,
     familySpaceId: 'family_123',
@@ -93,6 +97,8 @@ describe('DELETE /api/posts/[postId]', () => {
   const mockOtherMember = {
     id: 'user_other',
     name: 'Other Member',
+    email: 'other@example.com',
+    username: 'other',
     emailOrUsername: 'other@example.com',
     avatarUrl: null,
     familySpaceId: 'family_123',
