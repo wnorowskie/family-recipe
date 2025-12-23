@@ -276,9 +276,9 @@ model Notification {
   postId         String   @map("post_id")
   commentId      String?  @map("comment_id")
   cookedEventId  String?  @map("cooked_event_id")
-  emojiCountsJson String?  @map("emoji_counts_json")
+  emojiCounts    Json?    @map("emoji_counts")
   totalCount     Int?     @map("total_count")
-  metadataJson   String?   @map("metadata_json")
+  metadata       Json?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   readAt         DateTime? @map("read_at")

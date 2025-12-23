@@ -206,9 +206,9 @@ export type MockNotification = {
   postId: string;
   commentId: string | null;
   cookedEventId: string | null;
-  emojiCountsJson: string | null;
+  emojiCounts: unknown | null;
   totalCount: number | null;
-  metadataJson: string | null;
+  metadata: unknown | null;
   createdAt: Date;
   updatedAt: Date;
   readAt: Date | null;
@@ -225,9 +225,9 @@ export const createMockNotification = (
   postId: 'post_test123',
   commentId: null,
   cookedEventId: null,
-  emojiCountsJson: null,
+  emojiCounts: null,
   totalCount: null,
-  metadataJson: null,
+  metadata: null,
   createdAt: new Date('2024-01-01T00:00:00Z'),
   updatedAt: new Date('2024-01-01T00:00:00Z'),
   readAt: null,

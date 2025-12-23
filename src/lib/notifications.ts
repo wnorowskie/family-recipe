@@ -91,7 +91,7 @@ export async function createCommentNotification(options: {
       actorId,
       type: 'comment',
       commentId,
-      metadataJson: serializeJson({ commentText }),
+      metadata: { commentText },
     },
   });
 }
@@ -125,7 +125,7 @@ export async function createCookedNotification(options: {
       actorId,
       type: 'cooked',
       cookedEventId,
-      metadataJson: serializeJson({ note, rating }),
+      metadata: { note, rating },
     },
   });
 }
@@ -192,8 +192,8 @@ export async function upsertReactionNotification(options: {
     actorId: latestReaction.user.id,
     type: 'reaction_batch',
     totalCount,
-    emojiCountsJson: serializeJson(emojiCounts),
-    metadataJson: serializeJson({ lastEmoji: latestReaction.emoji }),
+    emojiCounts,
+    metadata: { lastEmoji: latestReaction.emoji },
   };
 
   if (existing) {
@@ -202,8 +202,8 @@ export async function upsertReactionNotification(options: {
       data: {
         actorId: payload.actorId,
         totalCount: payload.totalCount,
-        emojiCountsJson: payload.emojiCountsJson,
-        metadataJson: payload.metadataJson,
+        emojiCounts: payload.emojiCounts,
+        metadata: payload.metadata,
         readAt: null,
       },
     });
@@ -282,11 +282,11 @@ export async function fetchNotifications(options: {
 
   const notifications: NotificationItem[] = await Promise.all(
     slice.map(async (row: any) => {
-      const reactionMeta = safeParseJson<ReactionMetadata>(row.metadataJson);
-      const cookedMeta = safeParseJson<CookedMetadata>(row.metadataJson);
-      const commentMeta = safeParseJson<CommentMetadata>(row.metadataJson);
-      const emojiCounts =
-        safeParseJson<ReactionEmojiCount[]>(row.emojiCountsJson) ?? [];
+      const reactionMeta = row.metadata as ReactionMetadata | null;
+      const cookedMeta = row.metadata as CookedMetadata | null;
+      const commentMeta = row.metadata as CommentMetadata | null;
+      const emojiCountsData =
+        (row.emojiCounts as ReactionEmojiCount[] | null) ?? [];
 
       return {
         id: row.id,
@@ -313,8 +313,8 @@ export async function fetchNotifications(options: {
             ? {
                 totalCount:
                   row.totalCount ??
-                  emojiCounts.reduce((sum, c) => sum + c.count, 0),
-                emojiCounts,
+                  emojiCountsData.reduce((sum, c) => sum + c.count, 0),
+                emojiCounts: emojiCountsData,
                 lastEmoji: reactionMeta?.lastEmoji,
               }
             : undefined,
