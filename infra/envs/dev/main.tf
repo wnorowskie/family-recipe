@@ -74,6 +74,22 @@ module "cloud_run_infra" {
   github_ref                  = var.github_ref
 }
 
+module "cloud_run_importer" {
+  source = "../../modules/cloud_run_importer"
+
+  project_id                    = var.project_id
+  region                        = var.region
+  service_name                  = var.importer_service_name
+  artifact_registry_repo_id     = var.importer_artifact_registry_repo_id
+  runtime_service_account_email = module.cloud_run_infra.runtime_service_account_email
+  min_instance_count            = var.importer_min_instance_count
+  max_instance_count            = var.importer_max_instance_count
+  max_html_bytes                = var.importer_max_html_bytes
+  enable_headless               = var.importer_enable_headless
+
+  depends_on = [module.cloud_run_infra]
+}
+
 module "monitoring" {
   source = "../../modules/monitoring"
 

@@ -7,7 +7,7 @@
 
 ---
 
-## 1) Product Spec
+## 1 Product Spec
 
 ### 1.1 Problem
 
@@ -57,7 +57,7 @@ Users copy recipes from random websites. Manually re-typing ingredients and step
 
 ---
 
-## 2) Technical Spec
+## 2 Technical Spec
 
 ### 2.1 Architecture Overview
 
@@ -217,6 +217,8 @@ If A–C fail or confidence is low:
 5. Gate with feature flag: `ENABLE_HEADLESS=false` by default; only enable for domains in `HEADLESS_ALLOWLIST_DOMAINS` (start empty). If disabled or domain not allowed, return partial + warning instead of headless fetch.
 
 > **DevSecOps note:** Headless is expensive and increases attack surface; gate it with strict timeouts, size limits, and rate limits. You can enable it for v1 but treat it as a controlled fallback.
+
+- **Implementation note:** Playwright binaries are not baked into the v1 image; `ENABLE_HEADLESS=true` is a no-op until Playwright is added in a later iteration.
 
 #### Locale / Charset (v1)
 
@@ -437,6 +439,7 @@ recipe_url_importer/
 - `IMPORTER_STRATEGY_ORDER` (optional, e.g., `jsonld,microdata,heuristic,headless`)
 - `CACHE_TTL_SECONDS` (e.g., `604800`)
 - `RATE_LIMIT_*` (if enforced at app layer)
+- Configured with `IMPORTER_` prefix in code (e.g., `IMPORTER_MAX_HTML_BYTES`).
 
 Configured via Terraform `google_cloud_run_v2_service` container envs; no secrets needed for these toggles.
 
@@ -455,7 +458,7 @@ Configured via Terraform `google_cloud_run_v2_service` container envs; no secret
 
 ---
 
-## 3) Rollout Plan
+## 3 Rollout Plan
 
 ### Phase 1 (MVP Import)
 

@@ -1,0 +1,29 @@
+<html>
+  <head>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Recipe",
+            "name": "Test Chili",
+            "recipeIngredient": ["1 lb beef", "1 onion"],
+            "recipeInstructions": [
+              {"@type": "HowToStep", "text": "Brown beef."},
+              {"@type": "HowToStep", "text": "Add onion."}
+            ],
+            "recipeYield": "6 servings",
+            "prepTime": "PT15M",
+            "cookTime": "PT45M",
+            "totalTime": "PT1H",
+            "image": "https://example.com/chili.jpg",
+            "author": {"@type": "Person", "name": "Test Author"}
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <h1>Test Chili Page</h1>
+  </body>
+</html>
