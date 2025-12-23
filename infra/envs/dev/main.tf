@@ -86,8 +86,8 @@ module "monitoring" {
   environment             = "dev"
 
   # Optional: override default thresholds
-  uptime_check_period         = "900s" # 15 minutes
-  uptime_check_authenticated  = true   # Dev requires IAM auth
+  uptime_check_period        = "900s" # 15 minutes
+  uptime_check_authenticated = true   # Dev requires IAM auth
 
   depends_on = [module.cloud_run_infra]
 }

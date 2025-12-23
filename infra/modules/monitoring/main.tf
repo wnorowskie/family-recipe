@@ -431,7 +431,7 @@ resource "google_monitoring_alert_policy" "cloud_run_high_memory" {
 # ==============================================================================
 
 resource "google_monitoring_dashboard" "main" {
-  project        = var.project_id
+  project = var.project_id
   dashboard_json = jsonencode({
     displayName = "Family Recipe - ${var.environment}"
     mosaicLayout = {
@@ -528,7 +528,7 @@ resource "google_monitoring_dashboard" "main" {
                       }
                     }
                   }
-                  plotType   = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "P50"
                 },
                 {
@@ -541,7 +541,7 @@ resource "google_monitoring_dashboard" "main" {
                       }
                     }
                   }
-                  plotType   = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "P95"
                 },
                 {
@@ -554,7 +554,7 @@ resource "google_monitoring_dashboard" "main" {
                       }
                     }
                   }
-                  plotType   = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "P99"
                 }
               ]
