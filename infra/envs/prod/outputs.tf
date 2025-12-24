@@ -58,3 +58,29 @@ output "managed_secret_ids" {
   value = module.cloud_run_infra.managed_secret_ids
 }
 
+# Monitoring outputs
+output "monitoring_dashboard_id" {
+  value = module.monitoring.dashboard_id
+}
+
+output "monitoring_notification_channel_id" {
+  value = module.monitoring.notification_channel_id
+}
+
+output "monitoring_uptime_check_id" {
+  value = module.monitoring.uptime_check_id
+}
+
+# Recipe URL Importer outputs
+output "importer_service_name" {
+  value = module.cloud_run_importer.service_name
+}
+
+output "importer_service_uri" {
+  value = module.cloud_run_importer.service_uri
+}
+
+output "importer_artifact_registry_repository" {
+  value = module.cloud_run_importer.artifact_registry_repository_id
+}
+

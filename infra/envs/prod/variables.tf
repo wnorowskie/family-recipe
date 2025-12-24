@@ -217,3 +217,59 @@ variable "github_ref" {
   type        = string
   default     = "refs/heads/main"
 }
+
+# Monitoring
+variable "alert_notification_email" {
+  description = "Email address for monitoring alert notifications"
+  type        = string
+}
+
+# Recipe Importer integration (for main app to call importer)
+variable "recipe_importer_url" {
+  description = "URL of the Recipe Importer Cloud Run service"
+  type        = string
+  default     = ""
+}
+
+variable "recipe_importer_service_account_email" {
+  description = "Service account email for authenticating to Recipe Importer"
+  type        = string
+  default     = ""
+}
+
+# Recipe URL Importer
+variable "importer_service_name" {
+  description = "Cloud Run service name for the recipe importer"
+  type        = string
+  default     = "recipe-importer-prod"
+}
+
+variable "importer_artifact_registry_repo_id" {
+  description = "Artifact Registry repository ID for importer images"
+  type        = string
+  default     = "recipe-importer-prod"
+}
+
+variable "importer_min_instance_count" {
+  description = "Minimum number of importer instances to keep warm"
+  type        = number
+  default     = 0
+}
+
+variable "importer_max_instance_count" {
+  description = "Maximum number of importer instances to allow"
+  type        = number
+  default     = 5
+}
+
+variable "importer_max_html_bytes" {
+  description = "Maximum HTML size the importer will process (bytes)"
+  type        = number
+  default     = 3000000
+}
+
+variable "importer_enable_headless" {
+  description = "Enable headless browser for JavaScript-rendered pages"
+  type        = bool
+  default     = false
+}
