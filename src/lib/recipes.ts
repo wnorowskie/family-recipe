@@ -2,17 +2,23 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 import { courseEnum } from '@/lib/validation';
+import { createSignedUrlResolver } from '@/lib/uploads';
 
 const COURSE_VALUES = new Set(courseEnum.options);
 const DIFFICULTY_VALUES = new Set(['easy', 'medium', 'hard']);
 
-function parseCourses(value: string | null, fallback?: string | null): string[] {
+function parseCourses(
+  value: string | null,
+  fallback?: string | null
+): string[] {
   if (value) {
     try {
       const parsed = JSON.parse(value);
       if (Array.isArray(parsed)) {
         const filtered = parsed.filter(
-          (entry): entry is string => typeof entry === 'string' && COURSE_VALUES.has(entry as typeof courseEnum.options[number])
+          (entry): entry is string =>
+            typeof entry === 'string' &&
+            COURSE_VALUES.has(entry as (typeof courseEnum.options)[number])
         );
         if (filtered.length > 0) {
           return Array.from(new Set(filtered));
@@ -23,7 +29,10 @@ function parseCourses(value: string | null, fallback?: string | null): string[] 
     }
   }
 
-  if (fallback && COURSE_VALUES.has(fallback as typeof courseEnum.options[number])) {
+  if (
+    fallback &&
+    COURSE_VALUES.has(fallback as (typeof courseEnum.options)[number])
+  ) {
     return [fallback];
   }
 
@@ -130,26 +139,32 @@ export async function getRecipes(
 
   const normalizedCourses = Array.from(
     new Set(
-      courses.filter((value): value is string => typeof value === 'string' && COURSE_VALUES.has(value as typeof courseEnum.options[number]))
+      courses.filter(
+        (value): value is string =>
+          typeof value === 'string' &&
+          COURSE_VALUES.has(value as (typeof courseEnum.options)[number])
+      )
     )
   );
 
   if (normalizedCourses.length > 0) {
-    const courseFilters: Prisma.PostWhereInput[] = normalizedCourses.map((value) => ({
-      recipeDetails: {
-        is: {
-          OR: [
-            { course: value },
-            {
-              courses: {
-                contains: JSON.stringify(value),
-                mode: 'insensitive',
+    const courseFilters: Prisma.PostWhereInput[] = normalizedCourses.map(
+      (value) => ({
+        recipeDetails: {
+          is: {
+            OR: [
+              { course: value },
+              {
+                courses: {
+                  contains: JSON.stringify(value),
+                  mode: 'insensitive',
+                },
               },
-            },
-          ],
+            ],
+          },
         },
-      },
-    }));
+      })
+    );
 
     andFilters.push({ OR: courseFilters });
   }
@@ -171,7 +186,8 @@ export async function getRecipes(
   const normalizedDifficulties = Array.from(
     new Set(
       difficulties.filter(
-        (value): value is string => typeof value === 'string' && DIFFICULTY_VALUES.has(value)
+        (value): value is string =>
+          typeof value === 'string' && DIFFICULTY_VALUES.has(value)
       )
     )
   );
@@ -257,14 +273,14 @@ export async function getRecipes(
         ]
       : [{ createdAt: 'desc' as const }];
 
-  const posts = await prisma.post.findMany({
+  const recipeQuery = {
     where,
     include: {
       author: {
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
       recipeDetails: true,
@@ -277,13 +293,20 @@ export async function getRecipes(
     orderBy,
     take: limit + 1,
     skip: offset,
-  });
+  } satisfies Prisma.PostFindManyArgs;
 
-  const hasMore = posts.length > limit;
-  const slice = hasMore ? posts.slice(0, limit) : posts;
-  const postIds = slice.map((post) => post.id);
+  const posts = await prisma.post.findMany(recipeQuery);
+  type RecipePost = Prisma.PostGetPayload<typeof recipeQuery>;
 
-  let cookedStatsMap: Record<string, { timesCooked: number; averageRating: number | null }> = {};
+  const typedPosts = posts as RecipePost[];
+  const hasMore = typedPosts.length > limit;
+  const slice = hasMore ? typedPosts.slice(0, limit) : typedPosts;
+  const postIds = slice.map((post: any) => post.id);
+
+  let cookedStatsMap: Record<
+    string,
+    { timesCooked: number; averageRating: number | null }
+  > = {};
 
   if (postIds.length > 0) {
     const cookedGroups = await prisma.cookedEvent.groupBy({
@@ -301,39 +324,58 @@ export async function getRecipes(
       },
     });
 
-    cookedStatsMap = cookedGroups.reduce<Record<string, { timesCooked: number; averageRating: number | null }>>(
-      (acc, group) => {
+    const cookedGroupsArray = cookedGroups as any[];
+    cookedStatsMap = cookedGroupsArray.reduce(
+      (
+        acc: Record<
+          string,
+          { timesCooked: number; averageRating: number | null }
+        >,
+        group: any
+      ) => {
         acc[group.postId] = {
           timesCooked: group._count._all,
           averageRating: group._avg.rating,
         };
         return acc;
       },
-      {}
+      {} as Record<
+        string,
+        { timesCooked: number; averageRating: number | null }
+      >
     );
   }
 
-  const items: RecipeListItem[] = slice.map((post) => {
-    const stats = cookedStatsMap[post.id] ?? { timesCooked: 0, averageRating: null };
-    const courses = parseCourses(post.recipeDetails?.courses ?? null, post.recipeDetails?.course ?? null);
-    return {
-      id: post.id,
-      title: post.title,
-      mainPhotoUrl: post.mainPhotoUrl,
-      author: {
-        id: post.author.id,
-        name: post.author.name,
-        avatarUrl: post.author.avatarUrl,
-      },
-      courses,
-      primaryCourse: courses[0] ?? null,
-      difficulty: post.recipeDetails?.difficulty ?? null,
-      tags: post.tags.map((entry) => entry.tag.name),
-      totalTime: post.recipeDetails?.totalTime ?? null,
-      servings: post.recipeDetails?.servings ?? null,
-      cookedStats: stats,
-    };
-  });
+  const resolveUrl = createSignedUrlResolver();
+  const items: RecipeListItem[] = await Promise.all(
+    slice.map(async (post: any) => {
+      const stats = cookedStatsMap[post.id] ?? {
+        timesCooked: 0,
+        averageRating: null,
+      };
+      const courses = parseCourses(
+        post.recipeDetails?.courses ?? null,
+        post.recipeDetails?.course ?? null
+      );
+      return {
+        id: post.id,
+        title: post.title,
+        mainPhotoUrl: await resolveUrl(post.mainPhotoStorageKey),
+        author: {
+          id: post.author.id,
+          name: post.author.name,
+          avatarUrl: await resolveUrl(post.author.avatarStorageKey),
+        },
+        courses,
+        primaryCourse: courses[0] ?? null,
+        difficulty: post.recipeDetails?.difficulty ?? null,
+        tags: post.tags.map((entry: any) => entry.tag.name),
+        totalTime: post.recipeDetails?.totalTime ?? null,
+        servings: post.recipeDetails?.servings ?? null,
+        cookedStats: stats,
+      };
+    })
+  );
 
   return {
     items,

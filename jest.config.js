@@ -16,6 +16,8 @@ const customJestConfig = {
   modulePaths: ['<rootDir>/src'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^glob$': '<rootDir>/__tests__/helpers/glob-default.js',
+    '^bcrypt$': 'bcryptjs',
   },
 
   // Test match patterns
@@ -46,8 +48,8 @@ const customJestConfig = {
 
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
 
-  // Transform TypeScript files
-  preset: 'ts-jest',
+  // Use native V8 coverage to avoid double transform issues
+  coverageProvider: 'v8',
 
   // Ignore patterns
   testPathIgnorePatterns: [

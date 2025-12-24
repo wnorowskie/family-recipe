@@ -1,0 +1,80 @@
+name: Deploy Recipe URL Importer Prod (Cloud Run)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/recipe-url-importer/**'
+      - '.github/workflows/deploy-recipe-url-importer-prod.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # Reuse existing prod secrets (same project/region/auth)
+      PROJECT_ID: ${{ secrets.PROD_GCP_PROJECT }}
+      REGION: ${{ secrets.PROD_GCP_REGION }}
+      WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.PROD_GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      DEPLOYER_SA: ${{ secrets.PROD_GCP_DEPLOYER_SA }}
+      # Importer-specific (only 2 new secrets needed)
+      CLOUD_RUN_SERVICE: ${{ secrets.PROD_IMPORTER_CLOUD_RUN_SERVICE }}
+      ARTIFACT_REGISTRY_REPO: ${{ secrets.PROD_IMPORTER_ARTIFACT_REGISTRY_REPO }}
+      # Same runtime SA as main app
+      RUNTIME_SERVICE_ACCOUNT: family-recipe-runner@family-recipe-prod.iam.gserviceaccount.com
+      # Importer config (hardcoded, not secrets)
+      IMPORTER_MAX_HTML_BYTES: 3000000
+      IMPORTER_FETCH_TIMEOUT_SECONDS: 8
+      IMPORTER_CONNECT_TIMEOUT_SECONDS: 2
+      IMPORTER_READ_TIMEOUT_SECONDS: 5
+      IMPORTER_ENABLE_HEADLESS: false
+      IMPORTER_CACHE_TTL_SECONDS: 604800
+      IMPORTER_RATE_LIMIT_IP_PER_MIN: 20
+      IMPORTER_RATE_LIMIT_DOMAIN_PER_MIN: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
+
+      - name: Build image
+        run: |
+          if [ -z "${ARTIFACT_REGISTRY_REPO:-}" ]; then
+            echo "ARTIFACT_REGISTRY_REPO is required but not set."
+            exit 1
+          fi
+          IMAGE="${ARTIFACT_REGISTRY_REPO}:${GITHUB_SHA}"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          docker build -t "$IMAGE" -f apps/recipe-url-importer/Dockerfile .
+
+      - name: Push image
+        run: docker push "$IMAGE"
+
+      - name: Deploy to Cloud Run (prod)
+        run: |
+          gcloud run deploy "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --image "$IMAGE" \
+            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
+            --platform managed \
+            --port 8000 \
+            --quiet \
+            --ingress all \
+            --no-allow-unauthenticated \
+            --set-env-vars IMPORTER_MAX_HTML_BYTES=${IMPORTER_MAX_HTML_BYTES},IMPORTER_FETCH_TIMEOUT_SECONDS=${IMPORTER_FETCH_TIMEOUT_SECONDS},IMPORTER_CONNECT_TIMEOUT_SECONDS=${IMPORTER_CONNECT_TIMEOUT_SECONDS},IMPORTER_READ_TIMEOUT_SECONDS=${IMPORTER_READ_TIMEOUT_SECONDS},IMPORTER_ENABLE_HEADLESS=${IMPORTER_ENABLE_HEADLESS},IMPORTER_CACHE_TTL_SECONDS=${IMPORTER_CACHE_TTL_SECONDS},IMPORTER_RATE_LIMIT_IP_PER_MIN=${IMPORTER_RATE_LIMIT_IP_PER_MIN},IMPORTER_RATE_LIMIT_DOMAIN_PER_MIN=${IMPORTER_RATE_LIMIT_DOMAIN_PER_MIN}

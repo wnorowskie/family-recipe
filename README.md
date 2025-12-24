@@ -105,12 +105,13 @@ docker compose up --build
 - App: <http://localhost:3000>
 - Postgres data persists in the `postgres-data` volume.
 - Uploaded images persist via the bind mount `./public/uploads:/app/public/uploads`.
-- Migrations run on container start via `prisma migrate deploy --schema prisma/schema.postgres.prisma`.
+- Migrations run on container start via `prisma migrate deploy --schema prisma/schema.postgres.node.prisma` (JS client only; avoids the Python generator).
+- Set `FAMILY_MASTER_KEY` (or `FAMILY_MASTER_KEY_HASH`) in your `.env` so docker-compose passes it through to the app.
 
 2. Re-run migrations manually (if needed):
 
 ```
-docker compose run --rm app npx prisma migrate deploy --schema prisma/schema.postgres.prisma
+docker compose run --rm app npx prisma migrate deploy --schema prisma/schema.postgres.node.prisma
 ```
 
 3. Seed data (optional):
@@ -118,6 +119,8 @@ docker compose run --rm app npx prisma migrate deploy --schema prisma/schema.pos
 ```
 docker compose exec app npm run db:seed
 ```
+
+> Note: The containerized Next.js app uses the `prisma/schema.postgres.node.prisma` schema (JS client only). Use `prisma/schema.postgres.prisma` when you need the Python client (FastAPI service) and have the Python generator available.
 
 ### Local Development Options
 

@@ -17,7 +17,11 @@ import {
   createMockFamilySpace,
   createMockFamilyMembership,
 } from '../../helpers/test-data';
-import { createUnauthenticatedRequest, parseResponseJSON } from '../../helpers/request-helpers';
+import {
+  createUnauthenticatedRequest,
+  parseResponseJSON,
+} from '../../helpers/request-helpers';
+import { getSignedUploadUrl } from '@/lib/uploads';
 
 // Mock dependencies
 jest.mock('jose', () => ({
@@ -39,15 +43,35 @@ jest.mock('@/lib/rateLimit', () => ({
   },
   applyRateLimit: jest.fn().mockReturnValue(null),
 }));
+jest.mock('@/lib/masterKey');
+jest.mock('@/lib/uploads', () => ({
+  getSignedUploadUrl: jest.fn(),
+}));
 
 import { hashPassword, verifyPassword } from '@/lib/auth';
 import { signToken } from '@/lib/jwt';
+import { ensureFamilySpace, getEnvMasterKeyHash } from '@/lib/masterKey';
 
-const mockHashPassword = hashPassword as jest.MockedFunction<typeof hashPassword>;
-const mockVerifyPassword = verifyPassword as jest.MockedFunction<typeof verifyPassword>;
+const mockHashPassword = hashPassword as jest.MockedFunction<
+  typeof hashPassword
+>;
+const mockVerifyPassword = verifyPassword as jest.MockedFunction<
+  typeof verifyPassword
+>;
 const mockSignToken = signToken as jest.MockedFunction<typeof signToken>;
+const mockGetSignedUploadUrl = getSignedUploadUrl as jest.MockedFunction<
+  typeof getSignedUploadUrl
+>;
 
 describe('POST /api/auth/signup', () => {
+  const mockEnsureFamilySpace = ensureFamilySpace as jest.MockedFunction<
+    typeof ensureFamilySpace
+  >;
+  const mockGetEnvMasterKeyHash = getEnvMasterKeyHash as jest.MockedFunction<
+    typeof getEnvMasterKeyHash
+  >;
+  const defaultFamilySpace = createMockFamilySpace();
+
   beforeEach(() => {
     resetPrismaMock();
     jest.clearAllMocks();
@@ -55,6 +79,17 @@ describe('POST /api/auth/signup', () => {
     // Default mocks
     mockHashPassword.mockResolvedValue('$2b$10$hashedPassword');
     mockSignToken.mockResolvedValue('mock-jwt-token');
+    mockGetEnvMasterKeyHash.mockResolvedValue('env-master-key-hash');
+    mockEnsureFamilySpace.mockResolvedValue(defaultFamilySpace as any);
+    mockGetSignedUploadUrl.mockResolvedValue(
+      'https://signed.example/avatar.jpg'
+    );
+    process.env.FAMILY_MASTER_KEY = 'env-master-key';
+  });
+
+  afterAll(() => {
+    delete process.env.FAMILY_MASTER_KEY;
+    delete process.env.FAMILY_MASTER_KEY_HASH;
   });
 
   const validSignupData = {
@@ -67,10 +102,14 @@ describe('POST /api/auth/signup', () => {
 
   describe('Validation', () => {
     it('requires all fields', async () => {
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        name: 'John Doe',
-        // Missing other required fields
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          name: 'John Doe',
+          // Missing other required fields
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -80,10 +119,14 @@ describe('POST /api/auth/signup', () => {
     });
 
     it('requires name field', async () => {
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-        name: undefined,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+          name: undefined,
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -93,10 +136,14 @@ describe('POST /api/auth/signup', () => {
     });
 
     it('requires emailOrUsername field', async () => {
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-        emailOrUsername: undefined,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+          emailOrUsername: undefined,
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -106,10 +153,14 @@ describe('POST /api/auth/signup', () => {
     });
 
     it('requires password field', async () => {
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-        password: undefined,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+          password: undefined,
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -119,10 +170,14 @@ describe('POST /api/auth/signup', () => {
     });
 
     it('requires familyMasterKey field', async () => {
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-        familyMasterKey: undefined,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+          familyMasterKey: undefined,
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -132,10 +187,14 @@ describe('POST /api/auth/signup', () => {
     });
 
     it('rejects password shorter than 8 characters', async () => {
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-        password: 'short',
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+          password: 'short',
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -145,10 +204,14 @@ describe('POST /api/auth/signup', () => {
     });
 
     it('rejects empty emailOrUsername', async () => {
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-        emailOrUsername: '',
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+          emailOrUsername: '',
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -160,13 +223,19 @@ describe('POST /api/auth/signup', () => {
 
   describe('Duplicate User Prevention', () => {
     it('rejects duplicate emailOrUsername', async () => {
-      const existingUser = createMockUser({ emailOrUsername: 'john@example.com' });
-      prismaMock.user.findUnique.mockResolvedValue(existingUser);
-
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
+      const existingUser = createMockUser({
         emailOrUsername: 'john@example.com',
       });
+      prismaMock.user.findUnique.mockResolvedValue(existingUser);
+
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+          emailOrUsername: 'john@example.com',
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -185,10 +254,14 @@ describe('POST /api/auth/signup', () => {
       );
       mockVerifyPassword.mockResolvedValue(false);
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-        familyMasterKey: 'wrong-key',
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+          familyMasterKey: 'wrong-key',
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -219,16 +292,20 @@ describe('POST /api/auth/signup', () => {
         });
       });
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+        }
+      );
 
       const response = await POST(request);
 
       expect(response.status).toBe(201);
       expect(mockVerifyPassword).toHaveBeenCalledWith(
         validSignupData.familyMasterKey,
-        familySpace.masterKeyHash
+        'env-master-key-hash'
       );
     });
   });
@@ -257,9 +334,13 @@ describe('POST /api/auth/signup', () => {
         });
       });
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+        }
+      );
 
       await POST(request);
 
@@ -267,7 +348,8 @@ describe('POST /api/auth/signup', () => {
       expect(mockUserCreate).toHaveBeenCalledWith({
         data: {
           name: validSignupData.name,
-          emailOrUsername: validSignupData.emailOrUsername,
+          email: validSignupData.emailOrUsername,
+          username: 'johnexamplecom',
           passwordHash: '$2b$10$hashedPassword',
         },
       });
@@ -286,6 +368,7 @@ describe('POST /api/auth/signup', () => {
       prismaMock.familySpace.findFirst.mockResolvedValue(familySpace as any);
       prismaMock.familyMembership.count.mockResolvedValue(1); // Not first user
       mockVerifyPassword.mockResolvedValue(true);
+      mockEnsureFamilySpace.mockResolvedValue(familySpace as any);
 
       const mockUserCreate = jest.fn().mockResolvedValue(newUser);
       const mockMembershipCreate = jest.fn().mockResolvedValue(membership);
@@ -297,9 +380,13 @@ describe('POST /api/auth/signup', () => {
         });
       });
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+        }
+      );
 
       await POST(request);
 
@@ -336,9 +423,13 @@ describe('POST /api/auth/signup', () => {
         });
       });
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -371,9 +462,13 @@ describe('POST /api/auth/signup', () => {
         });
       });
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -407,9 +502,13 @@ describe('POST /api/auth/signup', () => {
         });
       });
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+        }
+      );
 
       await POST(request);
 
@@ -440,10 +539,14 @@ describe('POST /api/auth/signup', () => {
         });
       });
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-        rememberMe: true,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+          rememberMe: true,
+        }
+      );
 
       await POST(request);
 
@@ -472,9 +575,13 @@ describe('POST /api/auth/signup', () => {
         });
       });
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+        }
+      );
 
       const response = await POST(request);
 
@@ -487,7 +594,7 @@ describe('POST /api/auth/signup', () => {
         id: 'new_user_id',
         name: 'John Doe',
         emailOrUsername: 'john@example.com',
-        avatarUrl: null,
+        avatarStorageKey: null,
       });
       const membership = createMockFamilyMembership({
         userId: newUser.id,
@@ -507,9 +614,15 @@ describe('POST /api/auth/signup', () => {
         });
       });
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-      });
+      mockGetSignedUploadUrl.mockResolvedValueOnce(null);
+
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -517,8 +630,10 @@ describe('POST /api/auth/signup', () => {
       expect(data.user).toEqual({
         id: newUser.id,
         name: newUser.name,
-        emailOrUsername: newUser.emailOrUsername,
-        avatarUrl: newUser.avatarUrl,
+        email: newUser.email,
+        username: newUser.username,
+        emailOrUsername: newUser.email,
+        avatarUrl: null,
         role: membership.role,
         familySpaceId: membership.familySpaceId,
       });
@@ -542,9 +657,13 @@ describe('POST /api/auth/signup', () => {
         });
       });
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+        }
+      );
 
       const response = await POST(request);
 
@@ -559,9 +678,13 @@ describe('POST /api/auth/signup', () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
       prismaMock.familySpace.findFirst.mockResolvedValue(null);
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);
@@ -571,11 +694,17 @@ describe('POST /api/auth/signup', () => {
     });
 
     it('returns 500 on database error', async () => {
-      prismaMock.user.findUnique.mockRejectedValue(new Error('Database connection failed'));
+      prismaMock.user.findUnique.mockRejectedValue(
+        new Error('Database connection failed')
+      );
 
-      const request = createUnauthenticatedRequest('POST', 'http://localhost/api/auth/signup', {
-        ...validSignupData,
-      });
+      const request = createUnauthenticatedRequest(
+        'POST',
+        'http://localhost/api/auth/signup',
+        {
+          ...validSignupData,
+        }
+      );
 
       const response = await POST(request);
       const data = await parseResponseJSON(response);

@@ -72,4 +72,43 @@ module "cloud_run_infra" {
   wif_provider_id             = var.wif_provider_id
   github_repository           = var.github_repository
   github_ref                  = var.github_ref
+
+  # Recipe Importer integration (use variables to avoid circular dependency)
+  recipe_importer_url                   = var.recipe_importer_url
+  recipe_importer_service_account_email = var.recipe_importer_service_account_email
+}
+
+module "cloud_run_importer" {
+  source = "../../modules/cloud_run_importer"
+
+  project_id                    = var.project_id
+  region                        = var.region
+  service_name                  = var.importer_service_name
+  artifact_registry_repo_id     = var.importer_artifact_registry_repo_id
+  runtime_service_account_email = module.cloud_run_infra.runtime_service_account_email
+  invoker_members               = ["serviceAccount:${module.cloud_run_infra.runtime_service_account_email}"]
+  min_instance_count            = var.importer_min_instance_count
+  max_instance_count            = var.importer_max_instance_count
+  max_html_bytes                = var.importer_max_html_bytes
+  enable_headless               = var.importer_enable_headless
+
+  depends_on = [module.cloud_run_infra]
+}
+
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  project_id              = var.project_id
+  region                  = var.region
+  cloud_run_service_name  = var.cloud_run_service_name
+  cloud_run_service_uri   = module.cloud_run_infra.cloud_run_service_uri
+  cloud_sql_instance_name = var.db_instance_name
+  notification_email      = var.alert_notification_email
+  environment             = "prod"
+
+  # Optional: override default thresholds
+  uptime_check_period        = "300s" # 5 minutes for prod
+  uptime_check_authenticated = false  # Prod allows unauthenticated
+
+  depends_on = [module.cloud_run_infra]
 }

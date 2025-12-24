@@ -6,7 +6,13 @@ import { signToken } from '@/lib/jwt';
 import { setSessionCookie } from '@/lib/session';
 import { logError, logInfo, logWarn } from '@/lib/logger';
 import { loginLimiter, applyRateLimit } from '@/lib/rateLimit';
-import { parseRequestBody, invalidCredentialsError, forbiddenError, internalError } from '@/lib/apiErrors';
+import {
+  parseRequestBody,
+  invalidCredentialsError,
+  forbiddenError,
+  internalError,
+} from '@/lib/apiErrors';
+import { getSignedUploadUrl } from '@/lib/uploads';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,16 +28,19 @@ export async function POST(request: NextRequest) {
     // Validate input
     const body = await request.json();
     const bodyValidation = parseRequestBody(body, loginSchema);
-    
+
     if (!bodyValidation.success) {
       return bodyValidation.error;
     }
 
     const { emailOrUsername, password, rememberMe } = bodyValidation.data;
+    const identifier = emailOrUsername.trim();
 
     // Find user
-    const user = await prisma.user.findUnique({
-      where: { emailOrUsername },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: identifier }, { username: identifier }],
+      },
       include: {
         memberships: {
           include: {
@@ -42,7 +51,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
-      logWarn('auth.login.invalid_credentials', { emailOrUsername, reason: 'user_not_found' });
+      logWarn('auth.login.invalid_credentials', {
+        emailOrUsername: identifier,
+        reason: 'user_not_found',
+      });
       return invalidCredentialsError();
     }
 
@@ -50,13 +62,19 @@ export async function POST(request: NextRequest) {
     const isValidPassword = await verifyPassword(password, user.passwordHash);
 
     if (!isValidPassword) {
-      logWarn('auth.login.invalid_credentials', { emailOrUsername, reason: 'bad_password' });
+      logWarn('auth.login.invalid_credentials', {
+        emailOrUsername: identifier,
+        reason: 'bad_password',
+      });
       return invalidCredentialsError();
     }
 
     // Check if user has a family membership
     if (user.memberships.length === 0) {
-      logWarn('auth.login.no_membership', { emailOrUsername, userId: user.id });
+      logWarn('auth.login.no_membership', {
+        emailOrUsername: identifier,
+        userId: user.id,
+      });
       return forbiddenError('User is not a member of any family space');
     }
 
@@ -76,17 +94,22 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       familySpaceId: membership.familySpaceId,
       role: membership.role,
-      emailOrUsername: user.emailOrUsername,
+      email: user.email,
+      username: user.username,
     });
 
     // Create response with session cookie
+    const avatarUrl = await getSignedUploadUrl(user.avatarStorageKey);
+
     const response = NextResponse.json(
       {
         user: {
           id: user.id,
           name: user.name,
-          emailOrUsername: user.emailOrUsername,
-          avatarUrl: user.avatarUrl,
+          email: user.email,
+          username: user.username,
+          emailOrUsername: user.email, // backward compatibility
+          avatarUrl,
           role: membership.role,
           familySpaceId: membership.familySpaceId,
           familySpaceName: membership.familySpace.name,

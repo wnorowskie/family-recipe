@@ -28,9 +28,20 @@ jest.mock('@/lib/rateLimit', () => ({
   applyRateLimit: jest.fn(() => null),
 }));
 
-import { getCurrentUser } from '@/lib/session';
+jest.mock('@/lib/notifications', () => ({
+  upsertReactionNotification: jest.fn(),
+}));
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
+import { getCurrentUser } from '@/lib/session';
+import { upsertReactionNotification } from '@/lib/notifications';
+
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
+>;
+const mockUpsertReactionNotification =
+  upsertReactionNotification as jest.MockedFunction<
+    typeof upsertReactionNotification
+  >;
 
 // Helper to parse response JSON
 const parseResponseJSON = async (response: Response) => {
@@ -41,6 +52,8 @@ const parseResponseJSON = async (response: Response) => {
 describe('POST /api/reactions', () => {
   const mockUser = {
     id: 'user_123',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     name: 'Test User',
     familySpaceId: 'family_123',
@@ -52,6 +65,7 @@ describe('POST /api/reactions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetCurrentUser.mockResolvedValue(mockUser);
+    mockUpsertReactionNotification.mockResolvedValue(undefined);
   });
 
   describe('Authentication', () => {
@@ -142,7 +156,9 @@ describe('POST /api/reactions', () => {
     });
 
     it('accepts valid targetType: post', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       prismaMock.reaction.findFirst.mockResolvedValue(null);
       prismaMock.reaction.create.mockResolvedValue({
         id: 'reaction_1',
@@ -169,7 +185,9 @@ describe('POST /api/reactions', () => {
     });
 
     it('accepts valid targetType: comment', async () => {
-      prismaMock.comment.findFirst.mockResolvedValue({ id: 'clh0000000000000000000101' } as any);
+      prismaMock.comment.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000101',
+      } as any);
       prismaMock.reaction.findFirst.mockResolvedValue(null);
       prismaMock.reaction.create.mockResolvedValue({
         id: 'reaction_1',
@@ -238,7 +256,7 @@ describe('POST /api/reactions', () => {
           id: 'clh0000000000000000000002',
           familySpaceId: 'family_123',
         },
-        select: { id: true },
+        select: { id: true, authorId: true, familySpaceId: true },
       });
       expect(prismaMock.reaction.create).not.toHaveBeenCalled();
     });
@@ -292,7 +310,11 @@ describe('POST /api/reactions', () => {
 
   describe('Success Cases - Create Reaction', () => {
     it('creates reaction for post', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+        authorId: 'author_123',
+        familySpaceId: 'family_123',
+      } as any);
       prismaMock.reaction.findFirst.mockResolvedValue(null);
       prismaMock.reaction.create.mockResolvedValue({
         id: 'reaction_1',
@@ -330,6 +352,12 @@ describe('POST /api/reactions', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
+      expect(mockUpsertReactionNotification).toHaveBeenCalledWith({
+        familySpaceId: 'family_123',
+        postId: 'clh0000000000000000000001',
+        recipientId: 'author_123',
+        actorId: 'user_123',
+      });
       const data = await parseResponseJSON(response);
       expect(data.reactions).toHaveLength(1);
       expect(data.reactions[0]).toEqual({
@@ -354,7 +382,9 @@ describe('POST /api/reactions', () => {
     });
 
     it('creates reaction for comment', async () => {
-      prismaMock.comment.findFirst.mockResolvedValue({ id: 'clh0000000000000000000101' } as any);
+      prismaMock.comment.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000101',
+      } as any);
       prismaMock.reaction.findFirst.mockResolvedValue(null);
       prismaMock.reaction.create.mockResolvedValue({
         id: 'reaction_1',
@@ -406,7 +436,9 @@ describe('POST /api/reactions', () => {
     });
 
     it('returns reaction summary with multiple reactions', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       prismaMock.reaction.findFirst.mockResolvedValue(null);
       prismaMock.reaction.create.mockResolvedValue({} as any);
       prismaMock.reaction.findMany.mockResolvedValue([
@@ -444,11 +476,11 @@ describe('POST /api/reactions', () => {
       expect(response.status).toBe(200);
       const data = await parseResponseJSON(response);
       expect(data.reactions).toHaveLength(2);
-      
+
       const thumbsUp = data.reactions.find((r: any) => r.emoji === '👍');
       expect(thumbsUp.count).toBe(2);
       expect(thumbsUp.users).toHaveLength(2);
-      
+
       const heart = data.reactions.find((r: any) => r.emoji === '❤️');
       expect(heart.count).toBe(1);
       expect(heart.users).toHaveLength(1);
@@ -457,7 +489,9 @@ describe('POST /api/reactions', () => {
 
   describe('Success Cases - Toggle Reaction (Remove)', () => {
     it('removes existing reaction when toggled', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       prismaMock.reaction.findFirst.mockResolvedValue({
         id: 'reaction_existing',
         targetType: 'post',
@@ -490,7 +524,9 @@ describe('POST /api/reactions', () => {
     });
 
     it('removes reaction and returns updated summary', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       prismaMock.reaction.findFirst.mockResolvedValue({
         id: 'reaction_user123',
         targetType: 'post',
@@ -529,7 +565,9 @@ describe('POST /api/reactions', () => {
     });
 
     it('user can toggle reaction multiple times', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
 
       // First toggle - add reaction
       prismaMock.reaction.findFirst.mockResolvedValueOnce(null);
@@ -603,7 +641,9 @@ describe('POST /api/reactions', () => {
     });
 
     it('handles errors during reaction creation', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       prismaMock.reaction.findFirst.mockResolvedValue(null);
       prismaMock.reaction.create.mockRejectedValue(new Error('Create error'));
 
@@ -624,7 +664,9 @@ describe('POST /api/reactions', () => {
     });
 
     it('handles errors during reaction deletion', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       prismaMock.reaction.findFirst.mockResolvedValue({
         id: 'reaction_existing',
         emoji: '👍',
@@ -648,10 +690,14 @@ describe('POST /api/reactions', () => {
     });
 
     it('handles errors during summary building', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'clh0000000000000000000001' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'clh0000000000000000000001',
+      } as any);
       prismaMock.reaction.findFirst.mockResolvedValue(null);
       prismaMock.reaction.create.mockResolvedValue({} as any);
-      prismaMock.reaction.findMany.mockRejectedValue(new Error('Summary error'));
+      prismaMock.reaction.findMany.mockRejectedValue(
+        new Error('Summary error')
+      );
 
       const request = new NextRequest('http://localhost/api/reactions', {
         method: 'POST',

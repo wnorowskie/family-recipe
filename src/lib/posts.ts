@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { createSignedUrlResolver } from '@/lib/uploads';
 import {
   ingredientUnitEnum,
   courseEnum,
@@ -22,11 +23,9 @@ function parseJsonArray(value: string | null): unknown[] {
   }
 }
 
-function parseRecipeIngredients(
-  value: string | null
-): RecipeIngredientInput[] {
+function parseRecipeIngredients(value: string | null): RecipeIngredientInput[] {
   const results: RecipeIngredientInput[] = [];
-  
+
   for (const entry of parseJsonArray(value)) {
     if (!entry || typeof entry !== 'object') {
       continue;
@@ -38,7 +37,9 @@ function parseRecipeIngredients(
       continue;
     }
 
-    if (!INGREDIENT_UNITS.has(unit as typeof ingredientUnitEnum.options[number])) {
+    if (
+      !INGREDIENT_UNITS.has(unit as (typeof ingredientUnitEnum.options)[number])
+    ) {
       continue;
     }
 
@@ -55,7 +56,7 @@ function parseRecipeIngredients(
       quantity: parsedQuantity,
     });
   }
-  
+
   return results;
 }
 
@@ -82,14 +83,19 @@ function parseCourseList(
   fallback?: string | null
 ): string[] {
   const parsed = parseJsonArray(value).filter(
-    (entry): entry is string => typeof entry === 'string' && COURSE_VALUES.has(entry as typeof courseEnum.options[number])
+    (entry): entry is string =>
+      typeof entry === 'string' &&
+      COURSE_VALUES.has(entry as (typeof courseEnum.options)[number])
   );
 
   if (parsed.length > 0) {
     return Array.from(new Set(parsed));
   }
 
-  if (fallback && COURSE_VALUES.has(fallback as typeof courseEnum.options[number])) {
+  if (
+    fallback &&
+    COURSE_VALUES.has(fallback as (typeof courseEnum.options)[number])
+  ) {
     return [fallback];
   }
 
@@ -154,18 +160,16 @@ export interface PostDetailData {
     id: string;
     url: string;
   }>;
-  recipe:
-    | {
-        origin: string | null;
-        ingredients: RecipeIngredientInput[];
-        steps: RecipeStepInput[];
-        totalTime: number | null;
-        servings: number | null;
-        courses: string[];
-        primaryCourse: string | null;
-        difficulty: string | null;
-      }
-    | null;
+  recipe: {
+    origin: string | null;
+    ingredients: RecipeIngredientInput[];
+    steps: RecipeStepInput[];
+    totalTime: number | null;
+    servings: number | null;
+    courses: string[];
+    primaryCourse: string | null;
+    difficulty: string | null;
+  } | null;
   tags: string[];
   reactionSummary: Array<{
     emoji: string;
@@ -242,7 +246,7 @@ export async function getPostDetail(
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
       editor: {
@@ -255,7 +259,7 @@ export async function getPostDetail(
         orderBy: { sortOrder: 'asc' },
         select: {
           id: true,
-          url: true,
+          storageKey: true,
         },
       },
       recipeDetails: true,
@@ -270,6 +274,19 @@ export async function getPostDetail(
   if (!post) {
     return null;
   }
+
+  const resolveUrl = createSignedUrlResolver();
+
+  const [mainPhotoUrl, authorAvatarUrl, photoEntries] = await Promise.all([
+    resolveUrl(post.mainPhotoStorageKey),
+    resolveUrl(post.author.avatarStorageKey),
+    Promise.all(
+      post.photos.map(async (photo: any) => ({
+        id: photo.id,
+        url: (await resolveUrl(photo.storageKey)) ?? '',
+      }))
+    ),
+  ]);
 
   let isFavorited = false;
 
@@ -286,73 +303,82 @@ export async function getPostDetail(
     isFavorited = Boolean(favorite);
   }
 
-  const [commentPage, cookedPage, postReactions, cookedAggregate] = await Promise.all([
-    getPostCommentsPage({
-      postId,
-      familySpaceId,
-      limit: options.commentLimit ?? COMMENT_DEFAULT_LIMIT,
-      offset: options.commentOffset ?? 0,
-    }),
-    getPostCookedEventsPage({
-      postId,
-      familySpaceId,
-      limit: options.cookedLimit ?? COOKED_DEFAULT_LIMIT,
-      offset: options.cookedOffset ?? 0,
-    }),
-    prisma.reaction.findMany({
-      where: {
-        targetType: 'post',
-        targetId: postId,
-      },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
+  const [commentPage, cookedPage, postReactions, cookedAggregate] =
+    await Promise.all([
+      getPostCommentsPage({
+        postId,
+        familySpaceId,
+        limit: options.commentLimit ?? COMMENT_DEFAULT_LIMIT,
+        offset: options.commentOffset ?? 0,
+      }),
+      getPostCookedEventsPage({
+        postId,
+        familySpaceId,
+        limit: options.cookedLimit ?? COOKED_DEFAULT_LIMIT,
+        offset: options.cookedOffset ?? 0,
+      }),
+      prisma.reaction.findMany({
+        where: {
+          targetType: 'post',
+          targetId: postId,
+        },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              avatarStorageKey: true,
+            },
           },
         },
-      },
-    }),
-    prisma.cookedEvent.aggregate({
-      where: {
-        postId,
-      },
-      _count: {
-        _all: true,
-      },
-      _avg: {
-        rating: true,
-      },
-    }),
-  ]);
+      }),
+      prisma.cookedEvent.aggregate({
+        where: {
+          postId,
+        },
+        _count: {
+          _all: true,
+        },
+        _avg: {
+          rating: true,
+        },
+      }),
+    ]);
 
-  const reactionSummaryMap = postReactions.reduce<Map<string, { count: number; users: ReactionUserSummary[] }>>(
-    (acc, reaction) => {
-      const entry = acc.get(reaction.emoji) ?? { count: 0, users: [] };
-      entry.count += 1;
-      entry.users.push({
+  const reactionsWithAvatars = await Promise.all(
+    postReactions.map(async (reaction: any) => ({
+      emoji: reaction.emoji,
+      user: {
         id: reaction.user.id,
         name: reaction.user.name,
-        avatarUrl: reaction.user.avatarUrl,
-      });
-      acc.set(reaction.emoji, entry);
-      return acc;
-    },
-    new Map()
+        avatarUrl: await resolveUrl(reaction.user.avatarStorageKey),
+      },
+    }))
   );
+
+  const reactionSummaryMap = reactionsWithAvatars.reduce<
+    Map<string, { count: number; users: ReactionUserSummary[] }>
+  >((acc: any, reaction: any) => {
+    const entry = acc.get(reaction.emoji) ?? { count: 0, users: [] };
+    entry.count += 1;
+    entry.users.push(reaction.user);
+    acc.set(reaction.emoji, entry);
+    return acc;
+  }, new Map());
 
   const cookedStats = {
     timesCooked: cookedAggregate._count._all,
     averageRating: cookedAggregate._avg.rating,
   };
 
-  const reactionSummary = Array.from(reactionSummaryMap.entries()).map(([emoji, data]) => ({
-    emoji,
-    count: data.count,
-    users: data.users,
-  }));
+  const reactionSummary = Array.from(reactionSummaryMap.entries()).map(
+    ([emoji, data]: any) => ({
+      emoji,
+      count: data.count,
+      users: data.users,
+    })
+  );
 
   return {
     id: post.id,
@@ -360,12 +386,12 @@ export async function getPostDetail(
     caption: post.caption ?? null,
     createdAt: post.createdAt.toISOString(),
     updatedAt: post.updatedAt.toISOString(),
-    mainPhotoUrl: post.mainPhotoUrl ?? null,
+    mainPhotoUrl: mainPhotoUrl,
     isFavorited,
     author: {
       id: post.author.id,
       name: post.author.name,
-      avatarUrl: post.author.avatarUrl,
+      avatarUrl: authorAvatarUrl,
     },
     editor: post.editor
       ? {
@@ -375,10 +401,7 @@ export async function getPostDetail(
       : null,
     lastEditNote: post.lastEditNote ?? null,
     lastEditAt: post.lastEditAt ? post.lastEditAt.toISOString() : null,
-    photos: post.photos.map((photo) => ({
-      id: photo.id,
-      url: photo.url,
-    })),
+    photos: photoEntries,
     recipe: post.recipeDetails
       ? {
           origin: post.recipeDetails.origin ?? null,
@@ -386,12 +409,15 @@ export async function getPostDetail(
           steps: parseRecipeSteps(post.recipeDetails.steps),
           totalTime: post.recipeDetails.totalTime ?? null,
           servings: post.recipeDetails.servings ?? null,
-          courses: parseCourseList(post.recipeDetails.courses, post.recipeDetails.course),
+          courses: parseCourseList(
+            post.recipeDetails.courses,
+            post.recipeDetails.course
+          ),
           primaryCourse: post.recipeDetails.course ?? null,
           difficulty: post.recipeDetails.difficulty ?? null,
         }
       : null,
-    tags: post.tags.map((entry) => entry.tag.name),
+    tags: post.tags.map((entry: any) => entry.tag.name),
     reactionSummary,
     cookedStats,
     comments: commentPage.comments,
@@ -410,12 +436,12 @@ export async function getPostDetail(
 interface RawCommentRecord {
   id: string;
   text: string;
-  photoUrl: string | null;
+  photoStorageKey: string | null;
   createdAt: Date;
   author: {
     id: string;
     name: string;
-    avatarUrl: string | null;
+    avatarStorageKey: string | null;
   };
 }
 
@@ -442,18 +468,19 @@ export async function getPostCommentsPage(
       },
       deletedAt: null,
     },
-    orderBy: [
-      { createdAt: 'desc' },
-      { id: 'desc' },
-    ],
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     skip: offset,
     take: limit + 1,
-    include: {
+    select: {
+      id: true,
+      text: true,
+      photoStorageKey: true,
+      createdAt: true,
       author: {
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
     },
@@ -462,7 +489,11 @@ export async function getPostCommentsPage(
   const hasMore = records.length > limit;
   const pageRecords = hasMore ? records.slice(0, limit) : records;
   const chronologicalRecords = [...pageRecords].reverse();
-  const comments = await attachReactionsToComments(chronologicalRecords);
+  const resolveUrl = createSignedUrlResolver();
+  const comments = await attachReactionsToComments(
+    chronologicalRecords,
+    resolveUrl
+  );
 
   return {
     comments,
@@ -472,7 +503,8 @@ export async function getPostCommentsPage(
 }
 
 async function attachReactionsToComments(
-  records: RawCommentRecord[]
+  records: RawCommentRecord[],
+  resolveUrl: ReturnType<typeof createSignedUrlResolver>
 ): Promise<PostDetailComment[]> {
   if (records.length === 0) {
     return [];
@@ -494,46 +526,57 @@ async function attachReactionsToComments(
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
     },
   });
 
-  const reactionMap = reactions.reduce<Record<string, PostDetailComment['reactions']>>(
-    (acc, reaction) => {
-      const list = acc[reaction.targetId] ?? [];
-      let entry = list.find((item) => item.emoji === reaction.emoji);
-
-      if (!entry) {
-        entry = { emoji: reaction.emoji, count: 0, users: [] };
-        list.push(entry);
-        acc[reaction.targetId] = list;
-      }
-
-      entry.count += 1;
-      entry.users.push({
+  const reactionsWithAvatars = await Promise.all(
+    reactions.map(async (reaction: any) => ({
+      targetId: reaction.targetId,
+      emoji: reaction.emoji,
+      user: {
         id: reaction.user.id,
         name: reaction.user.name,
-        avatarUrl: reaction.user.avatarUrl,
-      });
-      return acc;
-    },
-    {}
+        avatarUrl: await resolveUrl(reaction.user.avatarStorageKey),
+      },
+    }))
   );
 
-  return records.map((record) => ({
-    id: record.id,
-    text: record.text,
-    photoUrl: record.photoUrl,
-    createdAt: record.createdAt.toISOString(),
-    author: {
-      id: record.author.id,
-      name: record.author.name,
-      avatarUrl: record.author.avatarUrl,
-    },
-    reactions: reactionMap[record.id] ?? [],
-  }));
+  const reactionMap = reactionsWithAvatars.reduce<
+    Record<string, PostDetailComment['reactions']>
+  >((acc: any, reaction: any) => {
+    const list = acc[reaction.targetId] ?? [];
+    let entry = list.find((item: any) => item.emoji === reaction.emoji);
+
+    if (!entry) {
+      entry = { emoji: reaction.emoji, count: 0, users: [] };
+      list.push(entry);
+      acc[reaction.targetId] = list;
+    }
+
+    entry.count += 1;
+    entry.users.push(reaction.user);
+    return acc;
+  }, {});
+
+  const commentPayloads = await Promise.all(
+    records.map(async (record: any) => ({
+      id: record.id,
+      text: record.text,
+      photoUrl: await resolveUrl(record.photoStorageKey),
+      createdAt: record.createdAt.toISOString(),
+      author: {
+        id: record.author.id,
+        name: record.author.name,
+        avatarUrl: await resolveUrl(record.author.avatarStorageKey),
+      },
+      reactions: reactionMap[record.id] ?? [],
+    }))
+  );
+
+  return commentPayloads;
 }
 
 function clampCookedLimit(limit?: number): number {
@@ -558,10 +601,7 @@ export async function getPostCookedEventsPage(
         familySpaceId: options.familySpaceId,
       },
     },
-    orderBy: [
-      { createdAt: 'desc' },
-      { id: 'desc' },
-    ],
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     skip: offset,
     take: limit + 1,
     include: {
@@ -569,7 +609,7 @@ export async function getPostCookedEventsPage(
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
     },
@@ -578,17 +618,20 @@ export async function getPostCookedEventsPage(
   const hasMore = records.length > limit;
   const pageRecords = hasMore ? records.slice(0, limit) : records;
 
-  const entries: PostCookedEntry[] = pageRecords.map((record) => ({
-    id: record.id,
-    rating: record.rating,
-    note: record.note,
-    createdAt: record.createdAt.toISOString(),
-    user: {
-      id: record.user.id,
-      name: record.user.name,
-      avatarUrl: record.user.avatarUrl,
-    },
-  }));
+  const resolveUrl = createSignedUrlResolver();
+  const entries: PostCookedEntry[] = await Promise.all(
+    pageRecords.map(async (record: any) => ({
+      id: record.id,
+      rating: record.rating,
+      note: record.note,
+      createdAt: record.createdAt.toISOString(),
+      user: {
+        id: record.user.id,
+        name: record.user.name,
+        avatarUrl: await resolveUrl(record.user.avatarStorageKey),
+      },
+    }))
+  );
 
   return {
     entries,

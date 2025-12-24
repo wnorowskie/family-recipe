@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createCommentSchema, postIdParamSchema } from '@/lib/validation';
-import { savePhotoFile } from '@/lib/uploads';
+import { getSignedUploadUrl, savePhotoFile } from '@/lib/uploads';
 import { getPostCommentsPage } from '@/lib/posts';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { commentLimiter, applyRateLimit } from '@/lib/rateLimit';
+import { createCommentNotification } from '@/lib/notifications';
 import {
   parseRouteParams,
   badRequestError,
@@ -27,7 +28,7 @@ export const GET = withAuth(
           id: postId,
           familySpaceId: user.familySpaceId,
         },
-        select: { id: true },
+        select: { id: true, authorId: true },
       });
 
       if (!post) {
@@ -99,7 +100,7 @@ export const POST = withAuth(
           id: postId,
           familySpaceId: user.familySpaceId,
         },
-        select: { id: true },
+        select: { id: true, authorId: true },
       });
 
       if (!post) {
@@ -124,7 +125,7 @@ export const POST = withAuth(
       }
 
       const photoFile = formData.get('photo');
-      let photoUrl: string | null = null;
+      let photoStorageKey: string | null = null;
 
       const isFormDataFile = (entry: unknown): entry is File => {
         if (typeof File !== 'undefined' && entry instanceof File)
@@ -140,7 +141,7 @@ export const POST = withAuth(
 
       if (isFormDataFile(photoFile)) {
         const saved = await savePhotoFile(photoFile);
-        photoUrl = saved.url;
+        photoStorageKey = saved.storageKey;
       }
 
       const comment = await prisma.comment.create({
@@ -148,27 +149,47 @@ export const POST = withAuth(
           postId,
           authorId: user.id,
           text: payloadResult.data.text,
-          photoUrl,
+          photoStorageKey,
         },
         include: {
           author: {
             select: {
               id: true,
               name: true,
-              avatarUrl: true,
+              avatarStorageKey: true,
             },
           },
         },
       });
+
+      const [photoUrl, authorAvatarUrl] = await Promise.all([
+        getSignedUploadUrl(comment.photoStorageKey),
+        getSignedUploadUrl(comment.author.avatarStorageKey),
+      ]);
+
+      if (post.authorId) {
+        await createCommentNotification({
+          familySpaceId: user.familySpaceId,
+          postId,
+          recipientId: post.authorId,
+          actorId: user.id,
+          commentId: comment.id,
+          commentText: payloadResult.data.text,
+        });
+      }
 
       return NextResponse.json(
         {
           comment: {
             id: comment.id,
             text: comment.text,
-            photoUrl: comment.photoUrl,
+            photoUrl,
             createdAt: comment.createdAt.toISOString(),
-            author: comment.author,
+            author: {
+              id: comment.author.id,
+              name: comment.author.name,
+              avatarUrl: authorAvatarUrl,
+            },
             reactions: [],
           },
         },

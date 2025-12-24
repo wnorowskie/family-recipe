@@ -22,6 +22,8 @@ import {
   updateProfileSchema,
   changePasswordSchema,
   recipeDetailsSchema,
+  resetPasswordSchema,
+  deleteAccountSchema,
 } from '@/lib/validation';
 
 describe('Validation Schemas', () => {
@@ -87,7 +89,10 @@ describe('Validation Schemas', () => {
     });
 
     it('should reject non-numeric values', () => {
-      const result = paginationSchema.safeParse({ limit: 'abc', offset: 'xyz' });
+      const result = paginationSchema.safeParse({
+        limit: 'abc',
+        offset: 'xyz',
+      });
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.issues.length).toBeGreaterThan(0);
@@ -274,7 +279,9 @@ describe('Validation Schemas', () => {
       });
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toContain('Maximum 5 ingredients');
+        expect(result.error.issues[0].message).toContain(
+          'Maximum 5 ingredients'
+        );
       }
     });
 
@@ -386,7 +393,9 @@ describe('Validation Schemas', () => {
         });
         expect(result.success).toBe(false);
         if (!result.success) {
-          expect(result.error.issues[0].message).toContain('Invalid comment ID');
+          expect(result.error.issues[0].message).toContain(
+            'Invalid comment ID'
+          );
         }
       });
     });
@@ -540,7 +549,9 @@ describe('Validation Schemas', () => {
         });
         expect(result.success).toBe(false);
         if (!result.success) {
-          expect(result.error.issues[0].message).toContain('At least one ingredient');
+          expect(result.error.issues[0].message).toContain(
+            'At least one ingredient'
+          );
         }
       });
 
@@ -787,7 +798,9 @@ describe('Validation Schemas', () => {
       const result = cookedEventSchema.safeParse({ rating: 6 });
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toContain('cannot be more than 5');
+        expect(result.error.issues[0].message).toContain(
+          'cannot be more than 5'
+        );
       }
     });
 
@@ -851,7 +864,8 @@ describe('Validation Schemas', () => {
       it('should accept valid signup data', () => {
         const result = signupSchema.safeParse({
           name: 'John Doe',
-          emailOrUsername: 'john@example.com',
+          email: 'john@example.com',
+          username: 'johnny',
           password: 'password123',
           familyMasterKey: 'secret-key',
         });
@@ -860,7 +874,8 @@ describe('Validation Schemas', () => {
 
       it('should require name', () => {
         const result = signupSchema.safeParse({
-          emailOrUsername: 'john@example.com',
+          email: 'john@example.com',
+          username: 'johnny',
           password: 'password123',
           familyMasterKey: 'secret-key',
         });
@@ -870,20 +885,44 @@ describe('Validation Schemas', () => {
       it('should require password at least 8 characters', () => {
         const result = signupSchema.safeParse({
           name: 'John Doe',
-          emailOrUsername: 'john@example.com',
+          email: 'john@example.com',
+          username: 'johnny',
           password: 'short',
           familyMasterKey: 'secret-key',
         });
         expect(result.success).toBe(false);
         if (!result.success) {
-          expect(result.error.issues[0].message).toContain('at least 8 characters');
+          expect(result.error.issues[0].message).toContain(
+            'at least 8 characters'
+          );
         }
+      });
+
+      it('should require username', () => {
+        const result = signupSchema.safeParse({
+          name: 'John Doe',
+          email: 'john@example.com',
+          password: 'password123',
+          familyMasterKey: 'secret-key',
+        });
+        expect(result.success).toBe(false);
+      });
+
+      it('should require email', () => {
+        const result = signupSchema.safeParse({
+          name: 'John Doe',
+          username: 'johnny',
+          password: 'password123',
+          familyMasterKey: 'secret-key',
+        });
+        expect(result.success).toBe(false);
       });
 
       it('should require familyMasterKey', () => {
         const result = signupSchema.safeParse({
           name: 'John Doe',
-          emailOrUsername: 'john@example.com',
+          email: 'john@example.com',
+          username: 'johnny',
           password: 'password123',
         });
         expect(result.success).toBe(false);
@@ -892,7 +931,8 @@ describe('Validation Schemas', () => {
       it('should default rememberMe to false', () => {
         const result = signupSchema.safeParse({
           name: 'John Doe',
-          emailOrUsername: 'john@example.com',
+          email: 'john@example.com',
+          username: 'johnny',
           password: 'password123',
           familyMasterKey: 'secret-key',
         });
@@ -905,7 +945,8 @@ describe('Validation Schemas', () => {
       it('should accept rememberMe as true', () => {
         const result = signupSchema.safeParse({
           name: 'John Doe',
-          emailOrUsername: 'john@example.com',
+          email: 'john@example.com',
+          username: 'johnny',
           password: 'password123',
           familyMasterKey: 'secret-key',
           rememberMe: true,
@@ -953,12 +994,13 @@ describe('Validation Schemas', () => {
     describe('updateProfileSchema', () => {
       it('should require name', () => {
         const result = updateProfileSchema.safeParse({
-          emailOrUsername: 'john@example.com',
+          email: 'john@example.com',
+          username: 'johnny',
         });
         expect(result.success).toBe(false);
       });
 
-      it('should require emailOrUsername', () => {
+      it('should require email and username', () => {
         const result = updateProfileSchema.safeParse({ name: 'John Doe' });
         expect(result.success).toBe(false);
       });
@@ -966,7 +1008,8 @@ describe('Validation Schemas', () => {
       it('should accept valid profile data', () => {
         const result = updateProfileSchema.safeParse({
           name: 'John Doe',
-          emailOrUsername: 'john@example.com',
+          email: 'john@example.com',
+          username: 'johnny',
         });
         expect(result.success).toBe(true);
       });
@@ -975,16 +1018,36 @@ describe('Validation Schemas', () => {
         const longName = 'a'.repeat(101);
         const result = updateProfileSchema.safeParse({
           name: longName,
-          emailOrUsername: 'john@example.com',
+          email: 'john@example.com',
+          username: 'johnny',
         });
         expect(result.success).toBe(false);
       });
 
-      it('should reject emailOrUsername longer than 100 chars', () => {
-        const longEmail = 'a'.repeat(101);
+      it('should reject email longer than 200 chars', () => {
+        const longEmail = 'a'.repeat(201) + '@example.com';
         const result = updateProfileSchema.safeParse({
           name: 'John Doe',
-          emailOrUsername: longEmail,
+          email: longEmail,
+          username: 'johnny',
+        });
+        expect(result.success).toBe(false);
+      });
+
+      it('should reject username shorter than 3 chars', () => {
+        const result = updateProfileSchema.safeParse({
+          name: 'John Doe',
+          email: 'john@example.com',
+          username: 'ab',
+        });
+        expect(result.success).toBe(false);
+      });
+
+      it('should reject username with invalid characters', () => {
+        const result = updateProfileSchema.safeParse({
+          name: 'John Doe',
+          email: 'john@example.com',
+          username: 'john doe',
         });
         expect(result.success).toBe(false);
       });
@@ -1012,7 +1075,9 @@ describe('Validation Schemas', () => {
         });
         expect(result.success).toBe(false);
         if (!result.success) {
-          expect(result.error.issues[0].message).toContain('at least 8 characters');
+          expect(result.error.issues[0].message).toContain(
+            'at least 8 characters'
+          );
         }
       });
 
@@ -1020,6 +1085,37 @@ describe('Validation Schemas', () => {
         const result = changePasswordSchema.safeParse({
           currentPassword: 'oldpassword123',
           newPassword: 'newpassword123',
+        });
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe('resetPasswordSchema', () => {
+      it('requires all fields', () => {
+        const result = resetPasswordSchema.safeParse({});
+        expect(result.success).toBe(false);
+      });
+
+      it('accepts valid input', () => {
+        const result = resetPasswordSchema.safeParse({
+          email: 'john@example.com',
+          masterKey: 'family-key',
+          newPassword: 'newpassword123',
+        });
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe('deleteAccountSchema', () => {
+      it('requires password and confirmation', () => {
+        const result = deleteAccountSchema.safeParse({});
+        expect(result.success).toBe(false);
+      });
+
+      it('accepts valid payload', () => {
+        const result = deleteAccountSchema.safeParse({
+          currentPassword: 'password123',
+          confirmation: 'DELETE',
         });
         expect(result.success).toBe(true);
       });

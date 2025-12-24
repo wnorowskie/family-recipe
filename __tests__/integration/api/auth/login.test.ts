@@ -3,12 +3,14 @@ import { POST } from '@/app/api/auth/login/route';
 import { prisma } from '@/lib/prisma';
 import * as auth from '@/lib/auth';
 import * as jwt from '@/lib/jwt';
+import { getSignedUploadUrl } from '@/lib/uploads';
 
 // Mock Prisma
 jest.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
   },
 }));
@@ -23,23 +25,34 @@ jest.mock('@/lib/jwt', () => ({
   signToken: jest.fn(),
 }));
 
-const mockPrismaFindUnique = prisma.user.findUnique as jest.MockedFunction<
-  typeof prisma.user.findUnique
+jest.mock('@/lib/uploads', () => ({
+  getSignedUploadUrl: jest.fn(),
+}));
+
+const mockPrismaFindFirst = prisma.user.findFirst as jest.MockedFunction<
+  typeof prisma.user.findFirst
 >;
 
 const mockVerifyPassword = auth.verifyPassword as jest.MockedFunction<
   typeof auth.verifyPassword
 >;
 
-const mockSignToken = jwt.signToken as jest.MockedFunction<typeof jwt.signToken>;
+const mockSignToken = jwt.signToken as jest.MockedFunction<
+  typeof jwt.signToken
+>;
+const mockGetSignedUploadUrl = getSignedUploadUrl as jest.MockedFunction<
+  typeof getSignedUploadUrl
+>;
 
 describe('POST /api/auth/login', () => {
   const mockUser = {
     id: 'clq1234567890abcdef',
     name: 'Test User',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     passwordHash: '$2a$10$hashedpassword',
-    avatarUrl: 'https://example.com/avatar.jpg',
+    avatarStorageKey: 'avatars/mock-user.jpg',
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
     memberships: [
@@ -61,6 +74,10 @@ describe('POST /api/auth/login', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetSignedUploadUrl.mockReset();
+    mockGetSignedUploadUrl.mockResolvedValue(
+      'https://signed.example/avatar.jpg'
+    );
   });
 
   async function parseResponseJSON(response: Response) {
@@ -136,7 +153,7 @@ describe('POST /api/auth/login', () => {
 
   describe('Authentication - User Not Found', () => {
     it('returns 401 for non-existent user', async () => {
-      mockPrismaFindUnique.mockResolvedValue(null);
+      mockPrismaFindFirst.mockResolvedValue(null);
 
       const request = new NextRequest('http://localhost/api/auth/login', {
         method: 'POST',
@@ -152,8 +169,13 @@ describe('POST /api/auth/login', () => {
       expect(response.status).toBe(401);
       expect(data.error.code).toBe('INVALID_CREDENTIALS');
       expect(data.error.message).toBe('Invalid credentials');
-      expect(mockPrismaFindUnique).toHaveBeenCalledWith({
-        where: { emailOrUsername: 'nonexistent@example.com' },
+      expect(mockPrismaFindFirst).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { email: 'nonexistent@example.com' },
+            { username: 'nonexistent@example.com' },
+          ],
+        },
         include: {
           memberships: {
             include: {
@@ -167,7 +189,7 @@ describe('POST /api/auth/login', () => {
 
   describe('Authentication - Invalid Password', () => {
     it('returns 401 for incorrect password', async () => {
-      mockPrismaFindUnique.mockResolvedValue(mockUser);
+      mockPrismaFindFirst.mockResolvedValue(mockUser as any);
       mockVerifyPassword.mockResolvedValue(false);
 
       const request = new NextRequest('http://localhost/api/auth/login', {
@@ -184,7 +206,10 @@ describe('POST /api/auth/login', () => {
       expect(response.status).toBe(401);
       expect(data.error.code).toBe('INVALID_CREDENTIALS');
       expect(data.error.message).toBe('Invalid credentials');
-      expect(mockVerifyPassword).toHaveBeenCalledWith('wrongpassword', mockUser.passwordHash);
+      expect(mockVerifyPassword).toHaveBeenCalledWith(
+        'wrongpassword',
+        mockUser.passwordHash
+      );
     });
   });
 
@@ -193,9 +218,11 @@ describe('POST /api/auth/login', () => {
       const userWithoutMembership = {
         ...mockUser,
         memberships: [],
+        email: 'test@example.com',
+        username: 'testuser',
       };
 
-      mockPrismaFindUnique.mockResolvedValue(userWithoutMembership);
+      mockPrismaFindFirst.mockResolvedValue(userWithoutMembership as any);
       mockVerifyPassword.mockResolvedValue(true);
 
       const request = new NextRequest('http://localhost/api/auth/login', {
@@ -211,13 +238,15 @@ describe('POST /api/auth/login', () => {
 
       expect(response.status).toBe(403);
       expect(data.error.code).toBe('FORBIDDEN');
-      expect(data.error.message).toBe('User is not a member of any family space');
+      expect(data.error.message).toBe(
+        'User is not a member of any family space'
+      );
     });
   });
 
   describe('Success Cases', () => {
     it('authenticates user with correct credentials', async () => {
-      mockPrismaFindUnique.mockResolvedValue(mockUser);
+      mockPrismaFindFirst.mockResolvedValue(mockUser as any);
       mockVerifyPassword.mockResolvedValue(true);
       mockSignToken.mockResolvedValue('mock-jwt-token-12345');
 
@@ -236,12 +265,17 @@ describe('POST /api/auth/login', () => {
       expect(data.user).toEqual({
         id: mockUser.id,
         name: mockUser.name,
+        email: mockUser.email,
+        username: mockUser.username,
         emailOrUsername: mockUser.emailOrUsername,
-        avatarUrl: mockUser.avatarUrl,
+        avatarUrl: 'https://signed.example/avatar.jpg',
         role: mockUser.memberships[0].role,
         familySpaceId: mockUser.memberships[0].familySpaceId,
         familySpaceName: mockUser.memberships[0].familySpace.name,
       });
+      expect(mockGetSignedUploadUrl).toHaveBeenCalledWith(
+        mockUser.avatarStorageKey
+      );
       expect(mockSignToken).toHaveBeenCalledWith(
         {
           userId: mockUser.id,
@@ -253,7 +287,7 @@ describe('POST /api/auth/login', () => {
     });
 
     it('returns JWT token and sets session cookie', async () => {
-      mockPrismaFindUnique.mockResolvedValue(mockUser);
+      mockPrismaFindFirst.mockResolvedValue(mockUser);
       mockVerifyPassword.mockResolvedValue(true);
       mockSignToken.mockResolvedValue('mock-jwt-token-12345');
 
@@ -268,7 +302,7 @@ describe('POST /api/auth/login', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
-      
+
       // Verify session cookie is set
       const cookies = response.headers.get('set-cookie');
       expect(cookies).toBeTruthy();
@@ -279,7 +313,7 @@ describe('POST /api/auth/login', () => {
     });
 
     it('respects rememberMe flag for token expiration', async () => {
-      mockPrismaFindUnique.mockResolvedValue(mockUser);
+      mockPrismaFindFirst.mockResolvedValue(mockUser);
       mockVerifyPassword.mockResolvedValue(true);
       mockSignToken.mockResolvedValue('mock-jwt-token-12345');
 
@@ -312,7 +346,7 @@ describe('POST /api/auth/login', () => {
         ],
       };
 
-      mockPrismaFindUnique.mockResolvedValue(ownerUser);
+      mockPrismaFindFirst.mockResolvedValue(ownerUser);
       mockVerifyPassword.mockResolvedValue(true);
       mockSignToken.mockResolvedValue('mock-jwt-token-12345');
 
@@ -334,12 +368,13 @@ describe('POST /api/auth/login', () => {
     it('handles users without avatarUrl', async () => {
       const userWithoutAvatar = {
         ...mockUser,
-        avatarUrl: null,
+        avatarStorageKey: null,
       };
 
-      mockPrismaFindUnique.mockResolvedValue(userWithoutAvatar);
+      mockPrismaFindFirst.mockResolvedValue(userWithoutAvatar);
       mockVerifyPassword.mockResolvedValue(true);
       mockSignToken.mockResolvedValue('mock-jwt-token-12345');
+      mockGetSignedUploadUrl.mockResolvedValue(null);
 
       const request = new NextRequest('http://localhost/api/auth/login', {
         method: 'POST',
@@ -359,7 +394,9 @@ describe('POST /api/auth/login', () => {
 
   describe('Error Handling', () => {
     it('handles database errors during user lookup', async () => {
-      mockPrismaFindUnique.mockRejectedValue(new Error('Database connection error'));
+      mockPrismaFindFirst.mockRejectedValue(
+        new Error('Database connection error')
+      );
 
       const request = new NextRequest('http://localhost/api/auth/login', {
         method: 'POST',
@@ -377,7 +414,7 @@ describe('POST /api/auth/login', () => {
     });
 
     it('handles password verification errors', async () => {
-      mockPrismaFindUnique.mockResolvedValue(mockUser);
+      mockPrismaFindFirst.mockResolvedValue(mockUser);
       mockVerifyPassword.mockRejectedValue(new Error('Bcrypt error'));
 
       const request = new NextRequest('http://localhost/api/auth/login', {
@@ -396,7 +433,7 @@ describe('POST /api/auth/login', () => {
     });
 
     it('handles JWT token generation errors', async () => {
-      mockPrismaFindUnique.mockResolvedValue(mockUser);
+      mockPrismaFindFirst.mockResolvedValue(mockUser);
       mockVerifyPassword.mockResolvedValue(true);
       mockSignToken.mockRejectedValue(new Error('JWT signing error'));
 

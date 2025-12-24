@@ -7,7 +7,8 @@ export default function SignupPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',
-    emailOrUsername: '',
+    email: '',
+    username: '',
     password: '',
     familyMasterKey: '',
     rememberMe: false,
@@ -87,22 +88,45 @@ export default function SignupPage() {
 
             <div>
               <label
-                htmlFor="emailOrUsername"
+                htmlFor="email"
                 className="block text-sm font-medium text-gray-700"
               >
-                Email or Username
+                Email
               </label>
               <input
-                id="emailOrUsername"
-                name="emailOrUsername"
-                type="text"
+                id="email"
+                name="email"
+                type="email"
                 required
-                value={formData.emailOrUsername}
+                value={formData.email}
                 onChange={(e) =>
-                  setFormData({ ...formData, emailOrUsername: e.target.value })
+                  setFormData({ ...formData, email: e.target.value })
                 }
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="email@example.com or username"
+                placeholder="you@example.com"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="username"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Username
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                minLength={3}
+                maxLength={30}
+                value={formData.username}
+                onChange={(e) =>
+                  setFormData({ ...formData, username: e.target.value })
+                }
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="family_handle"
               />
             </div>
 

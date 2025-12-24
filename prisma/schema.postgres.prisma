@@ -17,9 +17,10 @@ datasource db {
 model User {
   id                String   @id @default(cuid())
   name              String
-  emailOrUsername   String   @unique @map("email_or_username")
+  email             String   @unique
+  username          String   @unique
   passwordHash      String   @map("password_hash")
-  avatarUrl         String?  @map("avatar_url")
+  avatarStorageKey  String?  @map("avatar_url")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -31,6 +32,7 @@ model User {
   reactions         Reaction[]
   cookedEvents      CookedEvent[]
   favorites         Favorite[]
+  feedbackSubmissions FeedbackSubmission[]
 
   @@map("users")
 }
@@ -46,6 +48,7 @@ model FamilySpace {
   // Relations
   memberships     FamilyMembership[]
   posts           Post[]
+  feedbackSubmissions FeedbackSubmission[]
 
   @@map("family_spaces")
 }
@@ -75,7 +78,7 @@ model Post {
   title             String
   caption           String?
   hasRecipeDetails  Boolean   @default(false) @map("has_recipe_details")
-  mainPhotoUrl      String?   @map("main_photo_url")
+  mainPhotoStorageKey String?   @map("main_photo_url")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   lastEditedBy      String?   @map("last_edited_by")
@@ -103,7 +106,7 @@ model Post {
 model PostPhoto {
   id          String   @id @default(cuid())
   postId      String   @map("post_id")
-  url         String
+  storageKey  String   @map("url")
   sortOrder   Int      @default(0) @map("sort_order")
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -170,7 +173,7 @@ model Comment {
   postId    String    @map("post_id")
   authorId  String    @map("author_id")
   text      String
-  photoUrl  String?   @map("photo_url")
+  photoStorageKey  String?   @map("photo_url")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime? @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
@@ -240,4 +243,24 @@ model Favorite {
   @@map("favorites")
   @@index([userId])
   @@index([postId])
+}
+
+model FeedbackSubmission {
+  id            String   @id @default(cuid())
+  userId        String?  @map("user_id")
+  familySpaceId String?  @map("family_space_id")
+  contactEmail  String?  @map("contact_email")
+  category      String   // 'bug' | 'suggestion'
+  message       String
+  pageUrl       String?  @map("page_url")
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  familySpace FamilySpace? @relation(fields: [familySpaceId], references: [id], onDelete: SetNull)
+
+  @@map("feedback_submissions")
+  @@index([familySpaceId])
+  @@index([userId])
+  @@index([createdAt])
 }

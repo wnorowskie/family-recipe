@@ -21,6 +21,8 @@ const { getCurrentUser } = require('@/lib/session');
 describe('GET /api/family/members', () => {
   const mockUser = {
     id: 'user_test123',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     name: 'Test User',
     avatarUrl: null,
@@ -76,6 +78,8 @@ describe('GET /api/family/members', () => {
           userId: 'user_1',
           membershipId: 'membership_1',
           name: 'Alice Owner',
+          email: 'alice@example.com',
+          username: 'alice',
           emailOrUsername: 'alice@example.com',
           avatarUrl: '/uploads/alice.jpg',
           role: 'owner',
@@ -86,6 +90,8 @@ describe('GET /api/family/members', () => {
           userId: 'user_2',
           membershipId: 'membership_2',
           name: 'Bob Member',
+          email: 'bob@example.com',
+          username: 'bob',
           emailOrUsername: 'bob@example.com',
           avatarUrl: null,
           role: 'member',
@@ -96,6 +102,8 @@ describe('GET /api/family/members', () => {
           userId: 'user_3',
           membershipId: 'membership_3',
           name: 'Carol Admin',
+          email: 'carol@example.com',
+          username: 'carol',
           emailOrUsername: 'carol@example.com',
           avatarUrl: '/uploads/carol.jpg',
           role: 'admin',
@@ -116,7 +124,7 @@ describe('GET /api/family/members', () => {
       expect(response.status).toBe(200);
       expect(data.members).toEqual(mockMembers);
       expect(data.members).toHaveLength(3);
-      
+
       // Verify data structure
       expect(data.members[0]).toHaveProperty('userId');
       expect(data.members[0]).toHaveProperty('membershipId');
@@ -134,6 +142,8 @@ describe('GET /api/family/members', () => {
           userId: 'user_1',
           membershipId: 'membership_1',
           name: 'Owner User',
+          email: 'owner@example.com',
+          username: 'owner',
           emailOrUsername: 'owner@example.com',
           avatarUrl: null,
           role: 'owner',
@@ -144,6 +154,8 @@ describe('GET /api/family/members', () => {
           userId: 'user_2',
           membershipId: 'membership_2',
           name: 'Admin User',
+          email: 'admin@example.com',
+          username: 'admin',
           emailOrUsername: 'admin@example.com',
           avatarUrl: null,
           role: 'admin',
@@ -154,6 +166,8 @@ describe('GET /api/family/members', () => {
           userId: 'user_3',
           membershipId: 'membership_3',
           name: 'Member User',
+          email: 'member@example.com',
+          username: 'member',
           emailOrUsername: 'member@example.com',
           avatarUrl: null,
           role: 'member',

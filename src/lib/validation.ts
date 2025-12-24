@@ -2,7 +2,19 @@ import { z } from 'zod';
 
 export const signupSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
-  emailOrUsername: z.string().min(1, 'Email or username is required').max(100),
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .max(200, 'Email must be 200 characters or fewer')
+    .email('Enter a valid email'),
+  username: z
+    .string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be 30 characters or fewer')
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      'Username can only contain letters, numbers, and underscores'
+    ),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   familyMasterKey: z.string().min(1, 'Family Master Key is required'),
   rememberMe: z.boolean().optional().default(false),
@@ -101,10 +113,7 @@ export const recipeDetailsSchema = z.object({
     .optional(),
   course: courseEnum.optional(),
   difficulty: difficultyEnum.optional(),
-  tags: z
-    .array(z.string().min(1).max(40))
-    .max(10)
-    .optional(),
+  tags: z.array(z.string().min(1).max(40)).max(10).optional(),
 });
 
 export const createPostSchema = z.object({
@@ -151,10 +160,19 @@ export type CookedEventInput = z.infer<typeof cookedEventSchema>;
 
 export const updateProfileSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
-  emailOrUsername: z
+  email: z
     .string()
-    .min(1, 'Email or username is required')
-    .max(100),
+    .min(1, 'Email is required')
+    .max(200, 'Email must be 200 characters or fewer')
+    .email('Enter a valid email'),
+  username: z
+    .string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be 30 characters or fewer')
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      'Username can only contain letters, numbers, and underscores'
+    ),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
@@ -165,6 +183,42 @@ export const changePasswordSchema = z.object({
 });
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+export const resetPasswordSchema = z.object({
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .max(200, 'Email must be 200 characters or fewer')
+    .email('Enter a valid email'),
+  masterKey: z.string().min(1, 'Master key is required'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const deleteAccountSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  confirmation: z
+    .string()
+    .transform((val) => val.trim())
+    .refine((val) => val.toUpperCase() === 'DELETE', {
+      message: 'Confirmation must be DELETE',
+    }),
+});
+
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
+
+export const feedbackSubmissionSchema = z.object({
+  category: z.enum(['bug', 'suggestion']),
+  message: z
+    .string()
+    .min(10, 'Please provide at least a few details (10+ characters)')
+    .max(2000, 'Message must be 2000 characters or fewer'),
+  email: z.string().email('Enter a valid email').max(200).optional(),
+  pageUrl: z.string().url('Enter a valid URL').max(2000).optional(),
+});
+
+export type FeedbackSubmissionInput = z.infer<typeof feedbackSubmissionSchema>;
 
 /**
  * Query parameter validation schemas
@@ -194,108 +248,138 @@ export const timelineQuerySchema = paginationSchema;
 
 export type TimelineQueryParams = z.infer<typeof timelineQuerySchema>;
 
+// Notifications query params
+export const notificationsQuerySchema = paginationSchema;
+
+export type NotificationsQueryParams = z.infer<typeof notificationsQuerySchema>;
+
+export const markNotificationsSchema = z.object({
+  ids: z
+    .array(z.string().cuid('Invalid notification ID'))
+    .max(50, 'Too many notifications to mark at once')
+    .optional(),
+});
+
 // Recipe filters query params (based on /api/recipes implementation)
 const MAX_TIME_MINUTES = 12 * 60; // 12 hours
 const MAX_SERVINGS = 50;
 const INGREDIENT_LIMIT = 5;
 
-export const recipeFiltersSchema = paginationSchema.extend({
-  search: z.string().max(200, 'Search query too long').optional(),
-  course: z
-    .union([courseEnum, z.array(courseEnum)])
-    .optional()
-    .transform((val): string[] | undefined => {
-      if (!val) return undefined;
-      const arr = Array.isArray(val) ? val : [val];
-      return arr.length > 0 ? Array.from(new Set(arr)) : undefined;
-    }),
-  tags: z
-    .union([z.string().max(40), z.array(z.string().max(40)).max(10, 'Too many tags')])
-    .optional()
-    .transform((val): string[] | undefined => {
-      if (!val) return undefined;
-      const arr = Array.isArray(val) ? val : [val];
-      return arr.length > 0 ? arr : undefined;
-    }),
-  difficulty: z
-    .union([difficultyEnum, z.array(difficultyEnum)])
-    .optional()
-    .transform((val): string[] | undefined => {
-      if (!val) return undefined;
-      const arr = Array.isArray(val) ? val : [val];
-      return arr.length > 0 ? Array.from(new Set(arr)) : undefined;
-    }),
-  authorId: z
-    .union([z.string().cuid('Invalid author ID'), z.array(z.string().cuid('Invalid author ID')).max(20, 'Too many authors')])
-    .optional()
-    .transform((val): string[] | undefined => {
-      if (!val) return undefined;
-      const arr = Array.isArray(val) ? val : [val];
-      return arr.length > 0 ? Array.from(new Set(arr)) : undefined;
-    }),
-  totalTimeMin: z.coerce
-    .number()
-    .int()
-    .min(0, 'Minimum time cannot be negative')
-    .max(MAX_TIME_MINUTES, `Maximum time is ${MAX_TIME_MINUTES} minutes`)
-    .optional(),
-  totalTimeMax: z.coerce
-    .number()
-    .int()
-    .min(0, 'Maximum time cannot be negative')
-    .max(MAX_TIME_MINUTES, `Maximum time is ${MAX_TIME_MINUTES} minutes`)
-    .optional(),
-  servingsMin: z.coerce
-    .number()
-    .int()
-    .min(1, 'Minimum servings must be at least 1')
-    .max(MAX_SERVINGS, `Maximum servings is ${MAX_SERVINGS}`)
-    .optional(),
-  servingsMax: z.coerce
-    .number()
-    .int()
-    .min(1, 'Maximum servings must be at least 1')
-    .max(MAX_SERVINGS, `Maximum servings is ${MAX_SERVINGS}`)
-    .optional(),
-  ingredients: z
-    .union([z.string().max(120, 'Ingredient name too long'), z.array(z.string().max(120, 'Ingredient name too long')).max(INGREDIENT_LIMIT, `Maximum ${INGREDIENT_LIMIT} ingredients`)])
-    .optional()
-    .transform((val): string[] | undefined => {
-      if (!val) return undefined;
-      const arr = Array.isArray(val) ? val : [val];
-      return arr.length > 0 ? arr : undefined;
-    }),
-  sort: z
-    .enum(['recent', 'alpha'], {
-      errorMap: () => ({ message: 'Sort must be either "recent" or "alpha"' }),
-    })
-    .optional()
-    .transform((val) => val ?? 'recent'),
-}).refine(
-  (data) => {
-    // Ensure min <= max for totalTime
-    if (data.totalTimeMin !== undefined && data.totalTimeMax !== undefined) {
-      return data.totalTimeMin <= data.totalTimeMax;
+export const recipeFiltersSchema = paginationSchema
+  .extend({
+    search: z.string().max(200, 'Search query too long').optional(),
+    course: z
+      .union([courseEnum, z.array(courseEnum)])
+      .optional()
+      .transform((val): string[] | undefined => {
+        if (!val) return undefined;
+        const arr = Array.isArray(val) ? val : [val];
+        return arr.length > 0 ? Array.from(new Set(arr)) : undefined;
+      }),
+    tags: z
+      .union([
+        z.string().max(40),
+        z.array(z.string().max(40)).max(10, 'Too many tags'),
+      ])
+      .optional()
+      .transform((val): string[] | undefined => {
+        if (!val) return undefined;
+        const arr = Array.isArray(val) ? val : [val];
+        return arr.length > 0 ? arr : undefined;
+      }),
+    difficulty: z
+      .union([difficultyEnum, z.array(difficultyEnum)])
+      .optional()
+      .transform((val): string[] | undefined => {
+        if (!val) return undefined;
+        const arr = Array.isArray(val) ? val : [val];
+        return arr.length > 0 ? Array.from(new Set(arr)) : undefined;
+      }),
+    authorId: z
+      .union([
+        z.string().cuid('Invalid author ID'),
+        z
+          .array(z.string().cuid('Invalid author ID'))
+          .max(20, 'Too many authors'),
+      ])
+      .optional()
+      .transform((val): string[] | undefined => {
+        if (!val) return undefined;
+        const arr = Array.isArray(val) ? val : [val];
+        return arr.length > 0 ? Array.from(new Set(arr)) : undefined;
+      }),
+    totalTimeMin: z.coerce
+      .number()
+      .int()
+      .min(0, 'Minimum time cannot be negative')
+      .max(MAX_TIME_MINUTES, `Maximum time is ${MAX_TIME_MINUTES} minutes`)
+      .optional(),
+    totalTimeMax: z.coerce
+      .number()
+      .int()
+      .min(0, 'Maximum time cannot be negative')
+      .max(MAX_TIME_MINUTES, `Maximum time is ${MAX_TIME_MINUTES} minutes`)
+      .optional(),
+    servingsMin: z.coerce
+      .number()
+      .int()
+      .min(1, 'Minimum servings must be at least 1')
+      .max(MAX_SERVINGS, `Maximum servings is ${MAX_SERVINGS}`)
+      .optional(),
+    servingsMax: z.coerce
+      .number()
+      .int()
+      .min(1, 'Maximum servings must be at least 1')
+      .max(MAX_SERVINGS, `Maximum servings is ${MAX_SERVINGS}`)
+      .optional(),
+    ingredients: z
+      .union([
+        z.string().max(120, 'Ingredient name too long'),
+        z
+          .array(z.string().max(120, 'Ingredient name too long'))
+          .max(INGREDIENT_LIMIT, `Maximum ${INGREDIENT_LIMIT} ingredients`),
+      ])
+      .optional()
+      .transform((val): string[] | undefined => {
+        if (!val) return undefined;
+        const arr = Array.isArray(val) ? val : [val];
+        return arr.length > 0 ? arr : undefined;
+      }),
+    sort: z
+      .enum(['recent', 'alpha'], {
+        errorMap: () => ({
+          message: 'Sort must be either "recent" or "alpha"',
+        }),
+      })
+      .optional()
+      .transform((val) => val ?? 'recent'),
+  })
+  .refine(
+    (data) => {
+      // Ensure min <= max for totalTime
+      if (data.totalTimeMin !== undefined && data.totalTimeMax !== undefined) {
+        return data.totalTimeMin <= data.totalTimeMax;
+      }
+      return true;
+    },
+    {
+      message: 'Minimum total time cannot be greater than maximum',
+      path: ['totalTimeMin'],
     }
-    return true;
-  },
-  {
-    message: 'Minimum total time cannot be greater than maximum',
-    path: ['totalTimeMin'],
-  }
-).refine(
-  (data) => {
-    // Ensure min <= max for servings
-    if (data.servingsMin !== undefined && data.servingsMax !== undefined) {
-      return data.servingsMin <= data.servingsMax;
+  )
+  .refine(
+    (data) => {
+      // Ensure min <= max for servings
+      if (data.servingsMin !== undefined && data.servingsMax !== undefined) {
+        return data.servingsMin <= data.servingsMax;
+      }
+      return true;
+    },
+    {
+      message: 'Minimum servings cannot be greater than maximum',
+      path: ['servingsMin'],
     }
-    return true;
-  },
-  {
-    message: 'Minimum servings cannot be greater than maximum',
-    path: ['servingsMin'],
-  }
-);
+  );
 
 export type RecipeFiltersParams = z.infer<typeof recipeFiltersSchema>;
 

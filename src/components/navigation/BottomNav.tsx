@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -18,20 +18,18 @@ export default function BottomNav() {
       <div className="mx-auto flex max-w-3xl items-center justify-around px-2 py-3">
         {NAV_ITEMS.map((item) => {
           const active = pathname ? pathname.startsWith(item.href) : false;
-          const isAdd = item.href === '/add';
-          const baseClasses = isAdd
-            ? 'flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold'
-            : 'flex flex-col items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold';
-          const colorClasses = isAdd
-            ? 'bg-gray-900 text-white'
-            : active
-            ? 'text-gray-900'
-            : 'text-gray-500';
+          const baseClasses =
+            'flex flex-col items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900/40';
+          const colorClasses = active
+            ? 'text-gray-900 bg-gray-900/5 shadow-sm'
+            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100/80';
+
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`${baseClasses} transition ${colorClasses}`}
+              aria-current={active ? 'page' : undefined}
+              className={`${baseClasses} ${colorClasses}`}
             >
               <span className="text-lg">{item.icon}</span>
               {item.label}

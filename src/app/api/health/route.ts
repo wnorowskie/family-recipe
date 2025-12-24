@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logError } from '@/lib/logger';
+import { masterKeyEnvPresent } from '@/lib/masterKey';
 
 export const GET = async () => {
   const startedAt = Date.now();
@@ -8,10 +9,14 @@ export const GET = async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
 
+    const masterKeyOk = masterKeyEnvPresent();
+    const familySpaceExists = (await prisma.familySpace.count()) > 0;
+
     return NextResponse.json(
       {
-        ok: true,
+        ok: masterKeyOk && familySpaceExists,
         db: { ok: true },
+        masterKey: { ok: masterKeyOk, familySpaceExists },
         timestamp: new Date().toISOString(),
         latencyMs: Date.now() - startedAt,
       },

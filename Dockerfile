@@ -11,7 +11,7 @@ ENV NODE_ENV=development
 COPY package.json package-lock.json ./
 # Install build deps for native modules (bcrypt) and install all deps (dev + prod)
 RUN apk add --no-cache python3 make g++ \
-  && npm ci
+  && HUSKY=0 npm ci
 
 FROM base AS builder
 ARG PRISMA_SCHEMA=prisma/schema.postgres.node.prisma

@@ -13,12 +13,13 @@ export async function getAllTags(): Promise<TagGroup> {
     orderBy: [{ type: 'asc' }, { name: 'asc' }],
   });
 
-  return tags.reduce<TagGroup>((groups, tag) => {
+  const tagArray = tags as TagRecord[];
+  return tagArray.reduce((groups: TagGroup, tag: TagRecord) => {
     const key = tag.type ?? 'other';
     if (!groups[key]) {
       groups[key] = [];
     }
     groups[key].push(tag);
     return groups;
-  }, {});
+  }, {} as TagGroup);
 }

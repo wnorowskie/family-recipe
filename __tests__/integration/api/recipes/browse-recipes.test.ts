@@ -32,7 +32,9 @@ jest.mock('@/lib/recipes', () => ({
 import { getCurrentUser } from '@/lib/session';
 import { getRecipes } from '@/lib/recipes';
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
+>;
 const mockGetRecipes = getRecipes as jest.MockedFunction<typeof getRecipes>;
 
 // Helper to parse response JSON
@@ -44,6 +46,8 @@ const parseResponseJSON = async (response: Response) => {
 describe('GET /api/recipes', () => {
   const mockUser = {
     id: 'user_123',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     name: 'Test User',
     familySpaceId: 'family_123',
@@ -103,9 +107,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?limit=10&offset=20', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?limit=10&offset=20',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -131,9 +138,12 @@ describe('GET /api/recipes', () => {
     });
 
     it('rejects invalid offset', async () => {
-      const request = new NextRequest('http://localhost/api/recipes?offset=-5', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?offset=-5',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -165,9 +175,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?search=chocolate', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?search=chocolate',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -183,9 +196,12 @@ describe('GET /api/recipes', () => {
 
     it('rejects search query longer than 200 characters', async () => {
       const longQuery = 'a'.repeat(201);
-      const request = new NextRequest(`http://localhost/api/recipes?search=${longQuery}`, {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        `http://localhost/api/recipes?search=${longQuery}`,
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -203,9 +219,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?course=breakfast&course=lunch', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?course=breakfast&course=lunch',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -218,9 +237,12 @@ describe('GET /api/recipes', () => {
     });
 
     it('rejects invalid course values', async () => {
-      const request = new NextRequest('http://localhost/api/recipes?course=invalid', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?course=invalid',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -236,9 +258,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?course=breakfast&course=breakfast', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?course=breakfast&course=breakfast',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -282,9 +307,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?tags=vegetarian&tags=gluten-free', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?tags=vegetarian&tags=gluten-free',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -297,7 +325,10 @@ describe('GET /api/recipes', () => {
     });
 
     it('rejects more than 10 tags', async () => {
-      const tags = Array(11).fill('tag').map((t, i) => `tags=${t}${i}`).join('&');
+      const tags = Array(11)
+        .fill('tag')
+        .map((t, i) => `tags=${t}${i}`)
+        .join('&');
       const request = new NextRequest(`http://localhost/api/recipes?${tags}`, {
         method: 'GET',
       });
@@ -341,9 +372,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?difficulty=easy&difficulty=medium', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?difficulty=easy&difficulty=medium',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -356,9 +390,12 @@ describe('GET /api/recipes', () => {
     });
 
     it('rejects invalid difficulty values', async () => {
-      const request = new NextRequest('http://localhost/api/recipes?difficulty=impossible', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?difficulty=impossible',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -374,9 +411,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?difficulty=easy&difficulty=easy', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?difficulty=easy&difficulty=easy',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -397,9 +437,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?totalTimeMin=30', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?totalTimeMin=30',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -418,9 +461,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?totalTimeMax=60', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?totalTimeMax=60',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -439,9 +485,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?totalTimeMin=30&totalTimeMax=60', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?totalTimeMin=30&totalTimeMax=60',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -455,9 +504,12 @@ describe('GET /api/recipes', () => {
     });
 
     it('rejects minTime > maxTime', async () => {
-      const request = new NextRequest('http://localhost/api/recipes?totalTimeMin=120&totalTimeMax=60', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?totalTimeMin=120&totalTimeMax=60',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -467,9 +519,12 @@ describe('GET /api/recipes', () => {
     });
 
     it('rejects negative time values', async () => {
-      const request = new NextRequest('http://localhost/api/recipes?totalTimeMin=-10', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?totalTimeMin=-10',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -487,9 +542,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?servingsMin=4', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?servingsMin=4',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -508,9 +566,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?servingsMax=8', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?servingsMax=8',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -529,9 +590,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?servingsMin=2&servingsMax=6', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?servingsMin=2&servingsMax=6',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -545,9 +609,12 @@ describe('GET /api/recipes', () => {
     });
 
     it('rejects minServings > maxServings', async () => {
-      const request = new NextRequest('http://localhost/api/recipes?servingsMin=10&servingsMax=4', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?servingsMin=10&servingsMax=4',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -557,9 +624,12 @@ describe('GET /api/recipes', () => {
     });
 
     it('rejects servings less than 1', async () => {
-      const request = new NextRequest('http://localhost/api/recipes?servingsMin=0', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?servingsMin=0',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -600,9 +670,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?ingredients=flour&ingredients=sugar', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?ingredients=flour&ingredients=sugar',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -615,10 +688,16 @@ describe('GET /api/recipes', () => {
     });
 
     it('rejects more than 5 ingredients', async () => {
-      const ingredients = Array(6).fill('ingredient').map((t, i) => `ingredients=${t}${i}`).join('&');
-      const request = new NextRequest(`http://localhost/api/recipes?${ingredients}`, {
-        method: 'GET',
-      });
+      const ingredients = Array(6)
+        .fill('ingredient')
+        .map((t, i) => `ingredients=${t}${i}`)
+        .join('&');
+      const request = new NextRequest(
+        `http://localhost/api/recipes?${ingredients}`,
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -659,9 +738,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?authorId=clh0000000000000000000001&authorId=clh0000000000000000000002', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?authorId=clh0000000000000000000001&authorId=clh0000000000000000000002',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -674,9 +756,12 @@ describe('GET /api/recipes', () => {
     });
 
     it('rejects invalid author ID format', async () => {
-      const request = new NextRequest('http://localhost/api/recipes?authorId=invalid_id', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?authorId=invalid_id',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -715,9 +800,12 @@ describe('GET /api/recipes', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/recipes?sort=alpha', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?sort=alpha',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -730,9 +818,12 @@ describe('GET /api/recipes', () => {
     });
 
     it('rejects invalid sort values', async () => {
-      const request = new NextRequest('http://localhost/api/recipes?sort=popularity', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/recipes?sort=popularity',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -855,7 +946,7 @@ describe('GET /api/recipes', () => {
       expect(response.status).toBe(200);
       const data = await parseResponseJSON(response);
       expect(data.items).toHaveLength(1);
-      
+
       const recipe = data.items[0];
       expect(recipe).toMatchObject({
         id: 'post_1',
@@ -881,19 +972,21 @@ describe('GET /api/recipes', () => {
 
     it('returns pagination metadata', async () => {
       mockGetRecipes.mockResolvedValue({
-        items: Array(20).fill(null).map((_, i) => ({
-          id: `post_${i}`,
-          title: `Recipe ${i}`,
-          mainPhotoUrl: null,
-          author: { id: 'user_1', name: 'Alice', avatarUrl: null },
-          courses: ['lunch'],
-          primaryCourse: 'lunch',
-          difficulty: 'easy',
-          tags: [],
-          totalTime: 30,
-          servings: 4,
-          cookedStats: { timesCooked: 0, averageRating: null },
-        })),
+        items: Array(20)
+          .fill(null)
+          .map((_, i) => ({
+            id: `post_${i}`,
+            title: `Recipe ${i}`,
+            mainPhotoUrl: null,
+            author: { id: 'user_1', name: 'Alice', avatarUrl: null },
+            courses: ['lunch'],
+            primaryCourse: 'lunch',
+            difficulty: 'easy',
+            tags: [],
+            totalTime: 30,
+            servings: 4,
+            cookedStats: { timesCooked: 0, averageRating: null },
+          })),
         hasMore: true,
         nextOffset: 20,
       });

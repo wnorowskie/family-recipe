@@ -32,13 +32,25 @@ jest.mock('@/lib/posts', () => ({
   getPostCookedEventsPage: jest.fn(),
 }));
 
+jest.mock('@/lib/notifications', () => ({
+  createCookedNotification: jest.fn(),
+}));
+
 import { getCurrentUser } from '@/lib/session';
 import { getPostCookedEventsPage } from '@/lib/posts';
+import { createCookedNotification } from '@/lib/notifications';
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
-const mockGetPostCookedEventsPage = getPostCookedEventsPage as jest.MockedFunction<
-  typeof getPostCookedEventsPage
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
 >;
+const mockGetPostCookedEventsPage =
+  getPostCookedEventsPage as jest.MockedFunction<
+    typeof getPostCookedEventsPage
+  >;
+const mockCreateCookedNotification =
+  createCookedNotification as jest.MockedFunction<
+    typeof createCookedNotification
+  >;
 
 // Helper to parse response JSON
 const parseResponseJSON = async (response: Response) => {
@@ -49,6 +61,8 @@ const parseResponseJSON = async (response: Response) => {
 describe('POST /api/posts/[postId]/cooked', () => {
   const mockUser = {
     id: 'user_123',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     name: 'Test User',
     familySpaceId: 'family_123',
@@ -64,16 +78,20 @@ describe('POST /api/posts/[postId]/cooked', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetCurrentUser.mockResolvedValue(mockUser);
+    mockCreateCookedNotification.mockResolvedValue(undefined);
   });
 
   describe('Authentication', () => {
     it('requires authentication', async () => {
       mockGetCurrentUser.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -100,10 +118,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
     });
 
     it('validates rating range - rejects rating < 1', async () => {
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 0 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 0 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -114,10 +135,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
     });
 
     it('validates rating range - rejects rating > 5', async () => {
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 6 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 6 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -128,7 +152,10 @@ describe('POST /api/posts/[postId]/cooked', () => {
     });
 
     it('accepts valid rating (1-5)', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'post_123',
+        authorId: 'author_123',
+      } as any);
       prismaMock.cookedEvent.create.mockResolvedValue({
         id: 'cooked_123',
         postId: 'post_123',
@@ -147,14 +174,26 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
       expect(response.status).toBe(201);
+      expect(mockCreateCookedNotification).toHaveBeenCalledWith({
+        familySpaceId: 'family_123',
+        postId: 'post_123',
+        recipientId: 'author_123',
+        actorId: 'user_123',
+        cookedEventId: 'cooked_123',
+        note: null,
+        rating: 5,
+      });
       expect(prismaMock.cookedEvent.create).toHaveBeenCalledWith({
         data: {
           postId: 'post_123',
@@ -166,7 +205,10 @@ describe('POST /api/posts/[postId]/cooked', () => {
     });
 
     it('accepts optional note', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'post_123',
+        authorId: 'author_123',
+      } as any);
       prismaMock.cookedEvent.create.mockResolvedValue({
         id: 'cooked_123',
         postId: 'post_123',
@@ -185,14 +227,26 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 4, note: 'Delicious!' }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 4, note: 'Delicious!' }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
       expect(response.status).toBe(201);
+      expect(mockCreateCookedNotification).toHaveBeenCalledWith({
+        familySpaceId: 'family_123',
+        postId: 'post_123',
+        recipientId: 'author_123',
+        actorId: 'user_123',
+        cookedEventId: 'cooked_123',
+        note: 'Delicious!',
+        rating: 4,
+      });
       expect(prismaMock.cookedEvent.create).toHaveBeenCalledWith({
         data: {
           postId: 'post_123',
@@ -223,10 +277,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ note: 'Made this today' }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ note: 'Made this today' }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -246,10 +303,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
     it('returns 404 for non-existent post', async () => {
       prismaMock.post.findFirst.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/posts/post_999/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_999/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, { params: { postId: 'post_999' } });
 
@@ -262,12 +322,17 @@ describe('POST /api/posts/[postId]/cooked', () => {
     it('returns 404 for post in different family', async () => {
       prismaMock.post.findFirst.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/posts/post_other/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_other/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
-      const response = await POST(request, { params: { postId: 'post_other' } });
+      const response = await POST(request, {
+        params: { postId: 'post_other' },
+      });
 
       expect(response.status).toBe(404);
       expect(prismaMock.post.findFirst).toHaveBeenCalledWith({
@@ -275,7 +340,7 @@ describe('POST /api/posts/[postId]/cooked', () => {
           id: 'post_other',
           familySpaceId: 'family_123',
         },
-        select: { id: true },
+        select: { id: true, authorId: true },
       });
       expect(prismaMock.cookedEvent.create).not.toHaveBeenCalled();
     });
@@ -283,7 +348,10 @@ describe('POST /api/posts/[postId]/cooked', () => {
 
   describe('Success Cases', () => {
     it('creates cooked event successfully', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'post_123',
+        authorId: 'author_123',
+      } as any);
       prismaMock.cookedEvent.create.mockResolvedValue({
         id: 'cooked_123',
         postId: 'post_123',
@@ -314,10 +382,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5, note: 'Amazing recipe!' }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5, note: 'Amazing recipe!' }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -330,7 +401,10 @@ describe('POST /api/posts/[postId]/cooked', () => {
     });
 
     it('allows multiple cooked events per user/post', async () => {
-      prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
+      prismaMock.post.findFirst.mockResolvedValue({
+        id: 'post_123',
+        authorId: 'author_123',
+      } as any);
       prismaMock.cookedEvent.create.mockResolvedValueOnce({
         id: 'cooked_1',
         postId: 'post_123',
@@ -349,10 +423,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request1 = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5, note: 'First time' }),
-      });
+      const request1 = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5, note: 'First time' }),
+        }
+      );
 
       const response1 = await POST(request1, mockContext);
       expect(response1.status).toBe(201);
@@ -376,10 +453,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 0,
       });
 
-      const request2 = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 4, note: 'Second time' }),
-      });
+      const request2 = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 4, note: 'Second time' }),
+        }
+      );
 
       const response2 = await POST(request2, mockContext);
       expect(response2.status).toBe(201);
@@ -429,10 +509,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
         nextOffset: 2,
       });
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -454,10 +537,13 @@ describe('POST /api/posts/[postId]/cooked', () => {
     it('handles database errors during post lookup', async () => {
       prismaMock.post.findFirst.mockRejectedValue(new Error('Database error'));
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -468,12 +554,17 @@ describe('POST /api/posts/[postId]/cooked', () => {
 
     it('handles database errors during cooked event creation', async () => {
       prismaMock.post.findFirst.mockResolvedValue({ id: 'post_123' } as any);
-      prismaMock.cookedEvent.create.mockRejectedValue(new Error('Database error'));
+      prismaMock.cookedEvent.create.mockRejectedValue(
+        new Error('Database error')
+      );
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 
@@ -492,12 +583,17 @@ describe('POST /api/posts/[postId]/cooked', () => {
         note: null,
         createdAt: new Date(),
       });
-      prismaMock.cookedEvent.aggregate.mockRejectedValue(new Error('Aggregate error'));
+      prismaMock.cookedEvent.aggregate.mockRejectedValue(
+        new Error('Aggregate error')
+      );
 
-      const request = new NextRequest('http://localhost/api/posts/post_123/cooked', {
-        method: 'POST',
-        body: JSON.stringify({ rating: 5 }),
-      });
+      const request = new NextRequest(
+        'http://localhost/api/posts/post_123/cooked',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rating: 5 }),
+        }
+      );
 
       const response = await POST(request, mockContext);
 

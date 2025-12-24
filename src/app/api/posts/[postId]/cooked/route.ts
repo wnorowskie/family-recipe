@@ -5,7 +5,13 @@ import { getPostCookedEventsPage } from '@/lib/posts';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { cookedEventLimiter, applyRateLimit } from '@/lib/rateLimit';
-import { badRequestError, validationError, notFoundError, internalError } from '@/lib/apiErrors';
+import {
+  badRequestError,
+  validationError,
+  notFoundError,
+  internalError,
+} from '@/lib/apiErrors';
+import { createCookedNotification } from '@/lib/notifications';
 
 interface RouteContext {
   params: {
@@ -34,7 +40,9 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
     const validationResult = cookedEventSchema.safeParse(body ?? {});
 
     if (!validationResult.success) {
-      return validationError(validationResult.error.errors[0]?.message ?? 'Invalid input');
+      return validationError(
+        validationResult.error.errors[0]?.message ?? 'Invalid input'
+      );
     }
 
     const { rating, note } = validationResult.data;
@@ -44,14 +52,14 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
         id: postId,
         familySpaceId: user.familySpaceId,
       },
-      select: { id: true },
+      select: { id: true, authorId: true },
     });
 
     if (!post) {
       return notFoundError('Post not found');
     }
 
-    await prisma.cookedEvent.create({
+    const cookedEvent = await prisma.cookedEvent.create({
       data: {
         postId: post.id,
         userId: user.id,
@@ -59,6 +67,18 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
         note: note?.trim() ? note.trim() : null,
       },
     });
+
+    if (post.authorId) {
+      await createCookedNotification({
+        familySpaceId: user.familySpaceId,
+        postId: post.id,
+        recipientId: post.authorId,
+        actorId: user.id,
+        cookedEventId: cookedEvent.id,
+        note: cookedEvent.note,
+        rating: cookedEvent.rating,
+      });
+    }
 
     const [cookedAggregate, cookedPage] = await Promise.all([
       prisma.cookedEvent.aggregate({
@@ -95,7 +115,6 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
 export const GET = withAuth(async (request, user, context?: RouteContext) => {
   const { postId } = context!.params;
   try {
-
     if (!postId) {
       return badRequestError('Post ID is required');
     }
@@ -115,15 +134,22 @@ export const GET = withAuth(async (request, user, context?: RouteContext) => {
     const searchParams = request.nextUrl?.searchParams;
     const limitParam = searchParams?.get('limit') ?? null;
     const offsetParam = searchParams?.get('offset') ?? null;
-    const rawLimit = limitParam !== null ? Number.parseInt(limitParam, 10) : undefined;
-    const rawOffset = offsetParam !== null ? Number.parseInt(offsetParam, 10) : undefined;
+    const rawLimit =
+      limitParam !== null ? Number.parseInt(limitParam, 10) : undefined;
+    const rawOffset =
+      offsetParam !== null ? Number.parseInt(offsetParam, 10) : undefined;
 
     const cookedPage = await getPostCookedEventsPage({
       postId: post.id,
       familySpaceId: user.familySpaceId,
-      limit: typeof rawLimit === 'number' && Number.isFinite(rawLimit) ? rawLimit : undefined,
+      limit:
+        typeof rawLimit === 'number' && Number.isFinite(rawLimit)
+          ? rawLimit
+          : undefined,
       offset:
-        typeof rawOffset === 'number' && Number.isFinite(rawOffset) ? rawOffset : undefined,
+        typeof rawOffset === 'number' && Number.isFinite(rawOffset)
+          ? rawOffset
+          : undefined,
     });
 
     return NextResponse.json({

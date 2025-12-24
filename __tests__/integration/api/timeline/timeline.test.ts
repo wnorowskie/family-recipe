@@ -32,8 +32,12 @@ jest.mock('@/lib/timeline-data', () => ({
 import { getCurrentUser } from '@/lib/session';
 import { getTimelineFeed } from '@/lib/timeline-data';
 
-const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
-const mockGetTimelineFeed = getTimelineFeed as jest.MockedFunction<typeof getTimelineFeed>;
+const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
+>;
+const mockGetTimelineFeed = getTimelineFeed as jest.MockedFunction<
+  typeof getTimelineFeed
+>;
 
 // Helper to parse response JSON
 const parseResponseJSON = async (response: Response) => {
@@ -44,6 +48,8 @@ const parseResponseJSON = async (response: Response) => {
 describe('GET /api/timeline', () => {
   const mockUser = {
     id: 'user_123',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     name: 'Test User',
     familySpaceId: 'family_123',
@@ -102,9 +108,12 @@ describe('GET /api/timeline', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/timeline?limit=10', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/timeline?limit=10',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -123,9 +132,12 @@ describe('GET /api/timeline', () => {
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/timeline?offset=20', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/timeline?offset=20',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -144,9 +156,12 @@ describe('GET /api/timeline', () => {
         nextOffset: 30,
       });
 
-      const request = new NextRequest('http://localhost/api/timeline?limit=10&offset=20', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/timeline?limit=10&offset=20',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -159,9 +174,12 @@ describe('GET /api/timeline', () => {
     });
 
     it('rejects invalid limit parameter', async () => {
-      const request = new NextRequest('http://localhost/api/timeline?limit=-1', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/timeline?limit=-1',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -171,9 +189,12 @@ describe('GET /api/timeline', () => {
     });
 
     it('rejects limit exceeding maximum', async () => {
-      const request = new NextRequest('http://localhost/api/timeline?limit=101', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/timeline?limit=101',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -183,9 +204,12 @@ describe('GET /api/timeline', () => {
     });
 
     it('rejects negative offset parameter', async () => {
-      const request = new NextRequest('http://localhost/api/timeline?offset=-5', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/timeline?offset=-5',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -508,20 +532,25 @@ describe('GET /api/timeline', () => {
   describe('Pagination', () => {
     it('returns hasMore: true when more items exist', async () => {
       mockGetTimelineFeed.mockResolvedValue({
-        items: Array(20).fill(null).map((_, i) => ({
-          id: `post-${i}`,
-          type: 'post_created',
-          timestamp: new Date(),
-          actor: { id: 'user_1', name: 'Alice', avatarUrl: null },
-          post: { id: `post_${i}`, title: `Post ${i}`, mainPhotoUrl: null },
-        })),
+        items: Array(20)
+          .fill(null)
+          .map((_, i) => ({
+            id: `post-${i}`,
+            type: 'post_created',
+            timestamp: new Date(),
+            actor: { id: 'user_1', name: 'Alice', avatarUrl: null },
+            post: { id: `post_${i}`, title: `Post ${i}`, mainPhotoUrl: null },
+          })),
         hasMore: true,
         nextOffset: 20,
       });
 
-      const request = new NextRequest('http://localhost/api/timeline?limit=20', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/timeline?limit=20',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -533,20 +562,25 @@ describe('GET /api/timeline', () => {
 
     it('returns hasMore: false when no more items exist', async () => {
       mockGetTimelineFeed.mockResolvedValue({
-        items: Array(10).fill(null).map((_, i) => ({
-          id: `post-${i}`,
-          type: 'post_created',
-          timestamp: new Date(),
-          actor: { id: 'user_1', name: 'Alice', avatarUrl: null },
-          post: { id: `post_${i}`, title: `Post ${i}`, mainPhotoUrl: null },
-        })),
+        items: Array(10)
+          .fill(null)
+          .map((_, i) => ({
+            id: `post-${i}`,
+            type: 'post_created',
+            timestamp: new Date(),
+            actor: { id: 'user_1', name: 'Alice', avatarUrl: null },
+            post: { id: `post_${i}`, title: `Post ${i}`, mainPhotoUrl: null },
+          })),
         hasMore: false,
         nextOffset: 0,
       });
 
-      const request = new NextRequest('http://localhost/api/timeline?limit=20', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/timeline?limit=20',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 
@@ -559,20 +593,25 @@ describe('GET /api/timeline', () => {
     it('supports pagination through multiple pages', async () => {
       // First page
       mockGetTimelineFeed.mockResolvedValueOnce({
-        items: Array(10).fill(null).map((_, i) => ({
-          id: `post-${i}`,
-          type: 'post_created',
-          timestamp: new Date(),
-          actor: { id: 'user_1', name: 'Alice', avatarUrl: null },
-          post: { id: `post_${i}`, title: `Post ${i}`, mainPhotoUrl: null },
-        })),
+        items: Array(10)
+          .fill(null)
+          .map((_, i) => ({
+            id: `post-${i}`,
+            type: 'post_created',
+            timestamp: new Date(),
+            actor: { id: 'user_1', name: 'Alice', avatarUrl: null },
+            post: { id: `post_${i}`, title: `Post ${i}`, mainPhotoUrl: null },
+          })),
         hasMore: true,
         nextOffset: 10,
       });
 
-      const request1 = new NextRequest('http://localhost/api/timeline?limit=10', {
-        method: 'GET',
-      });
+      const request1 = new NextRequest(
+        'http://localhost/api/timeline?limit=10',
+        {
+          method: 'GET',
+        }
+      );
       const response1 = await GET(request1);
       const data1 = await parseResponseJSON(response1);
 
@@ -581,20 +620,29 @@ describe('GET /api/timeline', () => {
 
       // Second page
       mockGetTimelineFeed.mockResolvedValueOnce({
-        items: Array(10).fill(null).map((_, i) => ({
-          id: `post-${i + 10}`,
-          type: 'post_created',
-          timestamp: new Date(),
-          actor: { id: 'user_1', name: 'Alice', avatarUrl: null },
-          post: { id: `post_${i + 10}`, title: `Post ${i + 10}`, mainPhotoUrl: null },
-        })),
+        items: Array(10)
+          .fill(null)
+          .map((_, i) => ({
+            id: `post-${i + 10}`,
+            type: 'post_created',
+            timestamp: new Date(),
+            actor: { id: 'user_1', name: 'Alice', avatarUrl: null },
+            post: {
+              id: `post_${i + 10}`,
+              title: `Post ${i + 10}`,
+              mainPhotoUrl: null,
+            },
+          })),
         hasMore: false,
         nextOffset: 0,
       });
 
-      const request2 = new NextRequest('http://localhost/api/timeline?limit=10&offset=10', {
-        method: 'GET',
-      });
+      const request2 = new NextRequest(
+        'http://localhost/api/timeline?limit=10&offset=10',
+        {
+          method: 'GET',
+        }
+      );
       const response2 = await GET(request2);
       const data2 = await parseResponseJSON(response2);
 
@@ -619,9 +667,12 @@ describe('GET /api/timeline', () => {
     });
 
     it('handles malformed query parameters gracefully', async () => {
-      const request = new NextRequest('http://localhost/api/timeline?limit=abc', {
-        method: 'GET',
-      });
+      const request = new NextRequest(
+        'http://localhost/api/timeline?limit=abc',
+        {
+          method: 'GET',
+        }
+      );
 
       const response = await GET(request);
 

@@ -5,20 +5,36 @@
  * Each factory provides sensible defaults and allows overrides.
  */
 
-import { User, Post, Comment, Reaction, CookedEvent, Favorite } from '@prisma/client';
+import {
+  User,
+  Post,
+  Comment,
+  Reaction,
+  CookedEvent,
+  Favorite,
+} from '@prisma/client';
 
 /**
  * Create a mock user with default values
  */
-export const createMockUser = (overrides: Partial<User> = {}): User => ({
+export const createMockUser = (
+  overrides: Partial<User> & { emailOrUsername?: string } = {}
+): User & { emailOrUsername?: string } => ({
   id: 'user_test123',
-  emailOrUsername: 'test@example.com',
+  email: 'test@example.com',
+  username: 'testuser',
   name: 'Test User',
   passwordHash: '$2b$10$hashedPasswordExample123456789',
-  avatarUrl: null,
+  avatarStorageKey: null,
   createdAt: new Date('2024-01-01T00:00:00Z'),
   updatedAt: new Date('2024-01-01T00:00:00Z'),
   ...overrides,
+  emailOrUsername:
+    (overrides as any).email ??
+    (overrides as any).username ??
+    overrides.emailOrUsername ??
+    overrides.email ??
+    'test@example.com',
 });
 
 /**
@@ -55,7 +71,7 @@ export const createMockPost = (overrides: Partial<Post> = {}): Post => ({
   authorId: 'user_test123',
   familySpaceId: 'family_test123',
   hasRecipeDetails: false,
-  mainPhotoUrl: null,
+  mainPhotoStorageKey: null,
   createdAt: new Date('2024-01-01T00:00:00Z'),
   updatedAt: new Date('2024-01-01T00:00:00Z'),
   lastEditAt: null,
@@ -81,12 +97,14 @@ export const createMockRecipeDetails = (overrides = {}) => ({
 /**
  * Create a mock comment
  */
-export const createMockComment = (overrides: Partial<Comment> = {}): Comment => ({
+export const createMockComment = (
+  overrides: Partial<Comment> = {}
+): Comment => ({
   id: 'comment_test123',
   text: 'This looks amazing!',
   authorId: 'user_test123',
   postId: 'post_test123',
-  photoUrl: null,
+  photoStorageKey: null,
   deletedAt: null,
   createdAt: new Date('2024-01-01T00:00:00Z'),
   updatedAt: new Date('2024-01-01T00:00:00Z'),
@@ -96,7 +114,9 @@ export const createMockComment = (overrides: Partial<Comment> = {}): Comment => 
 /**
  * Create a mock reaction
  */
-export const createMockReaction = (overrides: Partial<Reaction> = {}): Reaction => ({
+export const createMockReaction = (
+  overrides: Partial<Reaction> = {}
+): Reaction => ({
   id: 'reaction_test123',
   emoji: '❤️',
   userId: 'user_test123',
@@ -126,7 +146,9 @@ export const createMockCookedEvent = (
 /**
  * Create a mock favorite
  */
-export const createMockFavorite = (overrides: Partial<Favorite> = {}): Favorite => ({
+export const createMockFavorite = (
+  overrides: Partial<Favorite> = {}
+): Favorite => ({
   id: 'favorite_test123',
   userId: 'user_test123',
   postId: 'post_test123',
@@ -164,7 +186,50 @@ export const createMockFullRecipe = () => {
   const post = createMockPost({ title: 'Full Test Recipe' });
   const recipe = createMockRecipeDetails({ postId: post.id });
   const photos = [createMockPostPhoto({ postId: post.id })];
-  const tags = [createMockTag({ name: 'dinner' }), createMockTag({ name: 'easy' })];
+  const tags = [
+    createMockTag({ name: 'dinner' }),
+    createMockTag({ name: 'easy' }),
+  ];
 
   return { post, recipe, photos, tags };
 };
+
+/**
+ * Create a mock notification
+ */
+export type MockNotification = {
+  id: string;
+  familySpaceId: string;
+  recipientId: string;
+  actorId: string;
+  type: string;
+  postId: string;
+  commentId: string | null;
+  cookedEventId: string | null;
+  emojiCounts: unknown | null;
+  totalCount: number | null;
+  metadata: unknown | null;
+  createdAt: Date;
+  updatedAt: Date;
+  readAt: Date | null;
+};
+
+export const createMockNotification = (
+  overrides: Partial<MockNotification> = {}
+): MockNotification => ({
+  id: 'notification_test123',
+  familySpaceId: 'family_test123',
+  recipientId: 'user_test123',
+  actorId: 'user_other123',
+  type: 'comment',
+  postId: 'post_test123',
+  commentId: null,
+  cookedEventId: null,
+  emojiCounts: null,
+  totalCount: null,
+  metadata: null,
+  createdAt: new Date('2024-01-01T00:00:00Z'),
+  updatedAt: new Date('2024-01-01T00:00:00Z'),
+  readAt: null,
+  ...overrides,
+});

@@ -229,6 +229,30 @@ resource "google_cloud_run_v2_service" "app" {
         }
       }
 
+      dynamic "env" {
+        for_each = var.recipe_importer_url != "" ? [1] : []
+        content {
+          name  = "RECIPE_IMPORTER_URL"
+          value = var.recipe_importer_url
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.recipe_importer_url != "" ? [1] : []
+        content {
+          name  = "RECIPE_IMPORTER_AUDIENCE"
+          value = var.recipe_importer_audience != "" ? var.recipe_importer_audience : var.recipe_importer_url
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.recipe_importer_service_account_email != "" ? [1] : []
+        content {
+          name  = "RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL"
+          value = var.recipe_importer_service_account_email
+        }
+      }
+
       volume_mounts {
         name       = "cloudsql"
         mount_path = "/cloudsql"

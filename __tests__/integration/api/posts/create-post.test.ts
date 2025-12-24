@@ -13,6 +13,10 @@
  * - Error handling (file types, size limits, invalid tags)
  */
 
+const mockResolveUrl = jest.fn(async (key?: string | null) =>
+  key ? `https://signed.example/${key}` : null
+);
+
 // Mock all dependencies BEFORE imports
 jest.mock('jose', () => ({
   SignJWT: jest.fn(),
@@ -29,11 +33,16 @@ jest.mock('@/lib/rateLimit', () => ({
   },
   applyRateLimit: jest.fn(() => null),
 }));
+jest.mock('@/lib/posts', () => ({
+  getPostDetail: jest.fn(),
+}));
 jest.mock('@/lib/uploads', () => ({
   savePhotoFile: jest.fn(async (file: File) => ({
+    storageKey: `uploads/${file.name}`,
     url: `/uploads/${file.name}`,
     filePath: `/public/uploads/${file.name}`,
   })),
+  createSignedUrlResolver: jest.fn(() => mockResolveUrl),
 }));
 jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
@@ -50,11 +59,15 @@ import {
 } from '../../helpers/test-data';
 import { parseResponseJSON } from '../../helpers/request-helpers';
 import { getCurrentUser } from '@/lib/session';
+import { getPostDetail } from '@/lib/posts';
 import { savePhotoFile } from '@/lib/uploads';
 import { revalidatePath } from 'next/cache';
 
 const mockGetCurrentUser = getCurrentUser as jest.MockedFunction<
   typeof getCurrentUser
+>;
+const mockGetPostDetail = getPostDetail as jest.MockedFunction<
+  typeof getPostDetail
 >;
 const mockSavePhotoFile = savePhotoFile as jest.MockedFunction<
   typeof savePhotoFile
@@ -63,11 +76,18 @@ const mockRevalidatePath = revalidatePath as jest.MockedFunction<
   typeof revalidatePath
 >;
 
+const resolvePostCreation = (post: any) => {
+  prismaMock.post.create.mockResolvedValue(post);
+  mockGetPostDetail.mockResolvedValue(post);
+};
+
 describe('POST /api/posts', () => {
   // Mock authenticated user (shape returned by getCurrentUser)
   const mockUser = {
     id: 'user_123',
     name: 'Test User',
+    email: 'test@example.com',
+    username: 'testuser',
     emailOrUsername: 'test@example.com',
     avatarUrl: null,
     role: 'member',
@@ -78,6 +98,14 @@ describe('POST /api/posts', () => {
   beforeEach(() => {
     resetPrismaMock();
     jest.clearAllMocks();
+    mockResolveUrl.mockReset();
+    mockResolveUrl.mockImplementation(async (key?: string | null) =>
+      key ? `https://signed.example/${key}` : null
+    );
+    mockGetPostDetail.mockReset();
+    mockGetPostDetail.mockResolvedValue(
+      createMockPost({ id: 'hydrated-post' }) as any
+    );
 
     // Default: user is authenticated
     mockGetCurrentUser.mockResolvedValue(mockUser);
@@ -206,7 +234,7 @@ describe('POST /api/posts', () => {
         }),
       } as any;
 
-      prismaMock.post.create.mockResolvedValue(mockPost);
+      resolvePostCreation(mockPost);
 
       const request = createFormDataRequest({
         title: 'Recipe with invalid course',
@@ -260,7 +288,7 @@ describe('POST /api/posts', () => {
         tags: [],
       };
 
-      prismaMock.post.create.mockResolvedValue(mockPost as any);
+      resolvePostCreation(mockPost as any);
 
       const request = createFormDataRequest({
         title: 'Simple Post',
@@ -296,10 +324,12 @@ describe('POST /api/posts', () => {
 
       mockSavePhotoFile
         .mockResolvedValueOnce({
+          storageKey: 'uploads/photo1.jpg',
           url: '/uploads/photo1.jpg',
           filePath: '/public/uploads/photo1.jpg',
         })
         .mockResolvedValueOnce({
+          storageKey: 'uploads/photo2.jpg',
           url: '/uploads/photo2.jpg',
           filePath: '/public/uploads/photo2.jpg',
         });
@@ -308,25 +338,25 @@ describe('POST /api/posts', () => {
         ...createMockPost({
           id: 'post_123',
           title: 'Post with Photos',
-          mainPhotoUrl: '/uploads/photo1.jpg',
+          mainPhotoStorageKey: 'uploads/photo1.jpg',
         }),
         photos: [
           {
             id: 'photo_1',
             postId: 'post_123',
-            url: '/uploads/photo1.jpg',
+            storageKey: 'uploads/photo1.jpg',
             sortOrder: 0,
           },
           {
             id: 'photo_2',
             postId: 'post_123',
-            url: '/uploads/photo2.jpg',
+            storageKey: 'uploads/photo2.jpg',
             sortOrder: 1,
           },
         ],
       } as any;
 
-      prismaMock.post.create.mockResolvedValue(mockPost as any);
+      resolvePostCreation(mockPost as any);
 
       const request = createFormDataRequest(
         {
@@ -342,15 +372,15 @@ describe('POST /api/posts', () => {
       expect(prismaMock.post.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            mainPhotoUrl: '/uploads/photo1.jpg',
+            mainPhotoStorageKey: 'uploads/photo1.jpg',
             photos: expect.objectContaining({
               create: expect.arrayContaining([
                 expect.objectContaining({
-                  url: '/uploads/photo1.jpg',
+                  storageKey: 'uploads/photo1.jpg',
                   sortOrder: 0,
                 }),
                 expect.objectContaining({
-                  url: '/uploads/photo2.jpg',
+                  storageKey: 'uploads/photo2.jpg',
                   sortOrder: 1,
                 }),
               ]),
@@ -366,7 +396,7 @@ describe('POST /api/posts', () => {
         title: 'New Post',
       });
 
-      prismaMock.post.create.mockResolvedValue(mockPost as any);
+      resolvePostCreation(mockPost as any);
 
       const request = createFormDataRequest({
         title: 'New Post',
@@ -409,7 +439,7 @@ describe('POST /api/posts', () => {
         },
       } as any;
 
-      prismaMock.post.create.mockResolvedValue(mockPost as any);
+      resolvePostCreation(mockPost as any);
 
       const request = createFormDataRequest({
         title: 'Chocolate Chip Cookies',
@@ -469,7 +499,7 @@ describe('POST /api/posts', () => {
         hasRecipeDetails: false,
       });
 
-      prismaMock.post.create.mockResolvedValue(mockPost as any);
+      resolvePostCreation(mockPost as any);
 
       const request = createFormDataRequest({
         title: 'Incomplete Recipe',
@@ -498,7 +528,7 @@ describe('POST /api/posts', () => {
         hasRecipeDetails: true,
       });
 
-      prismaMock.post.create.mockResolvedValue(mockPost as any);
+      resolvePostCreation(mockPost as any);
 
       const request = createFormDataRequest({
         title: 'Recipe',
@@ -532,7 +562,7 @@ describe('POST /api/posts', () => {
         hasRecipeDetails: true,
       });
 
-      prismaMock.post.create.mockResolvedValue(mockPost as any);
+      resolvePostCreation(mockPost as any);
 
       const request = createFormDataRequest({
         title: 'Recipe',
@@ -565,7 +595,7 @@ describe('POST /api/posts', () => {
         hasRecipeDetails: true,
       });
 
-      prismaMock.post.create.mockResolvedValue(mockPost as any);
+      resolvePostCreation(mockPost as any);
 
       const request = createFormDataRequest({
         title: 'Brunch Recipe',
@@ -607,7 +637,7 @@ describe('POST /api/posts', () => {
           hasRecipeDetails: true,
         });
 
-        prismaMock.post.create.mockResolvedValue(mockPost as any);
+        resolvePostCreation(mockPost as any);
 
         const request = createFormDataRequest({
           title: `${course} Recipe`,
@@ -635,7 +665,7 @@ describe('POST /api/posts', () => {
           hasRecipeDetails: true,
         });
 
-        prismaMock.post.create.mockResolvedValue(mockPost as any);
+        resolvePostCreation(mockPost as any);
 
         const request = createFormDataRequest({
           title: `${difficulty} Recipe`,
@@ -675,7 +705,7 @@ describe('POST /api/posts', () => {
         ],
       } as any;
 
-      prismaMock.post.create.mockResolvedValue(mockPost as any);
+      resolvePostCreation(mockPost as any);
 
       const request = createFormDataRequest({
         title: 'Tagged Recipe',
@@ -761,7 +791,7 @@ describe('POST /api/posts', () => {
         tags: [],
       } as any;
 
-      prismaMock.post.create.mockResolvedValue(mockPost as any);
+      resolvePostCreation(mockPost as any);
 
       const request = createFormDataRequest({
         title: 'Untagged Post',

@@ -4,7 +4,13 @@ import { reactionSchema } from '@/lib/validation';
 import { logError } from '@/lib/logger';
 import { withAuth } from '@/lib/apiAuth';
 import { reactionLimiter, applyRateLimit } from '@/lib/rateLimit';
-import { parseRequestBody, notFoundError, internalError } from '@/lib/apiErrors';
+import { upsertReactionNotification } from '@/lib/notifications';
+import {
+  parseRequestBody,
+  notFoundError,
+  internalError,
+} from '@/lib/apiErrors';
+import { createSignedUrlResolver } from '@/lib/uploads';
 
 type TargetType = 'post' | 'comment';
 
@@ -20,30 +26,44 @@ async function buildReactionSummary(targetType: TargetType, targetId: string) {
         select: {
           id: true,
           name: true,
-          avatarUrl: true,
+          avatarStorageKey: true,
         },
       },
     },
   });
 
-  const summaryMap = reactions.reduce(
-    (acc, reaction) => {
-      const entry = acc.get(reaction.emoji) ?? {
-        emoji: reaction.emoji,
-        count: 0,
-        users: [] as Array<{ id: string; name: string; avatarUrl: string | null }>,
-      };
-      entry.count += 1;
-      entry.users.push({
+  const resolveUrl = createSignedUrlResolver();
+  const enrichedReactions = await Promise.all(
+    reactions.map(async (reaction: any) => ({
+      emoji: reaction.emoji,
+      user: {
         id: reaction.user.id,
         name: reaction.user.name,
-        avatarUrl: reaction.user.avatarUrl,
-      });
-      acc.set(reaction.emoji, entry);
-      return acc;
-    },
-    new Map<string, { emoji: string; count: number; users: Array<{ id: string; name: string; avatarUrl: string | null }> }>()
+        avatarUrl: await resolveUrl(reaction.user.avatarStorageKey),
+      },
+      targetId: reaction.targetId,
+    }))
   );
+
+  const summaryMap = enrichedReactions.reduce((acc, reaction) => {
+    const entry = acc.get(reaction.emoji) ?? {
+      emoji: reaction.emoji,
+      count: 0,
+      users: [] as Array<{
+        id: string;
+        name: string;
+        avatarUrl: string | null;
+      }>,
+    };
+    entry.count += 1;
+    entry.users.push({
+      id: reaction.user.id,
+      name: reaction.user.name,
+      avatarUrl: reaction.user.avatarUrl,
+    });
+    acc.set(reaction.emoji, entry);
+    return acc;
+  }, new Map<string, { emoji: string; count: number; users: Array<{ id: string; name: string; avatarUrl: string | null }> }>());
 
   return Array.from(summaryMap.values());
 }
@@ -67,17 +87,22 @@ export const POST = withAuth(async (request, user) => {
     }
 
     const { targetType, targetId, emoji } = bodyValidation.data;
+    let targetPost: {
+      id: string;
+      authorId: string | null;
+      familySpaceId: string;
+    } | null = null;
 
     if (targetType === 'post') {
-      const post = await prisma.post.findFirst({
+      targetPost = await prisma.post.findFirst({
         where: {
           id: targetId,
           familySpaceId: user.familySpaceId,
         },
-        select: { id: true },
+        select: { id: true, authorId: true, familySpaceId: true },
       });
 
-      if (!post) {
+      if (!targetPost) {
         return notFoundError('Post not found');
       }
     } else {
@@ -117,6 +142,15 @@ export const POST = withAuth(async (request, user) => {
     }
 
     const summary = await buildReactionSummary(targetType, targetId);
+
+    if (targetType === 'post' && targetPost?.authorId) {
+      await upsertReactionNotification({
+        familySpaceId: targetPost.familySpaceId,
+        postId: targetPost.id,
+        recipientId: targetPost.authorId,
+        actorId: user.id,
+      });
+    }
 
     return NextResponse.json({
       reactions: summary,

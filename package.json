@@ -13,7 +13,7 @@
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "test:coverage": "node --require ./jest-glob-shim.js ./node_modules/.bin/jest --coverage --watchAll=false",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
     "test:unit": "jest __tests__/unit",
     "test:integration": "jest __tests__/integration",
@@ -60,7 +60,8 @@
     "tailwindcss": "^3.4.0",
     "ts-jest": "^29.4.6",
     "tsx": "^4.21.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "bcryptjs": "^2.4.3"
   },
   "overrides": {
     "glob": "^11.1.0",

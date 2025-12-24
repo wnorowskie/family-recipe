@@ -103,3 +103,22 @@ variable "github_ref" {
   description = "Git ref allowed to assume WIF (e.g., refs/heads/develop)"
   type        = string
 }
+
+# Recipe Importer integration
+variable "recipe_importer_url" {
+  description = "URL of the Recipe Importer Cloud Run service"
+  type        = string
+  default     = ""
+}
+
+variable "recipe_importer_audience" {
+  description = "Audience for Recipe Importer IAM auth (defaults to recipe_importer_url if empty)"
+  type        = string
+  default     = ""
+}
+
+variable "recipe_importer_service_account_email" {
+  description = "Service account email for authenticating to Recipe Importer"
+  type        = string
+  default     = ""
+}
