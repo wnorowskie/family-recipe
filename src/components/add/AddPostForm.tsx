@@ -337,6 +337,25 @@ export default function AddPostForm({
     );
   }, [ingredients, steps, recipe, tags, selectedCourses]);
 
+  const recipeHasCoreDetails = useMemo(() => {
+    const hasIngredientContent = ingredients.some(
+      (ingredient) => ingredient.name.trim() || ingredient.quantity.trim()
+    );
+    const hasStepContent = steps.some((step) => step.text.trim().length > 0);
+    const hasDuration =
+      Number(recipe.totalTimeHours) > 0 || Number(recipe.totalTimeMinutes) > 0;
+
+    return (
+      recipe.origin.trim().length > 0 ||
+      hasDuration ||
+      recipe.difficulty.length > 0 ||
+      hasIngredientContent ||
+      hasStepContent ||
+      tags.length > 0 ||
+      selectedCourses.length > 0
+    );
+  }, [ingredients, steps, recipe, tags, selectedCourses]);
+
   const coverPhotoId = photos[0]?.id;
 
   function handleReset() {
@@ -517,6 +536,7 @@ export default function AddPostForm({
   function applyImportedRecipe(
     prefill: ReturnType<typeof mapImporterResponseToPrefill>
   ) {
+    const preservedCaption = caption;
     setRecipeOpen(true);
     if (prefill.title) {
       setTitle(prefill.title);
@@ -548,6 +568,9 @@ export default function AddPostForm({
 
     setIngredients(mappedIngredients);
     setSteps(mappedSteps);
+
+    // Keep whatever caption the user already entered
+    setCaption(preservedCaption);
 
     if (prefill.lowConfidence) {
       setImportWarning(
@@ -652,7 +675,7 @@ export default function AddPostForm({
       .filter((text) => text.length > 0);
 
     if (
-      recipeHasAnyData &&
+      recipeHasCoreDetails &&
       (!sanitizedIngredients.length || !sanitizedSteps.length)
     ) {
       setFormError(
@@ -1023,7 +1046,7 @@ export default function AddPostForm({
                 <input
                   type="text"
                   className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                  placeholder="Family story or origin"
+                  placeholder="Story / Source / Origin"
                   value={recipe.origin}
                   onChange={(event) =>
                     handleRecipeChange('origin', event.target.value)
