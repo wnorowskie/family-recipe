@@ -12,6 +12,7 @@ resource "google_sql_database_instance" "this" {
     disk_size         = var.disk_size_gb
     disk_autoresize   = true
     availability_type = "ZONAL"
+    activation_policy = var.activation_policy
 
     ip_configuration {
       ipv4_enabled = var.enable_public_ip

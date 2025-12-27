@@ -46,6 +46,12 @@ variable "tier" {
   type        = string
 }
 
+variable "activation_policy" {
+  description = "When to run the instance (ALWAYS or NEVER)"
+  type        = string
+  default     = "ALWAYS"
+}
+
 variable "disk_size_gb" {
   description = "Disk size in GB"
   type        = number

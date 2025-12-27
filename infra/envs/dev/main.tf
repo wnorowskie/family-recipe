@@ -36,6 +36,7 @@ module "sql_instance" {
   db_user                   = var.db_user
   db_password               = var.db_password
   tier                      = var.tier
+  activation_policy         = var.activation_policy
   disk_size_gb              = var.disk_size_gb
   backup_retention_days     = var.backup_retention_days
   maintenance_window_day    = var.maintenance_window_day

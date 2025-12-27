@@ -63,6 +63,12 @@ variable "tier" {
   default     = "db-custom-1-3840"
 }
 
+variable "activation_policy" {
+  description = "When to run the Cloud SQL instance (ALWAYS to keep on, NEVER to keep stopped)"
+  type        = string
+  default     = "ALWAYS"
+}
+
 variable "disk_size_gb" {
   description = "Disk size in GB"
   type        = number
