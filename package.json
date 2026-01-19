@@ -68,7 +68,8 @@
   },
   "overrides": {
     "glob": "^11.1.0",
-    "cross-spawn": "^7.0.6"
+    "cross-spawn": "^7.0.6",
+    "tar": "^7.5.3"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
