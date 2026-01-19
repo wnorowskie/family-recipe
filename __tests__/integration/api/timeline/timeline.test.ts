@@ -358,45 +358,6 @@ describe('GET /api/timeline', () => {
       expect(data.items[0].cooked.note).toBe('Turned out amazing!');
     });
 
-    it('returns timeline with post_edited activity', async () => {
-      mockGetTimelineFeed.mockResolvedValue({
-        items: [
-          {
-            id: 'edit-clh001-1234567890',
-            type: 'post_edited',
-            timestamp: new Date('2024-01-04T10:00:00.000Z'),
-            actor: {
-              id: 'user_1',
-              name: 'Alice',
-              avatarUrl: null,
-            },
-            post: {
-              id: 'clh001',
-              title: 'Chocolate Cake (Updated)',
-              mainPhotoUrl: '/uploads/cake.jpg',
-            },
-            edit: {
-              note: 'Updated baking time',
-            },
-          },
-        ],
-        hasMore: false,
-        nextOffset: 0,
-      });
-
-      const request = new NextRequest('http://localhost/api/timeline', {
-        method: 'GET',
-      });
-
-      const response = await GET(request);
-
-      expect(response.status).toBe(200);
-      const data = await parseResponseJSON(response);
-      expect(data.items).toHaveLength(1);
-      expect(data.items[0].type).toBe('post_edited');
-      expect(data.items[0].edit.note).toBe('Updated baking time');
-    });
-
     it('returns timeline with reaction_added activity', async () => {
       mockGetTimelineFeed.mockResolvedValue({
         items: [

@@ -1,5 +1,3 @@
-import { prisma } from '@/lib/prisma';
-
 export interface TagRecord {
   id: string;
   name: string;
@@ -8,18 +6,24 @@ export interface TagRecord {
 
 export type TagGroup = Record<string, TagRecord[]>;
 
-export async function getAllTags(): Promise<TagGroup> {
-  const tags = await prisma.tag.findMany({
-    orderBy: [{ type: 'asc' }, { name: 'asc' }],
-  });
+const TAG_GROUP_DEFINITIONS: Array<{ type: string; names: string[] }> = [
+  {
+    type: 'diet-preference',
+    names: ['vegetarian', 'vegan', 'pescatarian'],
+  },
+  {
+    type: 'allergen-safe',
+    names: ['nut-free', 'dairy-free', 'gluten-free'],
+  },
+];
 
-  const tagArray = tags as TagRecord[];
-  return tagArray.reduce((groups: TagGroup, tag: TagRecord) => {
-    const key = tag.type ?? 'other';
-    if (!groups[key]) {
-      groups[key] = [];
-    }
-    groups[key].push(tag);
+export async function getAllTags(): Promise<TagGroup> {
+  return TAG_GROUP_DEFINITIONS.reduce((groups: TagGroup, group) => {
+    groups[group.type] = group.names.map((name) => ({
+      id: `${group.type}:${name}`,
+      name,
+      type: group.type,
+    }));
     return groups;
   }, {} as TagGroup);
 }

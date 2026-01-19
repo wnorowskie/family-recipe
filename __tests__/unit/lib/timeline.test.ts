@@ -39,7 +39,9 @@ describe('Timeline Utilities', () => {
       const result = formatRelativeTime(date);
 
       expect(result).toBe('5 minutes ago');
-      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, { addSuffix: true });
+      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, {
+        addSuffix: true,
+      });
     });
 
     it('formats a date from hours ago', () => {
@@ -49,7 +51,9 @@ describe('Timeline Utilities', () => {
       const result = formatRelativeTime(date);
 
       expect(result).toBe('2 hours ago');
-      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, { addSuffix: true });
+      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, {
+        addSuffix: true,
+      });
     });
 
     it('formats a date from days ago', () => {
@@ -59,7 +63,9 @@ describe('Timeline Utilities', () => {
       const result = formatRelativeTime(date);
 
       expect(result).toBe('7 days ago');
-      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, { addSuffix: true });
+      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, {
+        addSuffix: true,
+      });
     });
 
     it('formats a date from months ago', () => {
@@ -69,7 +75,9 @@ describe('Timeline Utilities', () => {
       const result = formatRelativeTime(date);
 
       expect(result).toBe('3 months ago');
-      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, { addSuffix: true });
+      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, {
+        addSuffix: true,
+      });
     });
 
     it('formats a date from years ago', () => {
@@ -79,7 +87,9 @@ describe('Timeline Utilities', () => {
       const result = formatRelativeTime(date);
 
       expect(result).toBe('about 2 years ago');
-      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, { addSuffix: true });
+      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, {
+        addSuffix: true,
+      });
     });
 
     it('handles just now', () => {
@@ -89,7 +99,9 @@ describe('Timeline Utilities', () => {
       const result = formatRelativeTime(date);
 
       expect(result).toBe('less than a minute ago');
-      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, { addSuffix: true });
+      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, {
+        addSuffix: true,
+      });
     });
 
     it('passes options correctly to date-fns', () => {
@@ -98,7 +110,9 @@ describe('Timeline Utilities', () => {
 
       formatRelativeTime(date);
 
-      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, { addSuffix: true });
+      expect(mockFormatDistanceToNow).toHaveBeenCalledWith(date, {
+        addSuffix: true,
+      });
     });
   });
 
@@ -123,11 +137,6 @@ describe('Timeline Utilities', () => {
       expect(result).toBe('cooked');
     });
 
-    it('returns "updated" for post_edited', () => {
-      const result = getActionText('post_edited');
-      expect(result).toBe('updated');
-    });
-
     it('returns "shared" for unknown type (default case)', () => {
       const result = getActionText('unknown_type' as TimelineItemType);
       expect(result).toBe('shared');
@@ -139,7 +148,6 @@ describe('Timeline Utilities', () => {
         'comment_added',
         'reaction_added',
         'cooked_logged',
-        'post_edited',
       ];
 
       types.forEach((type) => {

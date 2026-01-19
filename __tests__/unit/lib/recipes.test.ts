@@ -86,7 +86,7 @@ describe('Recipe Utilities', () => {
 
       const args = latestPostArgs();
       expect(args?.where?.AND).toContainEqual({
-        title: { contains: 'cake' },
+        title: { contains: 'cake', mode: 'insensitive' },
       });
     });
 
@@ -283,7 +283,7 @@ describe('Recipe Utilities', () => {
 
       const args = latestPostArgs();
       expect(args.where?.AND).toEqual([
-        { title: { contains: 'pasta' } },
+        { title: { contains: 'pasta', mode: 'insensitive' } },
         { authorId: { in: ['auth_1'] } },
         {
           OR: [
