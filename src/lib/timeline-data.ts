@@ -25,7 +25,6 @@ interface RawTimelineResult {
   reactionEmoji?: string;
   cookedRating?: number | null;
   cookedNote?: string | null;
-  editNote?: string | null;
 }
 
 export async function getTimelineFeed({
@@ -140,41 +139,6 @@ export async function getTimelineFeed({
     },
   });
 
-  const editEvents = await prisma.post.findMany({
-    where: {
-      familySpaceId,
-      lastEditAt: {
-        not: null,
-      },
-    },
-    orderBy: {
-      lastEditAt: 'desc',
-    },
-    take: limit + offset + 5,
-    select: {
-      id: true,
-      title: true,
-      mainPhotoStorageKey: true,
-      createdAt: true,
-      lastEditAt: true,
-      lastEditNote: true,
-      editor: {
-        select: {
-          id: true,
-          name: true,
-          avatarStorageKey: true,
-        },
-      },
-      author: {
-        select: {
-          id: true,
-          name: true,
-          avatarStorageKey: true,
-        },
-      },
-    },
-  });
-
   const raw: RawTimelineResult[] = [];
 
   postEvents.forEach((event: any) =>
@@ -238,32 +202,6 @@ export async function getTimelineFeed({
     })
   );
 
-  editEvents.forEach((event: any) => {
-    if (!event.lastEditAt) {
-      return;
-    }
-    if (event.lastEditAt.getTime() === event.createdAt.getTime()) {
-      return;
-    }
-    const actor = event.editor ?? event.author;
-    if (!actor) {
-      return;
-    }
-    // Skip edit events that occurred at creation time
-    raw.push({
-      id: `edit-${event.id}-${event.lastEditAt.getTime()}`,
-      type: 'post_edited',
-      createdAt: event.lastEditAt,
-      actorId: actor.id,
-      actorName: actor.name,
-      actorAvatar: actor.avatarStorageKey,
-      postId: event.id,
-      postTitle: event.title,
-      postPhoto: event.mainPhotoStorageKey,
-      editNote: event.lastEditNote ?? null,
-    });
-  });
-
   raw.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   const slice = raw.slice(offset, offset + limit);
@@ -318,14 +256,6 @@ export async function getTimelineFeed({
             cooked: {
               rating: entry.cookedRating ?? null,
               note: entry.cookedNote ?? null,
-            },
-          };
-        case 'post_edited':
-          return {
-            ...base,
-            type: 'post_edited' as const,
-            edit: {
-              note: entry.editNote ?? null,
             },
           };
         default:

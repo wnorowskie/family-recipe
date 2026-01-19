@@ -4,8 +4,7 @@ export type TimelineItemType =
   | 'post_created'
   | 'comment_added'
   | 'reaction_added'
-  | 'cooked_logged'
-  | 'post_edited';
+  | 'cooked_logged';
 
 export interface TimelineActor {
   id: string;
@@ -62,23 +61,11 @@ export interface CookedLoggedItem {
   };
 }
 
-export interface PostEditedItem {
-  id: string;
-  type: 'post_edited';
-  timestamp: Date;
-  actor: TimelineActor;
-  post: TimelinePostSummary;
-  edit: {
-    note: string | null;
-  };
-}
-
 export type TimelineItem =
   | PostCreatedItem
   | CommentAddedItem
   | ReactionAddedItem
-  | CookedLoggedItem
-  | PostEditedItem;
+  | CookedLoggedItem;
 
 export function formatRelativeTime(date: Date): string {
   return formatDistanceToNow(date, { addSuffix: true });
@@ -94,8 +81,6 @@ export function getActionText(type: TimelineItemType): string {
       return 'reacted to';
     case 'cooked_logged':
       return 'cooked';
-    case 'post_edited':
-      return 'updated';
     default:
       return 'shared';
   }

@@ -86,7 +86,7 @@ describe('Recipe Utilities', () => {
 
       const args = latestPostArgs();
       expect(args?.where?.AND).toContainEqual({
-        title: { contains: 'cake' },
+        title: { contains: 'cake', mode: 'insensitive' },
       });
     });
 

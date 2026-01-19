@@ -116,6 +116,7 @@ export async function getRecipes(
       andFilters.push({
         title: {
           contains: searchValue,
+          mode: 'insensitive',
         },
       });
     }

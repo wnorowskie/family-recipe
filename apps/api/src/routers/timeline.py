@@ -46,12 +46,6 @@ async def get_timeline(
             take=take,
             include={"user": True, "post": True},
         )
-        edit_events = await prisma.post.find_many(
-            where={"familySpaceId": user.familySpaceId, "lastEditAt": {"not": None}},
-            order={"lastEditAt": "desc"},
-            take=take,
-            include={"editor": True, "author": True},
-        )
 
         def _post_summary(post):
             """Extract only the fields we need from a post object."""
@@ -103,24 +97,6 @@ async def get_timeline(
                     "cooked": {"rating": event.rating, "note": event.note},
                 }
             )
-        for event in edit_events:
-            if not event.lastEditAt:
-                continue
-            actor = event.editor or event.author
-            if not actor:
-                continue
-            if event.lastEditAt == event.createdAt:
-                continue
-            raw.append(
-                {
-                    "id": f"edit-{event.id}-{int(event.lastEditAt.timestamp()*1000)}",
-                    "createdAt": event.lastEditAt,
-                    "type": "post_edited",
-                    "actor": actor,
-                    "post": {"id": event.id, "title": event.title, "mainPhotoUrl": event.mainPhotoUrl},
-                    "edit": {"note": event.lastEditNote},
-                }
-            )
 
         raw.sort(key=lambda e: e["createdAt"], reverse=True)
         slice_items = raw[offset : offset + limit]
@@ -132,7 +108,6 @@ async def get_timeline(
                 "comment_added": "commented on",
                 "reaction_added": "reacted to",
                 "cooked_logged": "cooked",
-                "post_edited": "updated",
             }
             return mapping.get(entry_type, "shared")
 
@@ -151,7 +126,6 @@ async def get_timeline(
                 **({"comment": entry["comment"]} if "comment" in entry else {}),
                 **({"reaction": entry["reaction"]} if "reaction" in entry else {}),
                 **({"cooked": entry["cooked"]} if "cooked" in entry else {}),
-                **({"edit": entry["edit"]} if "edit" in entry else {}),
             }
             for entry in slice_items
         ]

@@ -92,21 +92,6 @@ class TestTimelineRouter:
             post=post or self._post_summary(cooked_id),
         )
 
-    def _edit_post(
-        self,
-        *,
-        post_id: str = "post-edit",
-        last_edit_at: datetime | None = None,
-        author: SimpleNamespace | None = None,
-        editor: SimpleNamespace | None = None,
-        note: str = "Updated",
-    ) -> SimpleNamespace:
-        post = self._post(post_id=post_id, created_at=self._ts(4), author=author or self._actor("author"))
-        post.lastEditAt = last_edit_at or self._ts(5)
-        post.lastEditNote = note
-        post.editor = editor or self._actor("editor")
-        return post
-
     def _mock_events(
         self,
         mock_prisma,
@@ -115,9 +100,8 @@ class TestTimelineRouter:
         comments: list[SimpleNamespace] | None = None,
         reactions: list[SimpleNamespace] | None = None,
         cooked: list[SimpleNamespace] | None = None,
-        edits: list[SimpleNamespace] | None = None,
     ) -> None:
-        mock_prisma.post.find_many = AsyncMock(side_effect=[posts or [], edits or []])
+        mock_prisma.post.find_many = AsyncMock(return_value=posts or [])
         mock_prisma.comment.find_many = AsyncMock(return_value=comments or [])
         mock_prisma.reaction.find_many = AsyncMock(return_value=reactions or [])
         mock_prisma.cookedevent.find_many = AsyncMock(return_value=cooked or [])
@@ -127,15 +111,14 @@ class TestTimelineRouter:
         comment = self._comment(comment_id="comment-mixed", created_at=self._ts(9))
         reaction = self._reaction(reaction_id="reaction-mixed", created_at=self._ts(8))
         cooked = self._cooked(cooked_id="cooked-mixed", created_at=self._ts(7))
-        edit = self._edit_post(post_id="post-edit-mixed", last_edit_at=self._ts(11))
-        self._mock_events(mock_prisma, posts=[post], comments=[comment], reactions=[reaction], cooked=[cooked], edits=[edit])
+        self._mock_events(mock_prisma, posts=[post], comments=[comment], reactions=[reaction], cooked=[cooked])
 
         response = client.get("/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         body = response.json()
         types = {item["type"] for item in body["items"]}
-        assert types == {"post_created", "comment_added", "reaction_added", "cooked_logged", "post_edited"}
+        assert types == {"post_created", "comment_added", "reaction_added", "cooked_logged"}
 
     def test_timeline_post_created_event(self, client, mock_prisma, member_auth):
         post = self._post(post_id="post-created", created_at=self._ts(5), title="Fresh Post")
@@ -180,19 +163,6 @@ class TestTimelineRouter:
         item = response.json()["items"][0]
         assert item["type"] == "cooked_logged"
         assert item["cooked"] == {"rating": 3, "note": "Could be spicier"}
-
-    def test_timeline_post_edited_event(self, client, mock_prisma, member_auth):
-        edit_post = self._edit_post(post_id="post-edit-1", note="Caption fix", last_edit_at=self._ts(12))
-        self._mock_events(mock_prisma, posts=[], edits=[edit_post])
-
-        response = client.get("/timeline", headers=member_auth)
-
-        assert response.status_code == 200, response.json()
-        item = response.json()["items"][0]
-        assert item["type"] == "post_edited"
-        assert item["edit"]["note"] == "Caption fix"
-        assert item["actionText"] == "updated"
-        assert item["actor"]["id"] == "user-editor"
 
     def test_timeline_sorted_by_date(self, client, mock_prisma, member_auth):
         older = self._post(post_id="post-old", created_at=self._ts(1))
@@ -245,8 +215,7 @@ class TestTimelineRouter:
         comment = self._comment(comment_id="comment-action", created_at=self._ts(10))
         reaction = self._reaction(reaction_id="reaction-action", created_at=self._ts(9))
         cooked = self._cooked(cooked_id="cooked-action", created_at=self._ts(8))
-        edit = self._edit_post(post_id="post-action-edit", last_edit_at=self._ts(12))
-        self._mock_events(mock_prisma, posts=[post], comments=[comment], reactions=[reaction], cooked=[cooked], edits=[edit])
+        self._mock_events(mock_prisma, posts=[post], comments=[comment], reactions=[reaction], cooked=[cooked])
 
         response = client.get("/timeline", headers=member_auth)
 
@@ -256,7 +225,6 @@ class TestTimelineRouter:
         assert mapping["comment_added"] == "commented on"
         assert mapping["reaction_added"] == "reacted to"
         assert mapping["cooked_logged"] == "cooked"
-        assert mapping["post_edited"] == "updated"
 
     def test_timeline_includes_actor(self, client, mock_prisma, member_auth):
         actor = self._actor("special")
@@ -287,7 +255,6 @@ class TestTimelineRouter:
         assert response.status_code == 200, response.json()
         post_calls = mock_prisma.post.find_many.await_args_list
         assert post_calls[0].kwargs["where"] == {"familySpaceId": "family_test_123"}
-        assert post_calls[1].kwargs["where"]["familySpaceId"] == "family_test_123"
         assert mock_prisma.comment.find_many.await_args.kwargs["where"]["post"]["familySpaceId"] == "family_test_123"
         assert mock_prisma.reaction.find_many.await_args.kwargs["where"]["post"]["familySpaceId"] == "family_test_123"
         assert mock_prisma.cookedevent.find_many.await_args.kwargs["where"]["post"]["familySpaceId"] == "family_test_123"
