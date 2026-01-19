@@ -3,8 +3,6 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 # Install OpenSSL so Prisma can detect and link against libssl
 RUN apk add --no-cache openssl
-# Upgrade npm to latest version to fix bundled dependency vulnerabilities
-RUN npm install -g npm@latest
 
 FROM base AS deps
 ENV NODE_ENV=development
@@ -32,6 +30,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/package.json /app/package-lock.json ./
 COPY --from=builder /app/prisma ./prisma
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["node", "./node_modules/.bin/next", "start"]

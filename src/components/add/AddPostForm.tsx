@@ -3,6 +3,14 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 import { ingredientUnitOptions } from '@/lib/ingredients';
 import { MAX_PHOTO_COUNT } from '@/lib/postPayload';
@@ -65,6 +73,173 @@ interface IngredientRow {
 interface StepRow {
   id: string;
   text: string;
+}
+
+interface SortableIngredientRowProps {
+  ingredient: IngredientRow;
+  index: number;
+  canRemove: boolean;
+  onRemove: (id: string) => void;
+  onChange: (
+    id: string,
+    field: keyof Omit<IngredientRow, 'id'>,
+    value: string
+  ) => void;
+}
+
+function SortableIngredientRow({
+  ingredient,
+  index,
+  canRemove,
+  onRemove,
+  onChange,
+}: SortableIngredientRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id: ingredient.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} className="space-y-3" style={style}>
+      <div className="group rounded-xl border border-gray-200 p-3 space-y-3">
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>Ingredient {index + 1}</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded-full border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-700"
+              aria-label="Reorder ingredient"
+              title="Drag to reorder"
+              {...attributes}
+              {...listeners}
+            >
+              ↕
+            </button>
+            {canRemove && (
+              <button
+                type="button"
+                onClick={() => onRemove(ingredient.id)}
+                className="rounded-full border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-600 hover:border-red-300"
+                aria-label="Remove ingredient"
+                title="Remove ingredient"
+              >
+                -
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div className="sm:col-span-2">
+            <input
+              type="text"
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              placeholder="Ingredient name"
+              value={ingredient.name}
+              data-ingredient-focus={ingredient.id}
+              onChange={(event) =>
+                onChange(ingredient.id, 'name', event.target.value)
+              }
+            />
+          </div>
+          <div>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              placeholder="Qty"
+              value={ingredient.quantity}
+              onChange={(event) =>
+                onChange(ingredient.id, 'quantity', event.target.value)
+              }
+            />
+          </div>
+          <div>
+            <select
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              value={ingredient.unit}
+              onChange={(event) =>
+                onChange(ingredient.id, 'unit', event.target.value)
+              }
+            >
+              {ingredientUnitOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface SortableStepRowProps {
+  step: StepRow;
+  index: number;
+  canRemove: boolean;
+  onRemove: (id: string) => void;
+  onChange: (id: string, text: string) => void;
+}
+
+function SortableStepRow({
+  step,
+  index,
+  canRemove,
+  onRemove,
+  onChange,
+}: SortableStepRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id: step.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} className="space-y-3" style={style}>
+      <div className="group rounded-xl border border-gray-200 p-3 space-y-2">
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>Step {index + 1}</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded-full border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-700"
+              aria-label="Reorder step"
+              title="Drag to reorder"
+              {...attributes}
+              {...listeners}
+            >
+              ↕
+            </button>
+            {canRemove && (
+              <button
+                type="button"
+                onClick={() => onRemove(step.id)}
+                className="rounded-full border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-600 hover:border-red-300"
+                aria-label="Remove step"
+                title="Remove step"
+              >
+                -
+              </button>
+            )}
+          </div>
+        </div>
+        <textarea
+          className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+          placeholder="Describe this step"
+          rows={3}
+          value={step.text}
+          data-step-focus={step.id}
+          onChange={(event) => onChange(step.id, event.target.value)}
+        />
+      </div>
+    </div>
+  );
 }
 
 interface PostFormRecipeDetails {
@@ -273,6 +448,12 @@ export default function AddPostForm({
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importWarning, setImportWarning] = useState<string | null>(null);
+  const [pendingIngredientFocusId, setPendingIngredientFocusId] = useState<
+    string | null
+  >(null);
+  const [pendingStepFocusId, setPendingStepFocusId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     return () => {
@@ -316,6 +497,38 @@ export default function AddPostForm({
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!pendingIngredientFocusId) {
+      return;
+    }
+
+    const input = document.querySelector<HTMLInputElement>(
+      `[data-ingredient-focus="${pendingIngredientFocusId}"]`
+    );
+
+    if (input) {
+      input.focus();
+    }
+
+    setPendingIngredientFocusId(null);
+  }, [ingredients, pendingIngredientFocusId]);
+
+  useEffect(() => {
+    if (!pendingStepFocusId) {
+      return;
+    }
+
+    const textarea = document.querySelector<HTMLTextAreaElement>(
+      `[data-step-focus="${pendingStepFocusId}"]`
+    );
+
+    if (textarea) {
+      textarea.focus();
+    }
+
+    setPendingStepFocusId(null);
+  }, [steps, pendingStepFocusId]);
 
   const recipeHasAnyData = useMemo(() => {
     const hasIngredientContent = ingredients.some(
@@ -487,7 +700,25 @@ export default function AddPostForm({
   }
 
   function addIngredientRow() {
-    setIngredients((prev) => [...prev, createIngredientRow()]);
+    const newRow = createIngredientRow();
+    setIngredients((prev) => [...prev, newRow]);
+    setPendingIngredientFocusId(newRow.id);
+  }
+
+  function handleIngredientDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    setIngredients((prev) => {
+      const oldIndex = prev.findIndex((row) => row.id === active.id);
+      const newIndex = prev.findIndex((row) => row.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) {
+        return prev;
+      }
+      return arrayMove(prev, oldIndex, newIndex);
+    });
   }
 
   function removeIngredientRow(id: string) {
@@ -508,7 +739,25 @@ export default function AddPostForm({
   }
 
   function addStepRow() {
-    setSteps((prev) => [...prev, createStepRow()]);
+    const newRow = createStepRow();
+    setSteps((prev) => [...prev, newRow]);
+    setPendingStepFocusId(newRow.id);
+  }
+
+  function handleStepDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    setSteps((prev) => {
+      const oldIndex = prev.findIndex((row) => row.id === active.id);
+      const newIndex = prev.findIndex((row) => row.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) {
+        return prev;
+      }
+      return arrayMove(prev, oldIndex, newIndex);
+    });
   }
 
   function removeStepRow(id: string) {
@@ -1162,86 +1411,39 @@ export default function AddPostForm({
                 <label className="text-sm font-medium text-gray-700">
                   Ingredients
                 </label>
+              </div>
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragEnd={handleIngredientDragEnd}
+              >
+                <SortableContext
+                  items={ingredients.map((ingredient) => ingredient.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {ingredients.map((ingredient, index) => (
+                      <SortableIngredientRow
+                        key={ingredient.id}
+                        ingredient={ingredient}
+                        index={index}
+                        canRemove={ingredients.length > 1}
+                        onRemove={removeIngredientRow}
+                        onChange={handleIngredientChange}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+              <div className="flex items-center justify-center">
                 <button
                   type="button"
-                  className="text-sm font-semibold text-gray-900"
                   onClick={addIngredientRow}
+                  className="h-8 w-8 rounded-full border border-gray-200 text-sm font-semibold text-gray-700"
+                  aria-label="Add ingredient"
+                  title="Add ingredient"
                 >
-                  + Add ingredient
+                  +
                 </button>
-              </div>
-              <div className="space-y-3">
-                {ingredients.map((ingredient, index) => (
-                  <div
-                    key={ingredient.id}
-                    className="rounded-xl border border-gray-200 p-3 space-y-3"
-                  >
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>Ingredient {index + 1}</span>
-                      {ingredients.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeIngredientRow(ingredient.id)}
-                          className="text-red-600 font-semibold"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                      <div className="sm:col-span-2">
-                        <input
-                          type="text"
-                          className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                          placeholder="Ingredient name"
-                          value={ingredient.name}
-                          onChange={(event) =>
-                            handleIngredientChange(
-                              ingredient.id,
-                              'name',
-                              event.target.value
-                            )
-                          }
-                        />
-                      </div>
-                      <div>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                          placeholder="Qty"
-                          value={ingredient.quantity}
-                          onChange={(event) =>
-                            handleIngredientChange(
-                              ingredient.id,
-                              'quantity',
-                              event.target.value
-                            )
-                          }
-                        />
-                      </div>
-                      <div>
-                        <select
-                          className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                          value={ingredient.unit}
-                          onChange={(event) =>
-                            handleIngredientChange(
-                              ingredient.id,
-                              'unit',
-                              event.target.value
-                            )
-                          }
-                        >
-                          {ingredientUnitOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
 
@@ -1250,43 +1452,39 @@ export default function AddPostForm({
                 <label className="text-sm font-medium text-gray-700">
                   Steps
                 </label>
+              </div>
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragEnd={handleStepDragEnd}
+              >
+                <SortableContext
+                  items={steps.map((step) => step.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {steps.map((step, index) => (
+                      <SortableStepRow
+                        key={step.id}
+                        step={step}
+                        index={index}
+                        canRemove={steps.length > 1}
+                        onRemove={removeStepRow}
+                        onChange={handleStepChange}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+              <div className="flex items-center justify-center">
                 <button
                   type="button"
-                  className="text-sm font-semibold text-gray-900"
                   onClick={addStepRow}
+                  className="h-8 w-8 rounded-full border border-gray-200 text-sm font-semibold text-gray-700"
+                  aria-label="Add step"
+                  title="Add step"
                 >
-                  + Add step
+                  +
                 </button>
-              </div>
-              <div className="space-y-3">
-                {steps.map((step, index) => (
-                  <div
-                    key={step.id}
-                    className="rounded-xl border border-gray-200 p-3 space-y-2"
-                  >
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>Step {index + 1}</span>
-                      {steps.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeStepRow(step.id)}
-                          className="text-red-600 font-semibold"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    <textarea
-                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                      placeholder="Describe this step"
-                      rows={3}
-                      value={step.text}
-                      onChange={(event) =>
-                        handleStepChange(step.id, event.target.value)
-                      }
-                    />
-                  </div>
-                ))}
               </div>
             </div>
 

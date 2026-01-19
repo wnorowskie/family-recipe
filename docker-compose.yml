@@ -39,8 +39,8 @@ services:
     volumes:
       - ./public/uploads:/app/public/uploads
     command: >
-      sh -c "npx prisma migrate deploy --schema ${PRISMA_SCHEMA:-prisma/schema.postgres.prisma} &&
-      npm run start"
+      sh -c "/app/node_modules/.bin/prisma migrate deploy --schema ${PRISMA_SCHEMA:-prisma/schema.postgres.prisma} &&
+      node /app/node_modules/.bin/next start"
 
   # fastapi:
   #   build:
