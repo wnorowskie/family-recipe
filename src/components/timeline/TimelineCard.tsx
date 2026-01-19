@@ -32,8 +32,6 @@ function getMetadata(item: TimelineItem): string | null {
         return `${item.cooked.rating} ★`;
       }
       return null;
-    case 'post_edited':
-      return null;
     default:
       return null;
   }
@@ -51,18 +49,7 @@ function renderExtra(item: TimelineItem) {
       if (!item.cooked?.note) {
         return null;
       }
-      return (
-        <p className="text-sm text-gray-600">“{item.cooked.note}”</p>
-      );
-    case 'post_edited':
-      if (!item.edit?.note) {
-        return null;
-      }
-      return (
-        <div className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">
-          “{item.edit.note}”
-        </div>
-      );
+      return <p className="text-sm text-gray-600">“{item.cooked.note}”</p>;
     default:
       return null;
   }

@@ -428,181 +428,6 @@ describe('Timeline Data Aggregation', () => {
     });
   });
 
-  describe('getTimelineFeed - Edit Events', () => {
-    it('returns post_edited events', async () => {
-      const createdAt = new Date('2024-01-01T10:00:00.000Z');
-      const editedAt = new Date('2024-01-01T14:00:00.000Z');
-
-      const mockEditedPost = withPostStorage({
-        id: 'post_1',
-        title: 'Chocolate Cake (Updated)',
-        mainPhotoUrl: '/cake.jpg',
-        createdAt,
-        lastEditAt: editedAt,
-        lastEditNote: 'Updated baking time',
-        editor: {
-          id: 'user_5',
-          name: 'Eve',
-          avatarUrl: null,
-        },
-        author: {
-          id: 'user_1',
-          name: 'Alice',
-          avatarUrl: null,
-        },
-      });
-
-      prismaMock.post.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValue([mockEditedPost] as any);
-      prismaMock.comment.findMany.mockResolvedValue([]);
-      prismaMock.reaction.findMany.mockResolvedValue([]);
-      prismaMock.cookedEvent.findMany.mockResolvedValue([]);
-
-      const result = await getTimelineFeed({ familySpaceId: 'family_1' });
-
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0]).toEqual({
-        id: `edit-post_1-${editedAt.getTime()}`,
-        type: 'post_edited',
-        timestamp: editedAt,
-        actor: {
-          id: 'user_5',
-          name: 'Eve',
-          avatarUrl: null,
-        },
-        post: {
-          id: 'post_1',
-          title: 'Chocolate Cake (Updated)',
-          mainPhotoUrl: '/cake.jpg',
-        },
-        edit: {
-          note: 'Updated baking time',
-        },
-      });
-    });
-
-    it('uses author as actor when editor is null', async () => {
-      const createdAt = new Date('2024-01-01T10:00:00.000Z');
-      const editedAt = new Date('2024-01-01T14:00:00.000Z');
-
-      const mockEditedPost = withPostStorage({
-        id: 'post_1',
-        title: 'Recipe',
-        mainPhotoUrl: null,
-        createdAt,
-        lastEditAt: editedAt,
-        lastEditNote: null,
-        editor: null,
-        author: {
-          id: 'user_1',
-          name: 'Alice',
-          avatarUrl: null,
-        },
-      });
-
-      prismaMock.post.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValue([mockEditedPost] as any);
-      prismaMock.comment.findMany.mockResolvedValue([]);
-      prismaMock.reaction.findMany.mockResolvedValue([]);
-      prismaMock.cookedEvent.findMany.mockResolvedValue([]);
-
-      const result = await getTimelineFeed({ familySpaceId: 'family_1' });
-
-      expect(result.items[0].actor).toEqual({
-        id: 'user_1',
-        name: 'Alice',
-        avatarUrl: null,
-      });
-    });
-
-    it('skips edit events when lastEditAt is null', async () => {
-      const mockPost = withPostStorage({
-        id: 'post_1',
-        title: 'Recipe',
-        mainPhotoUrl: null,
-        createdAt: new Date('2024-01-01T10:00:00.000Z'),
-        lastEditAt: null,
-        lastEditNote: null,
-        editor: null,
-        author: {
-          id: 'user_1',
-          name: 'Alice',
-          avatarUrl: null,
-        },
-      });
-
-      prismaMock.post.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValue([mockPost] as any);
-      prismaMock.comment.findMany.mockResolvedValue([]);
-      prismaMock.reaction.findMany.mockResolvedValue([]);
-      prismaMock.cookedEvent.findMany.mockResolvedValue([]);
-
-      const result = await getTimelineFeed({ familySpaceId: 'family_1' });
-
-      expect(result.items).toHaveLength(0);
-    });
-
-    it('skips edit events when lastEditAt equals createdAt', async () => {
-      const timestamp = new Date('2024-01-01T10:00:00.000Z');
-
-      const mockPost = withPostStorage({
-        id: 'post_1',
-        title: 'Recipe',
-        mainPhotoUrl: null,
-        createdAt: timestamp,
-        lastEditAt: timestamp,
-        lastEditNote: null,
-        editor: null,
-        author: {
-          id: 'user_1',
-          name: 'Alice',
-          avatarUrl: null,
-        },
-      });
-
-      prismaMock.post.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValue([mockPost] as any);
-      prismaMock.comment.findMany.mockResolvedValue([]);
-      prismaMock.reaction.findMany.mockResolvedValue([]);
-      prismaMock.cookedEvent.findMany.mockResolvedValue([]);
-
-      const result = await getTimelineFeed({ familySpaceId: 'family_1' });
-
-      expect(result.items).toHaveLength(0);
-    });
-
-    it('skips edit events when both editor and author are null', async () => {
-      const createdAt = new Date('2024-01-01T10:00:00.000Z');
-      const editedAt = new Date('2024-01-01T14:00:00.000Z');
-
-      const mockPost = withPostStorage({
-        id: 'post_1',
-        title: 'Recipe',
-        mainPhotoUrl: null,
-        createdAt,
-        lastEditAt: editedAt,
-        lastEditNote: null,
-        editor: null,
-        author: null,
-      });
-
-      prismaMock.post.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValue([mockPost] as any);
-      prismaMock.comment.findMany.mockResolvedValue([]);
-      prismaMock.reaction.findMany.mockResolvedValue([]);
-      prismaMock.cookedEvent.findMany.mockResolvedValue([]);
-
-      const result = await getTimelineFeed({ familySpaceId: 'family_1' });
-
-      expect(result.items).toHaveLength(0);
-    });
-  });
-
   describe('getTimelineFeed - Sorting', () => {
     it('sorts all events by timestamp descending', async () => {
       const mockPost = withPostStorage({
@@ -884,7 +709,7 @@ describe('Timeline Data Aggregation', () => {
       expect(result.items.every((item) => item.post.id)).toBe(true);
     });
 
-    it('queries posts for both creation and edit events', async () => {
+    it('queries posts for creation events', async () => {
       prismaMock.post.findMany.mockResolvedValue([]);
       prismaMock.comment.findMany.mockResolvedValue([]);
       prismaMock.reaction.findMany.mockResolvedValue([]);
@@ -892,8 +717,7 @@ describe('Timeline Data Aggregation', () => {
 
       await getTimelineFeed({ familySpaceId: 'family_1' });
 
-      // Should be called twice: once for post_created, once for edit events
-      expect(prismaMock.post.findMany).toHaveBeenCalledTimes(2);
+      expect(prismaMock.post.findMany).toHaveBeenCalledTimes(1);
     });
 
     it('handles familySpaceId filtering correctly', async () => {
