@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const MAX_RECIPE_INGREDIENT_NAME_LENGTH = 240;
+export const MAX_RECIPE_ORIGIN_LENGTH = 240;
+
 export const signupSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
   email: z
@@ -74,7 +77,13 @@ export const ingredientUnitEnum = z.enum([
 ]);
 
 const recipeIngredientSchema = z.object({
-  name: z.string().min(1, 'Ingredient name is required').max(120),
+  name: z
+    .string()
+    .min(1, 'Ingredient name is required')
+    .max(
+      MAX_RECIPE_INGREDIENT_NAME_LENGTH,
+      `Ingredient name must be ${MAX_RECIPE_INGREDIENT_NAME_LENGTH} characters or fewer`
+    ),
   quantity: z
     .number({ invalid_type_error: 'Quantity must be a number' })
     .positive('Quantity must be positive')
@@ -87,7 +96,14 @@ const recipeStepSchema = z.object({
   text: z.string().min(1, 'Step description is required').max(2000),
 });
 export const recipeDetailsSchema = z.object({
-  origin: z.string().min(1).max(120).optional(),
+  origin: z
+    .string()
+    .min(1)
+    .max(
+      MAX_RECIPE_ORIGIN_LENGTH,
+      `Origin must be ${MAX_RECIPE_ORIGIN_LENGTH} characters or fewer`
+    )
+    .optional(),
   ingredients: z
     .array(recipeIngredientSchema)
     .min(1, 'At least one ingredient is required')
@@ -334,9 +350,21 @@ export const recipeFiltersSchema = paginationSchema
       .optional(),
     ingredients: z
       .union([
-        z.string().max(120, 'Ingredient name too long'),
         z
-          .array(z.string().max(120, 'Ingredient name too long'))
+          .string()
+          .max(
+            MAX_RECIPE_INGREDIENT_NAME_LENGTH,
+            `Ingredient name must be ${MAX_RECIPE_INGREDIENT_NAME_LENGTH} characters or fewer`
+          ),
+        z
+          .array(
+            z
+              .string()
+              .max(
+                MAX_RECIPE_INGREDIENT_NAME_LENGTH,
+                `Ingredient name must be ${MAX_RECIPE_INGREDIENT_NAME_LENGTH} characters or fewer`
+              )
+          )
           .max(INGREDIENT_LIMIT, `Maximum ${INGREDIENT_LIMIT} ingredients`),
       ])
       .optional()
