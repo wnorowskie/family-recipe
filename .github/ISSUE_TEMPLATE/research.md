@@ -14,7 +14,7 @@ labels: 'type: research'
 -
 
 **Output:**
-A written summary committed to `docs/research/<topic>.md`
+A written summary committed to `docs/research/<topic>.md` (see [docs/research/README.md](../../docs/research/README.md) for conventions)
 
 **Testing:**
 
