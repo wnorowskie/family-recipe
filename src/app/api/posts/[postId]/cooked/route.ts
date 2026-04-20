@@ -14,14 +14,15 @@ import {
 import { createCookedNotification } from '@/lib/notifications';
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     postId: string;
-  };
+  }>;
 }
 
 export const POST = withAuth(async (request, user, context?: RouteContext) => {
-  const { postId } = context!.params;
+  const resolvedParams = await context!.params;
   try {
+    const { postId } = resolvedParams;
     // Apply rate limiting (10 cooked events per user per minute)
     const rateLimitResult = applyRateLimit(
       cookedEventLimiter,
@@ -107,14 +108,15 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
       { status: 201 }
     );
   } catch (error) {
-    logError('cooked.create.error', error, { postId });
+    logError('cooked.create.error', error, { postId: resolvedParams?.postId });
     return internalError('An unexpected error occurred');
   }
 });
 
 export const GET = withAuth(async (request, user, context?: RouteContext) => {
-  const { postId } = context!.params;
+  const resolvedParams = await context!.params;
   try {
+    const { postId } = resolvedParams;
     if (!postId) {
       return badRequestError('Post ID is required');
     }
@@ -158,7 +160,7 @@ export const GET = withAuth(async (request, user, context?: RouteContext) => {
       nextOffset: cookedPage.nextOffset,
     });
   } catch (error) {
-    logError('cooked.list.error', error, { postId });
+    logError('cooked.list.error', error, { postId: resolvedParams?.postId });
     return internalError('An unexpected error occurred');
   }
 });

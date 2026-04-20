@@ -88,7 +88,7 @@ describe('GET /api/posts/[postId]/comments', () => {
   };
 
   const mockContext = {
-    params: { postId: 'clh0000000000000000000001' },
+    params: Promise.resolve({ postId: 'clh0000000000000000000001' }),
   };
 
   beforeEach(() => {
@@ -126,7 +126,7 @@ describe('GET /api/posts/[postId]/comments', () => {
 
   describe('Validation', () => {
     it('returns 400 for invalid post ID', async () => {
-      const invalidContext = { params: { postId: '' } };
+      const invalidContext = { params: Promise.resolve({ postId: '' }) };
 
       const request = new NextRequest('http://localhost/api/posts//comments', {
         method: 'GET',
@@ -152,7 +152,7 @@ describe('GET /api/posts/[postId]/comments', () => {
       );
 
       const response = await GET(request, {
-        params: { postId: 'clh0000000000000000000999' },
+        params: Promise.resolve({ postId: 'clh0000000000000000000999' }),
       });
 
       expect(response.status).toBe(404);
@@ -171,7 +171,7 @@ describe('GET /api/posts/[postId]/comments', () => {
       );
 
       const response = await GET(request, {
-        params: { postId: 'clh0000000000000000000002' },
+        params: Promise.resolve({ postId: 'clh0000000000000000000002' }),
       });
 
       expect(response.status).toBe(404);
@@ -342,7 +342,7 @@ describe('POST /api/posts/[postId]/comments', () => {
   };
 
   const mockContext = {
-    params: { postId: 'clh0000000000000000000001' },
+    params: Promise.resolve({ postId: 'clh0000000000000000000001' }),
   };
 
   beforeEach(() => {
@@ -375,7 +375,7 @@ describe('POST /api/posts/[postId]/comments', () => {
 
   describe('Validation', () => {
     it('returns 400 for invalid post ID', async () => {
-      const invalidContext = { params: { postId: '' } };
+      const invalidContext = { params: Promise.resolve({ postId: '' }) };
 
       const formData = new FormData();
       formData.append('payload', JSON.stringify({ text: 'Great!' }));
@@ -474,7 +474,7 @@ describe('POST /api/posts/[postId]/comments', () => {
       );
 
       const response = await POST(request, {
-        params: { postId: 'clh0000000000000000000999' },
+        params: Promise.resolve({ postId: 'clh0000000000000000000999' }),
       });
 
       expect(response.status).toBe(404);
@@ -498,7 +498,7 @@ describe('POST /api/posts/[postId]/comments', () => {
       );
 
       const response = await POST(request, {
-        params: { postId: 'clh0000000000000000000002' },
+        params: Promise.resolve({ postId: 'clh0000000000000000000002' }),
       });
 
       expect(response.status).toBe(404);

@@ -16,10 +16,10 @@ import {
 } from '@/lib/apiErrors';
 
 export const GET = withAuth(
-  async (request, user, context?: { params: { postId: string } }) => {
+  async (request, user, context?: { params: Promise<{ postId: string }> }) => {
+    const resolvedParams = await context!.params;
     try {
-      const { params } = context!;
-      const validation = parseRouteParams(params, postIdParamSchema);
+      const validation = parseRouteParams(resolvedParams, postIdParamSchema);
       if (!validation.success) return validation.error;
       const { postId } = validation.data;
 
@@ -71,7 +71,7 @@ export const GET = withAuth(
       });
     } catch (error) {
       logError('comments.list.error', error, {
-        postId: context?.params?.postId,
+        postId: resolvedParams?.postId,
       });
       return internalError('An unexpected error occurred');
     }
@@ -79,7 +79,8 @@ export const GET = withAuth(
 );
 
 export const POST = withAuth(
-  async (request, user, context?: { params: { postId: string } }) => {
+  async (request, user, context?: { params: Promise<{ postId: string }> }) => {
+    const resolvedParams = await context!.params;
     try {
       // Apply rate limiting (10 comments per user per minute)
       const rateLimitResult = applyRateLimit(
@@ -90,8 +91,7 @@ export const POST = withAuth(
         return rateLimitResult;
       }
 
-      const { params } = context!;
-      const validation = parseRouteParams(params, postIdParamSchema);
+      const validation = parseRouteParams(resolvedParams, postIdParamSchema);
       if (!validation.success) return validation.error;
       const { postId } = validation.data;
 
@@ -197,7 +197,7 @@ export const POST = withAuth(
       );
     } catch (error) {
       logError('comments.create.error', error, {
-        postId: context?.params?.postId,
+        postId: resolvedParams?.postId,
       });
       return internalError('An unexpected error occurred');
     }

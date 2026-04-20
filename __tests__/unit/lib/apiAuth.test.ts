@@ -92,7 +92,7 @@ describe('withAuth', () => {
       const user = createMockUser();
       mockGetCurrentUser.mockResolvedValue(user);
 
-      const context = { params: { id: 'test-123' } };
+      const context = { params: Promise.resolve({ id: 'test-123' }) };
       const mockResponse = NextResponse.json({ success: true });
       const handler = jest.fn().mockResolvedValue(mockResponse);
       const wrappedHandler = withAuth(handler);
@@ -307,7 +307,7 @@ describe('withRole', () => {
       const user = createMockUser({ role: 'admin' });
       mockGetCurrentUser.mockResolvedValue(user);
 
-      const context = { params: { postId: 'post-123' } };
+      const context = { params: Promise.resolve({ postId: 'post-123' }) };
       const mockResponse = NextResponse.json({ success: true });
       const handler = jest.fn().mockResolvedValue(mockResponse);
       const wrappedHandler = withRole(['admin'], handler);

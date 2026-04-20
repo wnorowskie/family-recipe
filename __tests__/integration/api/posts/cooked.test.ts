@@ -72,7 +72,7 @@ describe('POST /api/posts/[postId]/cooked', () => {
   };
 
   const mockContext = {
-    params: { postId: 'post_123' },
+    params: Promise.resolve({ postId: 'post_123' }),
   };
 
   beforeEach(() => {
@@ -103,7 +103,7 @@ describe('POST /api/posts/[postId]/cooked', () => {
 
   describe('Validation', () => {
     it('returns 400 for invalid post ID', async () => {
-      const invalidContext = { params: { postId: '' } };
+      const invalidContext = { params: Promise.resolve({ postId: '' }) };
 
       const request = new NextRequest('http://localhost/api/posts//cooked', {
         method: 'POST',
@@ -311,7 +311,9 @@ describe('POST /api/posts/[postId]/cooked', () => {
         }
       );
 
-      const response = await POST(request, { params: { postId: 'post_999' } });
+      const response = await POST(request, {
+        params: Promise.resolve({ postId: 'post_999' }),
+      });
 
       expect(response.status).toBe(404);
       const data = await parseResponseJSON(response);
@@ -331,7 +333,7 @@ describe('POST /api/posts/[postId]/cooked', () => {
       );
 
       const response = await POST(request, {
-        params: { postId: 'post_other' },
+        params: Promise.resolve({ postId: 'post_other' }),
       });
 
       expect(response.status).toBe(404);
