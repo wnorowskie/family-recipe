@@ -165,9 +165,9 @@ export const GET = withAuth(
 
 export const PUT = withAuth(
   async (request, user, context?: { params: Promise<{ postId: string }> }) => {
-    const { postId } = await context!.params;
-
+    const resolvedParams = await context!.params;
     try {
+      const { postId } = resolvedParams;
       const existingPost = await prisma.post.findFirst({
         where: {
           id: postId,
@@ -611,7 +611,9 @@ export const PUT = withAuth(
         post: updatedPost,
       });
     } catch (error) {
-      logError('posts.update.error', error, { postId });
+      logError('posts.update.error', error, {
+        postId: resolvedParams?.postId,
+      });
       if (error instanceof Error) {
         if (error.message === 'UNSUPPORTED_FILE_TYPE') {
           return NextResponse.json(

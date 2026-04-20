@@ -23,8 +23,9 @@ async function ensurePostAccess(postId: string, familySpaceId: string) {
 }
 
 export const POST = withAuth(async (request, user, context?: RouteContext) => {
-  const { postId } = await context!.params;
+  const resolvedParams = await context!.params;
   try {
+    const { postId } = resolvedParams;
     const canAccess = await ensurePostAccess(postId, user.familySpaceId);
 
     if (!canAccess) {
@@ -47,15 +48,16 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
 
     return NextResponse.json({ status: 'favorited' }, { status: 200 });
   } catch (error) {
-    logError('favorites.add.error', error, { postId });
+    logError('favorites.add.error', error, { postId: resolvedParams?.postId });
     return internalError('Unable to favorite post');
   }
 });
 
 export const DELETE = withAuth(
   async (request, user, context?: RouteContext) => {
-    const { postId } = await context!.params;
+    const resolvedParams = await context!.params;
     try {
+      const { postId } = resolvedParams;
       const canAccess = await ensurePostAccess(postId, user.familySpaceId);
 
       if (!canAccess) {
@@ -71,7 +73,9 @@ export const DELETE = withAuth(
 
       return NextResponse.json({ status: 'unfavorited' }, { status: 200 });
     } catch (error) {
-      logError('favorites.remove.error', error, { postId });
+      logError('favorites.remove.error', error, {
+        postId: resolvedParams?.postId,
+      });
       return internalError('Unable to remove favorite');
     }
   }
