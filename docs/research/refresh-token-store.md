@@ -35,6 +35,7 @@ model RefreshToken {
   @@index([chainId])
   @@index([familySpaceId])
   @@index([expiresAt])
+  @@index([revokedAt])
 }
 ```
 
@@ -45,7 +46,8 @@ Back-relations on `User` and `FamilySpace`: `refreshTokens RefreshToken[]`.
 - `id` — matches every other model's primary-key convention (cuid), keeps Prisma relations ergonomic.
 - `family_space_id` — family scoping is the implicit security boundary everywhere else per root [CLAUDE.md](../../CLAUDE.md); keep the pattern so future admin queries don't accidentally leak cross-tenant.
 - `chain_id` — enables chain-scoped reuse revocation (see below). Without it, the only options are revoke-just-this-jti (too narrow, attacker keeps going) or revoke-all-user-tokens (too wide, kicks out the user's other devices).
-- `revoked_reason` — minimal forensics; cheap to populate, lets us answer "did the user log out or did we detect reuse?" without digging through logs.
+- `rotated_from_jti` — **forensics-only**. Never read on the hot path; `chain_id` already groups a chain for the reuse-revoke query. This column exists so post-incident we can reconstruct the exact rotation order (what came from what, when) without parsing log lines. If you don't value that, drop the column — nothing in the runtime flow depends on it.
+- `revoked_reason` — minimal forensics; cheap to populate, lets us answer "did the user log out or did we detect reuse?" without digging through logs. Stored as a free-form `String?` because Prisma enums don't cross the SQLite/Postgres providers we use ([prisma/CLAUDE.md](../../prisma/CLAUDE.md)). Implementers should define a const union in both TS and Python (e.g. `const REVOKED_REASONS = ['rotated', 'logout', 'logout_all', 'reuse_detected', 'admin'] as const`) and insert via that union so typos don't become silent forensic gaps.
 - `user_agent` / `ip_address` — optional, recorded at issuance; used to render a "signed-in devices" list and to enrich the security event log on reuse detection. **Flag for the owner to sign off on:** this is a deliberate shift from log-only to DB-persisted storage of UA/IP. Log rotation currently bounds how long we keep this data; rows in `refresh_tokens` live until the cleanup cron (expiry + 7d, or revoked + 30d). Real family users are the audience — if we'd rather keep UA/IP in logs only, drop both columns and enrich the security event from the request at detection time (we lose the "compare new IP to issuance IP" trick in the log, which is the main reason to persist them).
 
 ## Indexes & Lookup Path
@@ -108,7 +110,7 @@ Use constant-time comparison (`hmac.compare_digest` in Python, `crypto.timingSaf
    SET revoked_at = NOW(), revoked_reason = 'reuse_detected'
    WHERE chain_id = (the row's chain_id) AND revoked_at IS NULL;
    ```
-   Log a security event (`userId`, `chainId`, current `ipAddress` vs. row's `ipAddress`, UAs). Return 401; client logs in again.
+   Log a security event (`userId`, `chainId`, current `ipAddress` vs. row's `ipAddress`, UAs). Return 401; client logs in again. (For the "nuclear" case — kick every session globally because the signing key or pepper is compromised — see `AUTH_EPOCH` in the Admin Denylist section.)
 5. Otherwise, rotate (inside a single transaction — see concurrency below):
    - Mark the current row `revoked_at = NOW(), revoked_reason = 'rotated'`.
    - Insert a fresh row: same `chain_id`, `rotated_from_jti = old_jti`, `remember_me` **copied from the old row**, new `jti`/`token`/`tokenHash`, `expires_at = now() + TTL` (TTL derived from the carried-forward `remember_me`).
@@ -118,7 +120,7 @@ Use constant-time comparison (`hmac.compare_digest` in Python, `crypto.timingSaf
 
 Issue [#35](https://github.com/wnorowskie/family-recipe/issues/35)'s AC requires that concurrent `/refresh` calls don't issue duplicate tokens or lose reuse detection. Two recipes both work; pick one at implementation time:
 
-- **Preferred: `SELECT … FOR UPDATE` inside a transaction.** The lookup at step 2 becomes `SELECT … WHERE jti = ? FOR UPDATE`, and the revoke + insert at step 5 run in the same transaction. The second concurrent caller blocks on the row lock, then sees `revoked_reason = 'rotated'` when it unblocks and correctly triggers chain-reuse detection. Works cleanly on Postgres; SQLite's `BEGIN IMMEDIATE` gives equivalent serialization for local dev.
+- **Preferred: `SELECT … FOR UPDATE` inside a transaction.** The lookup at step 2 becomes `SELECT … WHERE jti = ? FOR UPDATE`, and the revoke + insert at step 5 run in the same transaction. The second concurrent caller blocks on the row lock, then sees `revoked_reason = 'rotated'` when it unblocks and correctly triggers chain-reuse detection. **Provider-aware code required:** Prisma's `$transaction` will accept a `FOR UPDATE` raw query against Postgres but is a no-op parse on SQLite — the SQLite path silently loses the row lock. The implementer needs a branch: `$queryRaw\`… FOR UPDATE\`` on Postgres, `BEGIN IMMEDIATE` (which serializes the whole DB) on SQLite. Don't ship a single unqualified `FOR UPDATE` statement.
 - **Alternative: short grace window.** Allow a just-rotated row to still mint one successor if used within e.g. 5s of its own rotation, as long as the successor's hash matches. Avoids false positives from legitimate double-submits (tab re-opens, retry-on-transient-error) without opening a meaningful attacker window. More moving parts; only worth it if we see reuse-detection false positives in practice.
 
 ### Reuse escalation — narrower case
@@ -159,6 +161,7 @@ WHERE (expires_at < NOW() - INTERVAL '7 days')
 ```
 
 - **Grace periods** (7d expired, 30d revoked) keep rows around long enough for incident forensics.
+- The `revoked_at`-only predicate benefits from the standalone `@@index([revokedAt])` above. Without it the DELETE would scan live rows too; fine at family scale, harmful once the table grows.
 - **Not** lazy-on-read: `/refresh` already filters on `expires_at` / `revoked_at`; the DELETE is only there to cap table growth. Doing it lazily mixes concerns and makes the refresh path harder to reason about.
 - **Not** background-on-write: adds p99 latency spikes on `/refresh`, which is the one endpoint we want predictable.
 - SQLite local dev: skip. Table size stays trivial.
@@ -168,7 +171,7 @@ WHERE (expires_at < NOW() - INTERVAL '7 days')
 The ticket asks whether we need an admin denylist for emergency session kill. Three scenarios:
 
 1. **Kick one user** → `/logout-all` for that userId. Single UPDATE, no new table.
-2. **Rotate all access tokens** (e.g., we rotate the JWT signing key) → bump `AUTH_EPOCH` env var and include it in the access-token claims; mismatch → 401. No DB writes, no refresh-side work.
+2. **Rotate all access tokens** (e.g., we rotate the JWT signing key) → bump `AUTH_EPOCH`. Definition: a monotonically-increasing integer stored in Secret Manager / env (`AUTH_EPOCH=1`, `AUTH_EPOCH=2`, …), embedded as a claim in every minted access token. On verify, reject if the token's `epoch` is lower than the current `AUTH_EPOCH`. Bumping the value invalidates every live access token on next verification; clients silently refresh and mint new ones bound to the new epoch. No DB writes, no refresh-side work.
 3. **Kick every session globally** (worst case: DB compromise, pepper compromise) → `UPDATE refresh_tokens SET revoked_at = NOW(), revoked_reason = 'admin' WHERE revoked_at IS NULL;` — one SQL statement, no new table.
 
 A separate denylist table would add a lookup on every `/refresh` for a feature we'd use approximately never. Revisit only if we land per-session granular admin controls (e.g., "kill just the session from this IP across all users").
