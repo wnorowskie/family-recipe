@@ -108,7 +108,7 @@ describe('PUT /api/posts/[postId]', () => {
   };
 
   const mockContext = {
-    params: { postId: 'post_123' },
+    params: Promise.resolve({ postId: 'post_123' }),
   };
 
   beforeEach(() => {

@@ -5,12 +5,13 @@ import { getCurrentUser } from '@/lib/session';
 import { getPostDetail } from '@/lib/posts';
 
 interface PostDetailPageProps {
-  params: {
+  params: Promise<{
     postId: string;
-  };
+  }>;
 }
 
-export default async function PostDetailPage({ params }: PostDetailPageProps) {
+export default async function PostDetailPage(props: PostDetailPageProps) {
+  const params = await props.params;
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get('session');
 
@@ -37,7 +38,9 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
   }
 
   const canEdit =
-    post.author.id === user.id || user.role === 'owner' || user.role === 'admin';
+    post.author.id === user.id ||
+    user.role === 'owner' ||
+    user.role === 'admin';
 
   return (
     <section className="max-w-2xl mx-auto space-y-4">

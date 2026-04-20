@@ -1,16 +1,19 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import AddPostForm, { type PostFormInitialData } from '@/components/add/AddPostForm';
+import AddPostForm, {
+  type PostFormInitialData,
+} from '@/components/add/AddPostForm';
 import { getCurrentUser } from '@/lib/session';
 import { getPostDetail } from '@/lib/posts';
 
 interface EditPostPageParams {
-  params: {
+  params: Promise<{
     postId: string;
-  };
+  }>;
 }
 
-export default async function EditPostPage({ params }: EditPostPageParams) {
+export default async function EditPostPage(props: EditPostPageParams) {
+  const params = await props.params;
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get('session');
 
@@ -37,7 +40,9 @@ export default async function EditPostPage({ params }: EditPostPageParams) {
   }
 
   const canEdit =
-    post.author.id === user.id || user.role === 'owner' || user.role === 'admin';
+    post.author.id === user.id ||
+    user.role === 'owner' ||
+    user.role === 'admin';
 
   if (!canEdit) {
     redirect(`/posts/${params.postId}`);
@@ -60,7 +65,9 @@ export default async function EditPostPage({ params }: EditPostPageParams) {
             name: ingredient.name,
             unit: ingredient.unit,
             quantity:
-              typeof ingredient.quantity === 'number' ? ingredient.quantity : null,
+              typeof ingredient.quantity === 'number'
+                ? ingredient.quantity
+                : null,
           })),
           steps: post.recipe.steps.map((step) => ({ text: step.text })),
         }
@@ -74,7 +81,8 @@ export default async function EditPostPage({ params }: EditPostPageParams) {
           <p className="text-sm font-semibold text-gray-500">Editing</p>
           <h1 className="text-2xl font-bold text-gray-900">{post.title}</h1>
           <p className="text-sm text-gray-600 mt-1">
-            Make updates to your recipe details and share a quick note about what changed.
+            Make updates to your recipe details and share a quick note about
+            what changed.
           </p>
         </div>
         <AddPostForm mode="edit" postId={post.id} initialData={initialData} />

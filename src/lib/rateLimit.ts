@@ -99,8 +99,8 @@ function getClientIP(request: NextRequest): string {
     return realIP.trim();
   }
 
-  // Fallback to connection IP (may not be available in all environments)
-  return request.ip ?? 'unknown';
+  // Next 15+ removed NextRequest.ip — rely on forwarded headers above.
+  return 'unknown';
 }
 
 /**

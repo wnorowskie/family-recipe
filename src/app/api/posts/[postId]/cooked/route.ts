@@ -14,13 +14,13 @@ import {
 import { createCookedNotification } from '@/lib/notifications';
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     postId: string;
-  };
+  }>;
 }
 
 export const POST = withAuth(async (request, user, context?: RouteContext) => {
-  const { postId } = context!.params;
+  const { postId } = await context!.params;
   try {
     // Apply rate limiting (10 cooked events per user per minute)
     const rateLimitResult = applyRateLimit(
@@ -113,7 +113,7 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
 });
 
 export const GET = withAuth(async (request, user, context?: RouteContext) => {
-  const { postId } = context!.params;
+  const { postId } = await context!.params;
   try {
     if (!postId) {
       return badRequestError('Post ID is required');

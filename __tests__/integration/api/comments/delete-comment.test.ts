@@ -75,7 +75,7 @@ describe('DELETE /api/comments/[commentId]', () => {
   };
 
   const mockContext = {
-    params: { commentId: 'clh0000000000000000000101' },
+    params: Promise.resolve({ commentId: 'clh0000000000000000000101' }),
   };
 
   beforeEach(() => {
@@ -104,7 +104,7 @@ describe('DELETE /api/comments/[commentId]', () => {
 
   describe('Validation', () => {
     it('returns 400 for invalid comment ID', async () => {
-      const invalidContext = { params: { commentId: '' } };
+      const invalidContext = { params: Promise.resolve({ commentId: '' }) };
 
       const request = new NextRequest('http://localhost/api/comments/', {
         method: 'DELETE',
@@ -130,7 +130,7 @@ describe('DELETE /api/comments/[commentId]', () => {
       );
 
       const response = await DELETE(request, {
-        params: { commentId: 'clh0000000000000000000999' },
+        params: Promise.resolve({ commentId: 'clh0000000000000000000999' }),
       });
 
       expect(response.status).toBe(404);
@@ -308,7 +308,7 @@ describe('DELETE /api/comments/[commentId]', () => {
       );
 
       const response = await DELETE(request, {
-        params: { commentId: 'clh0000000000000000000456' },
+        params: Promise.resolve({ commentId: 'clh0000000000000000000456' }),
       });
 
       expect(response.status).toBe(204);
