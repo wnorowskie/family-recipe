@@ -117,3 +117,6 @@ __pycache__/
 
 # Husky (git hooks will be installed locally)
 .husky/_
+
+# CLAUDE
+/.claude

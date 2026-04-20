@@ -1,0 +1,148 @@
+# GitHub Usage Guide
+
+How we use GitHub Issues, branches, commits, and PRs on family-recipe.
+
+## Environments and release flow
+
+- `main` — **production**. Only updated via release PRs from `develop`.
+- `develop` — **dev environment**. All feature work lands here first.
+- Feature branches are cut from `develop` and merged back into `develop`.
+- To release, open a PR from `develop` → `main`. Only the repo owner cuts these.
+
+---
+
+## Principles
+
+- Non-trivial work has a GitHub issue before it starts — trivial fixes (typos, one-line bugs) can skip the issue
+- PRs exist even for solo work — they are a review checkpoint
+- Commits reference the issue number when one exists
+
+---
+
+## Issues
+
+### Ticket format
+
+Tickets use the templates in [ISSUE_TEMPLATE/](ISSUE_TEMPLATE/) — one per type (`feature`, `chore`, `research`). The template applies the `type:` label automatically via frontmatter. See [TICKET_FORMAT.md](TICKET_FORMAT.md) for the rationale behind each section.
+
+### When to create one
+
+Before starting any feature, bug, research spike, or non-trivial chore. If you are about to write more than a few lines of code and there is no issue for it, create one first.
+
+### Labels
+
+The only required namespace is `type:`, which the issue templates apply automatically:
+
+| Namespace | Labels                                   |
+| --------- | ---------------------------------------- |
+| `type:`   | `feature` · `bug` · `chore` · `research` |
+
+Add extra labels freely (e.g. area or priority tags) when they help filter issues later — no strict taxonomy is enforced.
+
+---
+
+## Branches
+
+### Naming convention
+
+```
+{type}/{issue-number}/short-description
+```
+
+Where `type` matches the ticket type: `feature`, `fix`, `chore`, or `research`. If there's no issue (trivial fix), omit the number: `fix/typo-in-readme`.
+
+Examples:
+
+```
+feature/12/cooked-event-reactions
+fix/18/recipe-importer-timeout
+chore/7/upgrade-next-15
+research/3/gcs-vs-r2-uploads
+```
+
+Always branch from `develop`. Never commit directly to `main` or `develop`.
+
+---
+
+## Commits
+
+### Format
+
+```
+{type}: {description} (#{issue-number})
+```
+
+The `(#N)` suffix is optional when there is no issue.
+
+Types:
+| Type | Use for |
+|------|---------|
+| `feat` | New feature code |
+| `fix` | Bug fix |
+| `chore` | Config, tooling, setup |
+| `refactor` | Code restructure, no behavior change |
+| `test` | Tests only |
+| `docs` | Documentation only |
+| `research` | Research spike findings |
+
+Examples (from this repo's history):
+
+```
+feat: add validation for recipe ingredient name and origin length
+fix: test for case sensitivity update
+refactor: Remove post_edited events and related logic from timeline handling
+```
+
+Keep commit subjects under 72 characters. Add a body for non-obvious context.
+
+---
+
+## Pull Requests
+
+All work merges via PR — no direct pushes to `main` or `develop`.
+
+### Workflow
+
+1. Create a branch from `develop` using the naming convention above
+2. Do the work, committing with issue references where applicable
+3. Open a PR targeting `develop` — title matches the issue title
+4. Body uses the template in [pull_request_template.md](pull_request_template.md)
+5. Review the diff yourself before merging
+6. Squash merge into `develop` to keep history clean
+7. Delete the branch after merge
+8. When ready to release, open a PR from `develop` → `main`. Release PRs use **merge commits**, not squash, so individual features stay visible in `main` history
+
+### PR title format
+
+```
+{type}: {issue title} (#{N})
+```
+
+Example: `feat: cooked-event reactions (#12)`
+
+### CI gates on every PR
+
+`.github/workflows/ci.yml` runs typecheck, lint, tests, docker build, trivy scan, prisma validate, `npm audit`, dependency-review, semgrep, IaC scan, and gitleaks. Separate workflows run for [apps/api/](../apps/api/) and [apps/recipe-url-importer/](../apps/recipe-url-importer/). All must pass before merging.
+
+---
+
+## Research Spikes
+
+Research issues are complete when:
+
+1. A written summary is committed to `docs/research/{topic}.md`
+2. The doc answers the questions listed in the issue
+3. The issue is closed with a comment linking to the committed doc
+
+Research docs are reference material for implementation decisions — keep them concise and decision-oriented.
+
+---
+
+## Creating issues mid-development
+
+When work surfaces something that needs tracking:
+
+1. Create the issue before context-switching to it
+2. Pick the right template so the `type:` label is applied
+3. Link it from the originating PR or commit
+4. Reference it in future commits that address it
