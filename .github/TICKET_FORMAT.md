@@ -74,5 +74,5 @@ So that [outcome]
 
 - Acceptance Criteria describe **observable outcomes**, not implementation steps
 - Testing describes **how to validate** the ticket is complete, not how to implement it
-- Research outputs are always committed to `docs/research/` and linked in the closing comment
+- Research outputs are always committed to [`docs/research/`](../docs/research/README.md) and linked in the closing comment
 - Chore tasks use checkboxes so progress is visible directly in the ticket

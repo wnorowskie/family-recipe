@@ -130,7 +130,7 @@ Example: `feat: cooked-event reactions (#12)`
 
 Research issues are complete when:
 
-1. A written summary is committed to `docs/research/{topic}.md`
+1. A written summary is committed to `docs/research/{topic}.md` — see [docs/research/README.md](../docs/research/README.md) for conventions
 2. The doc answers the questions listed in the issue
 3. The issue is closed with a comment linking to the committed doc
 
