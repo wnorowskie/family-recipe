@@ -12,7 +12,7 @@ Research output for [#47](https://github.com/wnorowskie/family-recipe/issues/47)
 
 - Cloudflare Registrar sells domains at registry cost — no markup, free WHOIS privacy, free DNS, and no upsells. Cheapest of the three registrars surveyed. ([cloudflare.com/products/registrar](https://www.cloudflare.com/products/registrar/))
 - Cloud Run's built-in **domain mappings** are free, work in `us-east1` (our current region — see `.github/workflows/deploy-dev.yml`), and issue a Google-managed TLS cert automatically within ~15 minutes. ([cloud.google.com/run/docs/mapping-custom-domains](https://cloud.google.com/run/docs/mapping-custom-domains))
-- Host-scoped session cookie (`httpOnly`, `secure: true`, `sameSite: 'lax'`, no `Domain` attribute — see [src/lib/session-core.ts:16-24](../../src/lib/session-core.ts#L16)) means **no code change** when the host changes. Users re-login once; that's it.
+- Host-scoped session cookie (`httpOnly`, `secure` in production, `sameSite: 'lax'`, no `Domain` attribute — see [src/lib/session-core.ts:16-24](../../src/lib/session-core.ts#L16)) means **no code change** when the host changes. Users re-login once; that's it.
 
 ## Alternatives considered
 
@@ -55,7 +55,7 @@ Two paths. We recommend path (A).
 
 ### Auth / cookie / JWT impact
 
-**None — no code change required.** The session cookie set by [src/lib/session-core.ts](../../src/lib/session-core.ts) omits `Domain`, so the browser binds it to whatever host served the response. Post-cutover, users re-authenticate once; subsequent cookies are scoped to the new host. `secure: true` continues to hold because Cloud Run + Google-managed cert terminate TLS end-to-end.
+**None — no code change required.** The session cookie set by [src/lib/session-core.ts](../../src/lib/session-core.ts) omits `Domain`, so the browser binds it to whatever host served the response. Post-cutover, users re-authenticate once; subsequent cookies are scoped to the new host. The cookie's `secure` flag (enabled in production via `NODE_ENV`) continues to hold because Cloud Run + Google-managed cert terminate TLS end-to-end.
 
 There is no `NEXTAUTH_URL` or equivalent base-URL env var in the app (verified via grep — the only URL env is the unrelated `NEXT_PUBLIC_API_BASE_URL` reserved for the FastAPI migration in [docs/API_BACKEND_MIGRATION_PLAN.md](../API_BACKEND_MIGRATION_PLAN.md)). JWTs are signed by `JWT_SECRET` only — the signer (`family-recipe-app` per [src/lib/jwt.ts:24](../../src/lib/jwt.ts#L24)) is host-agnostic.
 
@@ -83,7 +83,7 @@ If we ever need **send-as** from the custom address (e.g. outbound transactional
 Follow-up ticket should track these steps end-to-end:
 
 1. **Register the domain** at Cloudflare Registrar. Pick `.xyz` or `.com` based on availability and taste.
-2. **Verify domain ownership** in Google Search Console — add the TXT record Cloudflare-side.
+2. **Verify domain ownership** in Google Search Console for the registrable domain (`familyrecipe.xyz`) — add the TXT record Cloudflare-side. This is a one-time verification at the apex level; once completed, any subdomain mapping under it (prod, dev, future) is allowed without re-verifying.
 3. **Create the prod domain mapping**: Cloud Run console → `family-recipe-prod` → Manage Custom Domains → add `familyrecipe.xyz`.
 4. **Create the dev domain mapping**: same flow on `family-recipe-dev` for `dev.familyrecipe.xyz`.
 5. **Add DNS records** at Cloudflare (grey cloud / DNS-only): the A/AAAA records Google provides for the apex, and a CNAME `dev` → `ghs.googlehosted.com` for the subdomain.
