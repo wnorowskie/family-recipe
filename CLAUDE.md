@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session Startup Checklist
+
+Before doing any work, a new Claude session should:
+
+1. **Check what's in flight** — look at the [Family Recipe Project board](https://github.com/users/wnorowskie/projects/4) for issues marked `In Progress`. Do not start work that overlaps with an open in-progress ticket.
+2. **Check the current branch** — run `git branch` and `git status`. If already on a feature branch, read the associated issue before continuing.
+3. **Check recent history** — run `git log --oneline -10` to understand what was last completed.
+4. **Confirm the issue exists** — every piece of work must have a GitHub issue. Create one before starting if it doesn't exist.
+5. **Follow the conventions** — branch naming, commit format, and PR workflow are in [.github/GITHUB_GUIDE.md](.github/GITHUB_GUIDE.md). Ticket format is in [.github/TICKET_FORMAT.md](.github/TICKET_FORMAT.md).
+
 ## Project
 
 Private family-only web app for sharing recipes and cooking activity. Single `FamilySpace` model with members joining via a hashed master key. Currently in **testing with real family users**, so prefer minimal, non-breaking changes and protect existing data flows.
