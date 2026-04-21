@@ -34,3 +34,7 @@ npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator cli
 ## Testing
 
 `pytest tests/unit/` for unit tests, `pytest tests/integration/` for integration. CI runs both plus ruff, mypy, trivy, pip-audit, semgrep, gitleaks ([.github/workflows/api-ci.yml](../../.github/workflows/api-ci.yml)).
+
+## Verification
+
+Before opening a PR that touches this service, run the [FastAPI playbook](../../docs/verification/fastapi.md) — includes the curl+cookie loop, contract parity check against the Next mirror, and the local quality gates.
