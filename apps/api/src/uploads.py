@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import hashlib
 import os
@@ -275,17 +276,19 @@ def create_signed_url_resolver() -> Callable[[Optional[str]], Awaitable[Optional
 
     Use when a single request touches the same user / photo multiple times
     (e.g. reactions + comments + cooked events in a post detail) so GCS is
-    only signed once per key.
+    only signed once per key. Caches the in-flight Task so concurrent
+    awaits for the same key dedupe to one IAM call — matches the Promise
+    caching in src/lib/uploads.ts#createSignedUrlResolver.
     """
-    cache: Dict[str, Optional[str]] = {}
+    cache: Dict[str, "asyncio.Task[Optional[str]]"] = {}
 
     async def resolve(storage_key: Optional[str]) -> Optional[str]:
         if not storage_key:
             return None
-        if storage_key in cache:
-            return cache[storage_key]
-        result = await get_signed_upload_url(storage_key)
-        cache[storage_key] = result
-        return result
+        task = cache.get(storage_key)
+        if task is None:
+            task = asyncio.ensure_future(get_signed_upload_url(storage_key))
+            cache[storage_key] = task
+        return await task
 
     return resolve

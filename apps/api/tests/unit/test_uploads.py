@@ -694,20 +694,38 @@ class TestCreateSignedUrlResolver:
 
     @pytest.mark.asyncio
     async def test_memoizes_calls_per_key(self):
-        with patch("src.uploads.settings") as mock_settings:
-            mock_settings.uploads_bucket = ""
-            resolve = create_signed_url_resolver()
+        resolve = create_signed_url_resolver()
 
-            with patch("src.uploads.get_signed_upload_url", new=AsyncMock(return_value="/uploads/x")) as mock_get:
-                first = await resolve("x")
-                second = await resolve("x")
-                other = await resolve("y")
+        async def fake(key):
+            return f"/uploads/{key}"
+
+        with patch("src.uploads.get_signed_upload_url", new=AsyncMock(side_effect=fake)) as mock_get:
+            first = await resolve("x")
+            second = await resolve("x")
+            other = await resolve("y")
 
         assert first == "/uploads/x"
         assert second == "/uploads/x"
-        assert other == "/uploads/x"
+        assert other == "/uploads/y"
         # "x" resolved once (cached), "y" resolved once → two total
         assert mock_get.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_dedupes_concurrent_awaits_for_same_key(self):
+        import asyncio
+
+        resolve = create_signed_url_resolver()
+
+        async def fake(key):
+            await asyncio.sleep(0)  # yield so both resolvers can reach the cache miss
+            return f"/uploads/{key}"
+
+        with patch("src.uploads.get_signed_upload_url", new=AsyncMock(side_effect=fake)) as mock_get:
+            a, b = await asyncio.gather(resolve("shared"), resolve("shared"))
+
+        assert a == "/uploads/shared"
+        assert b == "/uploads/shared"
+        assert mock_get.await_count == 1
 
     @pytest.mark.asyncio
     async def test_surfaces_resolver_errors(self):
