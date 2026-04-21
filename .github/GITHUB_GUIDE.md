@@ -126,6 +126,28 @@ Example: `feat: cooked-event reactions (#12)`
 
 ---
 
+## Branch protection
+
+`main` and `develop` are protected via GitHub branch protection rules. The configuration is applied via the REST API (see issue #30); ground-truth state is queryable via GraphQL (`branchProtectionRules`).
+
+Shared settings on both branches:
+
+- **PR required** — no direct pushes; all commits arrive via PR
+- **Force pushes blocked** and **deletions blocked**
+- **Strict status checks** — branch must be up-to-date with the base before merge
+- **Conversation resolution required** — open review comments block merge
+- **Required approving reviews: 0** — as a solo maintainer, self-merge is allowed
+- **Admins not enforced** — the repo owner can bypass in genuine emergencies (use sparingly)
+
+Required status checks (from [ci.yml](workflows/ci.yml), the only workflow that runs on every PR): `typecheck`, `lint`, `test`, `build`, `container-scan`, `prisma-validate`, `dependency-scan`, `sast-semgrep`, `iac-scan`, `secrets-scan`. Job names in [api-ci.yml](workflows/api-ci.yml) and [recipe-url-importer-ci.yml](workflows/recipe-url-importer-ci.yml) are path-filtered, so they are **not** listed as required (a path-filtered required check that never runs would permanently block merges). They share names (`lint`, `typecheck`, etc.) with ci.yml jobs, so when they do run and fail, the shared-name required check fails too — effectively required when the relevant paths change.
+
+Difference between branches:
+
+- `develop` — **linear history required** (squash-merge only, matching the feature-PR workflow)
+- `main` — **linear history not required** (release PRs from `develop` use merge commits so individual feature commits stay visible in `main` history)
+
+---
+
 ## Research Spikes
 
 Research issues are complete when:
