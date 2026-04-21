@@ -99,9 +99,12 @@ async function seedTestUser(familySpaceId: string) {
     process.env.CLAUDE_TEST_PASSWORD?.trim() || CLAUDE_TEST_PASSWORD_DEFAULT;
   const passwordHash = await bcrypt.hash(password, 10);
 
+  // Username is set on create only. Rotating CLAUDE_TEST_USER between runs
+  // would otherwise hit the User.username unique constraint if another row
+  // already holds the new value. To rotate, delete the row and re-seed.
   const user = await prisma.user.upsert({
     where: { email: CLAUDE_TEST_EMAIL },
-    update: { username, passwordHash, name: CLAUDE_TEST_NAME },
+    update: { passwordHash, name: CLAUDE_TEST_NAME },
     create: {
       email: CLAUDE_TEST_EMAIL,
       username,

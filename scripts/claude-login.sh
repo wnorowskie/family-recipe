@@ -62,10 +62,14 @@ fi
 
 rm -f "$COOKIES"
 
+# Build the JSON body via jq so " and \ in the password are escaped safely.
+BODY=$(jq -n --arg u "$USER" --arg p "$PASSWORD" \
+  '{emailOrUsername: $u, password: $p}')
+
 HTTP_CODE=$(curl -sS -o /tmp/claude-login-body.json -w '%{http_code}' \
   -c "$COOKIES" \
   -H "Content-Type: application/json" \
-  -d "{\"emailOrUsername\":\"${USER}\",\"password\":\"${PASSWORD}\"}" \
+  -d "$BODY" \
   "${HOST}${LOGIN_PATH}")
 
 if [[ "$HTTP_CODE" != "200" ]]; then
@@ -75,7 +79,9 @@ if [[ "$HTTP_CODE" != "200" ]]; then
   exit 1
 fi
 
-if ! grep -q 'session' "$COOKIES"; then
+# Tab-anchored match against the Netscape cookie-jar format — avoids
+# false-positives from hosts or paths that contain the word "session".
+if ! grep -q $'\tsession\t' "$COOKIES"; then
   echo "Login returned 200 but no session cookie was set" >&2
   exit 1
 fi
