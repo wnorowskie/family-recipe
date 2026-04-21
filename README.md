@@ -213,7 +213,7 @@ family-recipe/
 │ │ ├── session.ts # Session management
 │ │ ├── validation.ts # Zod schemas
 │ │ └── ...
-│ └── middleware.ts # Next.js middleware (auth)
+│ └── proxy.ts # Next.js proxy / middleware (auth)
 ├── docs/ # Product and technical specs
 ├── figma/ # Figma design prototypes
 ├── public/ # Static assets

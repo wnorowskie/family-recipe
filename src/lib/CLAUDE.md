@@ -7,7 +7,7 @@ Module map for the shared backend logic. Most of these are imported from API rou
 - [prisma.ts](prisma.ts) — singleton `PrismaClient`. Always import `prisma` from here, never construct your own.
 - [auth.ts](auth.ts) — bcrypt password hashing/verify. Tests substitute `bcryptjs` via [jest.config.js](../../jest.config.js).
 - [jwt.ts](jwt.ts) — sign/verify the session JWT with `jose`. Tokens carry `userId`, `familySpaceId`, `role`.
-- [session-core.ts](session-core.ts) — cookie set/clear and `getSessionFromRequest`. Edge-runtime safe (used by [src/middleware.ts](../middleware.ts)).
+- [session-core.ts](session-core.ts) — cookie set/clear and `getSessionFromRequest`. Edge-runtime safe (used by [src/proxy.ts](../proxy.ts)).
 - [session.ts](session.ts) — Node-runtime `getCurrentUser(request)` that does the DB fetch + signed avatar URL. Re-exports the cookie helpers.
 - [apiAuth.ts](apiAuth.ts) — `withAuth` / `withRole` HOCs for route handlers. **Always use these** in API routes; don't read the session inline.
 - [permissions.ts](permissions.ts) — `canEditPost`, `canDeletePost`, `canDeleteComment`, `canRemoveMember`. Centralizes ownership/admin rules.

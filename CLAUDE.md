@@ -57,7 +57,7 @@ When working against Postgres locally, set `PRISMA_SCHEMA=prisma/schema.postgres
 
 **Three Prisma schemas** describe the same domain for different deploy targets — [prisma/CLAUDE.md](prisma/CLAUDE.md) explains when to edit which.
 
-**Auth flow.** Credentials login → bcrypt verify → JWT signed with `jose` ([src/lib/jwt.ts](src/lib/jwt.ts)) → HTTP-only `session` cookie. [src/middleware.ts](src/middleware.ts) gates the `(app)` route group; API routes use `withAuth`/`withRole` wrappers from [src/lib/apiAuth.ts](src/lib/apiAuth.ts). See [src/app/api/CLAUDE.md](src/app/api/CLAUDE.md) for the handler pattern.
+**Auth flow.** Credentials login → bcrypt verify → JWT signed with `jose` ([src/lib/jwt.ts](src/lib/jwt.ts)) → HTTP-only `session` cookie. [src/proxy.ts](src/proxy.ts) gates the `(app)` route group; API routes use `withAuth`/`withRole` wrappers from [src/lib/apiAuth.ts](src/lib/apiAuth.ts). See [src/app/api/CLAUDE.md](src/app/api/CLAUDE.md) for the handler pattern.
 
 **Family scoping is implicit.** Every authenticated handler receives `user.familySpaceId`. All Post/Comment/Reaction/etc. queries must filter by it — there is no row-level enforcement in Prisma, so a missing filter leaks data across families. (V1 only has one family, but the schema is multi-tenant-ready and tests assume the filter is present.)
 
