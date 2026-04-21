@@ -456,6 +456,17 @@ def test_browse_recipes_sort_rating_rejects_invalid_pattern(client, mock_prisma,
     assert response.status_code == 422
 
 
+def test_browse_recipes_sort_rating_caps_candidate_fetch(client, mock_prisma, member_auth):
+    # Mirrors RATING_SORT_CANDIDATE_LIMIT in src/lib/recipes.ts. Keep both
+    # services in lockstep so pagination stays identical past the cap.
+    _setup_posts(mock_prisma, [])
+
+    response = client.get("/recipes?sort=rating", headers=member_auth)
+
+    assert response.status_code == 200
+    assert mock_prisma.post.find_many.await_args.kwargs["take"] == 500
+
+
 def test_browse_recipes_multiple_filters(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
     params = (

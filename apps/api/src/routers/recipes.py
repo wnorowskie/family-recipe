@@ -14,6 +14,9 @@ router = APIRouter(prefix="/recipes", tags=["recipes"])
 COURSE_VALUES = {"breakfast", "lunch", "dinner", "dessert", "snack", "other"}
 DIFFICULTY_VALUES = {"easy", "medium", "hard"}
 MAX_INGREDIENTS = 5
+# Mirror of RATING_SORT_CANDIDATE_LIMIT in src/lib/recipes.ts. Keep values
+# identical so the Node and Python services paginate the same candidate set.
+RATING_SORT_CANDIDATE_LIMIT = 500
 
 
 def _dedupe(values: Optional[List[str]]) -> List[str]:
@@ -153,11 +156,13 @@ async def browse_recipes(
 
         if sort == "rating":
             # Rating sort joins against a CookedEvent aggregate that Prisma
-            # cannot express in a single order clause. Fetch all matches,
-            # compute stats, sort in memory, then paginate. Safe at V1 scale.
+            # cannot express in a single order clause. Fetch bounded matches,
+            # compute stats, sort in memory, then paginate. The cap matches
+            # the Node service so both paginate the same candidate set.
             all_posts = await prisma.post.find_many(
                 where=where,
                 order=[{"createdAt": "desc"}],
+                take=RATING_SORT_CANDIDATE_LIMIT,
                 include=include_shape,
             )
             ids = [item.id for item in all_posts]
