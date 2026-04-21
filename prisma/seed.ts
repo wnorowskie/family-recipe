@@ -4,6 +4,11 @@ import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+const CLAUDE_TEST_USER_DEFAULT = 'claude-test';
+const CLAUDE_TEST_EMAIL = 'claude-test@example.local';
+const CLAUDE_TEST_NAME = 'Claude Test';
+const CLAUDE_TEST_PASSWORD_DEFAULT = 'claude-test-password';
+
 async function main() {
   console.log('🌱 Seeding database...');
 
@@ -11,6 +16,8 @@ async function main() {
   if (existingFamily) {
     console.log('ℹ️  Family space already exists; not overwriting master key.');
   }
+
+  let familySpaceId: string;
 
   if (!existingFamily) {
     const masterKey =
@@ -71,7 +78,51 @@ async function main() {
     }
 
     console.log('🏷️ Seeded canonical tags');
+
+    familySpaceId = familySpace.id;
+  } else {
+    familySpaceId = existingFamily.id;
   }
+
+  await seedTestUser(familySpaceId);
+}
+
+async function seedTestUser(familySpaceId: string) {
+  if (process.env.NODE_ENV === 'production') {
+    console.log('⏭️  Skipping claude-test user (NODE_ENV=production)');
+    return;
+  }
+
+  const username =
+    process.env.CLAUDE_TEST_USER?.trim() || CLAUDE_TEST_USER_DEFAULT;
+  const password =
+    process.env.CLAUDE_TEST_PASSWORD?.trim() || CLAUDE_TEST_PASSWORD_DEFAULT;
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const user = await prisma.user.upsert({
+    where: { email: CLAUDE_TEST_EMAIL },
+    update: { username, passwordHash, name: CLAUDE_TEST_NAME },
+    create: {
+      email: CLAUDE_TEST_EMAIL,
+      username,
+      name: CLAUDE_TEST_NAME,
+      passwordHash,
+    },
+  });
+
+  await prisma.familyMembership.upsert({
+    where: {
+      familySpaceId_userId: { familySpaceId, userId: user.id },
+    },
+    update: {},
+    create: {
+      familySpaceId,
+      userId: user.id,
+      role: 'member',
+    },
+  });
+
+  console.log(`🧪 Seeded claude-test user (username="${username}")`);
 }
 
 function generateMasterKey() {

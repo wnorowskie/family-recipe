@@ -48,14 +48,14 @@ until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
 echo "ready"
 ```
 
-**Cookie-jar login** (pattern reused across playbooks). The `<user>` / `<pass>` placeholders are intentional — a dedicated `claude-test` seed user and `scripts/claude-login.sh` wrapper are tracked as a follow-up in [#63](https://github.com/wnorowskie/family-recipe/issues/63). Until that lands, log in as any seeded family member (the master key output of `npm run db:seed` lets you create one via `/signup`):
+**Cookie-jar login** — use [scripts/claude-login.sh](../../scripts/claude-login.sh), which logs in as the `claude-test` seed user and writes a session cookie to `/tmp/fr-cookies.txt`:
 
 ```bash
-curl -s -c /tmp/fr-cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"emailOrUsername":"<user>","password":"<pass>"}' \
-  http://localhost:3000/api/auth/login | jq .
+COOKIES=$(scripts/claude-login.sh)                          # Next on :3000
+COOKIES=$(scripts/claude-login.sh --host http://localhost:8000)  # FastAPI
 ```
+
+The user is created (and its password refreshed) every time `npm run db:seed` runs outside `NODE_ENV=production`. Credentials come from `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD` in env or `.env.local` (see [.env.example](../../.env.example)). This is the canonical auth path — playbook snippets assume it.
 
 **Stop any leftover dev servers:**
 
