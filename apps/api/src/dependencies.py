@@ -33,8 +33,12 @@ async def get_current_user(request: Request) -> UserResponse:
     return UserResponse(
         id=user.id,
         name=user.name,
-        emailOrUsername=user.emailOrUsername,
-        avatarUrl=user.avatarUrl,
+        email=user.email,
+        username=user.username,
+        emailOrUsername=user.email,
+        # FastAPI lacks the signed-URL helper the Next app uses to resolve
+        # avatarStorageKey → signed URL; return None until that lands.
+        avatarUrl=None,
         role=membership.role,
         familySpaceId=membership.familySpaceId,
         familySpaceName=membership.familySpace.name if membership.familySpace else None,

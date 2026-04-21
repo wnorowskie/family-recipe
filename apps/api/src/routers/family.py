@@ -24,8 +24,11 @@ async def list_members(user: UserResponse = Depends(get_current_user)):
                 "userId": m.userId,
                 "membershipId": m.id,
                 "name": m.user.name,
-                "emailOrUsername": m.user.emailOrUsername,
-                "avatarUrl": m.user.avatarUrl,
+                "email": m.user.email,
+                "username": m.user.username,
+                "emailOrUsername": m.user.email,
+                # FastAPI lacks the signed-URL helper; see dependencies.py.
+                "avatarUrl": None,
                 "role": m.role,
                 "joinedAt": m.createdAt.isoformat(),
                 "postCount": len(m.user.posts) if m.user.posts else 0,

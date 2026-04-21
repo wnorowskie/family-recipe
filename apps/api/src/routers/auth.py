@@ -17,8 +17,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def signup(payload: SignupRequest, response: Response):
     try:
-        existing_user = await prisma.user.find_unique(
-            where={"emailOrUsername": payload.emailOrUsername}
+        email = payload.email.strip()
+        username = payload.username.strip()
+
+        existing_user = await prisma.user.find_first(
+            where={"OR": [{"email": email}, {"username": username}]}
         )
         if existing_user:
             return bad_request("A user with this email or username already exists")
@@ -40,7 +43,8 @@ async def signup(payload: SignupRequest, response: Response):
             user = await tx.user.create(
                 data={
                     "name": payload.name,
-                    "emailOrUsername": payload.emailOrUsername,
+                    "email": email,
+                    "username": username,
                     "passwordHash": hash_password(payload.password),
                 }
             )
@@ -65,8 +69,10 @@ async def signup(payload: SignupRequest, response: Response):
         user_response = UserResponse(
             id=user.id,
             name=user.name,
-            emailOrUsername=user.emailOrUsername,
-            avatarUrl=user.avatarUrl,
+            email=user.email,
+            username=user.username,
+            emailOrUsername=user.email,
+            avatarUrl=None,
             role=membership.role,
             familySpaceId=membership.familySpaceId,
             familySpaceName=family_space.name,
@@ -86,8 +92,9 @@ async def signup(payload: SignupRequest, response: Response):
 @router.post("/login", response_model=AuthResponse)
 async def login(payload: LoginRequest, response: Response):
     try:
-        user = await prisma.user.find_unique(
-            where={"emailOrUsername": payload.emailOrUsername},
+        identifier = payload.emailOrUsername.strip()
+        user = await prisma.user.find_first(
+            where={"OR": [{"email": identifier}, {"username": identifier}]},
             include={
                 "memberships": {
                     "include": {"familySpace": True},
@@ -98,7 +105,7 @@ async def login(payload: LoginRequest, response: Response):
         if not user:
             logger.info(
                 "auth.login.invalid_credentials user not found",
-                extra={"emailOrUsername": payload.emailOrUsername},
+                extra={"emailOrUsername": identifier},
             )
             return invalid_credentials()
 
@@ -106,14 +113,14 @@ async def login(payload: LoginRequest, response: Response):
         if not is_valid_password:
             logger.info(
                 "auth.login.invalid_credentials bad password",
-                extra={"emailOrUsername": payload.emailOrUsername},
+                extra={"emailOrUsername": identifier},
             )
             return invalid_credentials()
 
         if not user.memberships:
             logger.info(
                 "auth.login.no_membership",
-                extra={"emailOrUsername": payload.emailOrUsername, "userId": user.id},
+                extra={"emailOrUsername": identifier, "userId": user.id},
             )
             return forbidden("User is not a member of any family space")
 
@@ -131,8 +138,10 @@ async def login(payload: LoginRequest, response: Response):
         user_response = UserResponse(
             id=user.id,
             name=user.name,
-            emailOrUsername=user.emailOrUsername,
-            avatarUrl=user.avatarUrl,
+            email=user.email,
+            username=user.username,
+            emailOrUsername=user.email,
+            avatarUrl=None,
             role=membership.role,
             familySpaceId=membership.familySpaceId,
             familySpaceName=membership.familySpace.name if membership.familySpace else None,

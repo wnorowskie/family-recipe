@@ -77,7 +77,8 @@ class TestAuthSignup:
     def test_signup_first_user_becomes_owner(self, client, mock_prisma, monkeypatch):
         payload = {
             "name": "New User",
-            "emailOrUsername": "new@example.com",
+            "email": "new@example.com",
+            "username": "newuser",
             "password": "password123",
             "familyMasterKey": "secret-key",
             "rememberMe": False,
@@ -85,11 +86,16 @@ class TestAuthSignup:
 
         family = make_mock_family_space(masterKeyHash="$2b$10$dummyhashforfamily")
 
-        mock_prisma.user.find_unique.return_value = None
+        mock_prisma.user.find_first.return_value = None
         mock_prisma.familyspace.find_first.return_value = family
         mock_prisma.familymembership.count.return_value = 0
 
-        user = make_mock_user(id="user_1", emailOrUsername=payload["emailOrUsername"], name=payload["name"])
+        user = make_mock_user(
+            id="user_1",
+            email=payload["email"],
+            username=payload["username"],
+            name=payload["name"],
+        )
         membership = make_mock_membership(userId=user.id, familySpaceId=family.id, role="owner", familySpace=family)
         self._setup_tx(mock_prisma, user, membership)
 
@@ -101,23 +107,32 @@ class TestAuthSignup:
         assert response.status_code == 201
         body = response.json()
         assert body["user"]["role"] == "owner"
+        assert body["user"]["email"] == payload["email"]
+        assert body["user"]["username"] == payload["username"]
+        assert body["user"]["emailOrUsername"] == payload["email"]
         assert "set-cookie" in response.headers
 
     def test_signup_subsequent_user_becomes_member(self, client, mock_prisma, monkeypatch):
         payload = {
             "name": "Next User",
-            "emailOrUsername": "next@example.com",
+            "email": "next@example.com",
+            "username": "nextuser",
             "password": "password123",
             "familyMasterKey": "secret-key",
             "rememberMe": False,
         }
 
         family = make_mock_family_space()
-        mock_prisma.user.find_unique.return_value = None
+        mock_prisma.user.find_first.return_value = None
         mock_prisma.familyspace.find_first.return_value = family
         mock_prisma.familymembership.count.return_value = 1
 
-        user = make_mock_user(id="user_2", emailOrUsername=payload["emailOrUsername"], name=payload["name"])
+        user = make_mock_user(
+            id="user_2",
+            email=payload["email"],
+            username=payload["username"],
+            name=payload["name"],
+        )
         membership = make_mock_membership(userId=user.id, familySpaceId=family.id, role="member", familySpace=family)
         self._setup_tx(mock_prisma, user, membership)
 
@@ -130,13 +145,14 @@ class TestAuthSignup:
         assert response.json()["user"]["role"] == "member"
 
     def test_signup_rejects_duplicate_email(self, client, mock_prisma):
-        mock_prisma.user.find_unique.return_value = make_mock_user()
+        mock_prisma.user.find_first.return_value = make_mock_user()
 
         response = client.post(
             "/auth/signup",
             json={
                 "name": "Dup User",
-                "emailOrUsername": "test@example.com",
+                "email": "test@example.com",
+                "username": "dupuser",
                 "password": "password123",
                 "familyMasterKey": "secret-key",
                 "rememberMe": False,
@@ -148,7 +164,7 @@ class TestAuthSignup:
 
     def test_signup_invalid_master_key(self, client, mock_prisma, monkeypatch):
         family = make_mock_family_space(masterKeyHash="$2b$10$hash")
-        mock_prisma.user.find_unique.return_value = None
+        mock_prisma.user.find_first.return_value = None
         mock_prisma.familyspace.find_first.return_value = family
         mock_prisma.familymembership.count.return_value = 0
         monkeypatch.setattr("src.security.verify_password", lambda pwd, hash: False)
@@ -158,7 +174,8 @@ class TestAuthSignup:
             "/auth/signup",
             json={
                 "name": "User",
-                "emailOrUsername": "user@example.com",
+                "email": "user@example.com",
+                "username": "someuser",
                 "password": "password123",
                 "familyMasterKey": "wrongkey",
                 "rememberMe": False,
@@ -169,14 +186,15 @@ class TestAuthSignup:
         assert response.json()["error"]["code"] == "BAD_REQUEST"
 
     def test_signup_no_family_space(self, client, mock_prisma):
-        mock_prisma.user.find_unique.return_value = None
+        mock_prisma.user.find_first.return_value = None
         mock_prisma.familyspace.find_first.return_value = None
 
         response = client.post(
             "/auth/signup",
             json={
                 "name": "User",
-                "emailOrUsername": "user@example.com",
+                "email": "user@example.com",
+                "username": "someuser",
                 "password": "password123",
                 "familyMasterKey": "secret-key",
                 "rememberMe": False,
@@ -197,7 +215,7 @@ class TestAuthLogin:
         assert response.status_code == 422
 
     def test_login_user_not_found(self, client, mock_prisma):
-        mock_prisma.user.find_unique.return_value = None
+        mock_prisma.user.find_first.return_value = None
 
         response = client.post(
             "/auth/login",
@@ -211,13 +229,13 @@ class TestAuthLogin:
         family = make_mock_family_space()
         membership = make_mock_membership(familySpaceId=family.id, familySpace=family)
         user = make_mock_user(memberships=[membership])
-        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.user.find_first.return_value = user
         monkeypatch.setattr("src.security.verify_password", lambda pwd, hash: False)
         monkeypatch.setattr("src.routers.auth.verify_password", lambda pwd, hash: False)
 
         response = client.post(
             "/auth/login",
-            json={"emailOrUsername": user.emailOrUsername, "password": "wrongpwd"},
+            json={"emailOrUsername": user.email, "password": "wrongpwd"},
         )
 
         assert response.status_code == 401
@@ -225,13 +243,13 @@ class TestAuthLogin:
 
     def test_login_no_membership_forbidden(self, client, mock_prisma, monkeypatch):
         user = make_mock_user(memberships=[])
-        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.user.find_first.return_value = user
         monkeypatch.setattr("src.security.verify_password", lambda pwd, hash: True)
         monkeypatch.setattr("src.routers.auth.verify_password", lambda pwd, hash: True)
 
         response = client.post(
             "/auth/login",
-            json={"emailOrUsername": user.emailOrUsername, "password": "password123"},
+            json={"emailOrUsername": user.email, "password": "password123"},
         )
 
         assert response.status_code == 403
@@ -241,31 +259,34 @@ class TestAuthLogin:
         family = make_mock_family_space()
         membership = make_mock_membership(familySpaceId=family.id, familySpace=family)
         user = make_mock_user(memberships=[membership])
-        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.user.find_first.return_value = user
         monkeypatch.setattr("src.security.verify_password", lambda pwd, hash: True)
         monkeypatch.setattr("src.routers.auth.verify_password", lambda pwd, hash: True)
 
         response = client.post(
             "/auth/login",
-            json={"emailOrUsername": user.emailOrUsername, "password": "password123"},
+            json={"emailOrUsername": user.username, "password": "password123"},
         )
 
         assert response.status_code == 200
         assert "set-cookie" in response.headers
         body = response.json()
         assert body["user"]["id"] == user.id
+        assert body["user"]["email"] == user.email
+        assert body["user"]["username"] == user.username
+        assert body["user"]["emailOrUsername"] == user.email
 
     def test_login_remember_me_extends_cookie(self, client, mock_prisma, monkeypatch):
         family = make_mock_family_space()
         membership = make_mock_membership(familySpaceId=family.id, familySpace=family)
         user = make_mock_user(memberships=[membership])
-        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.user.find_first.return_value = user
         monkeypatch.setattr("src.security.verify_password", lambda pwd, hash: True)
         monkeypatch.setattr("src.routers.auth.verify_password", lambda pwd, hash: True)
 
         response = client.post(
             "/auth/login",
-            json={"emailOrUsername": user.emailOrUsername, "password": "password123", "rememberMe": True},
+            json={"emailOrUsername": user.email, "password": "password123", "rememberMe": True},
         )
 
         assert response.status_code == 200
