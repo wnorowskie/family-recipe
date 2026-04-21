@@ -110,6 +110,19 @@ jobs:
 
           npx prisma migrate deploy --schema "${PRISMA_SCHEMA}"
 
+      - name: Capture currently-serving revision (for rollback)
+        run: |
+          PREV_REVISION="$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --format='value(status.traffic[0].revisionName)' 2>/dev/null || true)"
+          if [ -n "$PREV_REVISION" ]; then
+            echo "Previously-serving revision: $PREV_REVISION"
+          else
+            echo "No previously-serving revision found (first deploy or service missing); rollback will be skipped."
+          fi
+          echo "PREV_REVISION=$PREV_REVISION" >> "$GITHUB_ENV"
+
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
 
@@ -149,6 +162,7 @@ jobs:
           echo "Healthcheck:  $URI/api/health"
 
       - name: Smoke check /api/health
+        id: smoke_check
         run: |
           URI="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
           for i in {1..20}; do
@@ -161,4 +175,20 @@ jobs:
             sleep 3
           done
           echo "Healthcheck did not return 200 within timeout."
+          exit 1
+
+      - name: Rollback traffic on smoke-check failure
+        if: failure() && steps.smoke_check.conclusion == 'failure'
+        run: |
+          if [ -z "${PREV_REVISION:-}" ]; then
+            echo "No previous revision was captured (first deploy?); cannot roll back."
+            exit 1
+          fi
+          echo "Smoke check failed. Rolling traffic back to previous revision: $PREV_REVISION"
+          gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --to-revisions="$PREV_REVISION=100" \
+            --quiet
+          echo "Rollback complete. Job will fail so the broken deploy is surfaced."
           exit 1

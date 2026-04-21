@@ -56,6 +56,15 @@ resource "google_service_account_iam_member" "runtime_self_token_creator" {
   member             = "serviceAccount:${google_service_account.runtime.email}"
 }
 
+# Allow deployer service account to mint ID tokens for itself
+# (used by deploy workflows to authenticate smoke checks against
+# Cloud Run services deployed with --no-allow-unauthenticated).
+resource "google_service_account_iam_member" "deployer_self_token_creator" {
+  service_account_id = google_service_account.deployer.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.deployer.email}"
+}
+
 resource "google_iam_workload_identity_pool" "github" {
   workload_identity_pool_id = var.wif_pool_id
   project                   = var.project_id
