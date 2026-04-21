@@ -11,7 +11,13 @@ from ..errors import conflict, forbidden, internal_error, not_found
 from ..permissions import can_edit_post
 from ..schemas.auth import UserResponse
 from ..schemas.posts import CookedRequest, CreatePostRequest, FavoriteResponse, UpdatePostRequest
-from ..uploads import ALLOWED_MIME_TYPES, MAX_PHOTO_COUNT, delete_uploads, save_photo_file
+from ..uploads import (
+    ALLOWED_MIME_TYPES,
+    MAX_PHOTO_COUNT,
+    create_signed_url_resolver,
+    delete_uploads,
+    save_photo_file,
+)
 from ..utils import iso, is_cuid
 
 router = APIRouter(prefix="/posts", tags=["posts"])
@@ -219,12 +225,17 @@ async def _load_post_detail(
         order={"createdAt": "asc"},
         include={"user": True},
     )
+    resolve_avatar = create_signed_url_resolver()
     reaction_summary_map: Dict[str, Dict[str, Any]] = {}
     for r in post_reactions:
         entry = reaction_summary_map.get(r.emoji) or {"emoji": r.emoji, "count": 0, "users": []}
         entry["count"] += 1
         entry["users"].append(
-            {"id": r.user.id, "name": r.user.name, "avatarUrl": r.user.avatarUrl}
+            {
+                "id": r.user.id,
+                "name": r.user.name,
+                "avatarUrl": await resolve_avatar(getattr(r.user, "avatarStorageKey", None)),
+            }
         )
         reaction_summary_map[r.emoji] = entry
 
@@ -248,7 +259,11 @@ async def _load_post_detail(
             comment_reaction_map[r.targetId] = lst
         found["count"] += 1
         found["users"].append(
-            {"id": r.user.id, "name": r.user.name, "avatarUrl": r.user.avatarUrl}
+            {
+                "id": r.user.id,
+                "name": r.user.name,
+                "avatarUrl": await resolve_avatar(getattr(r.user, "avatarStorageKey", None)),
+            }
         )
 
     comments = []
@@ -259,23 +274,36 @@ async def _load_post_detail(
                 "text": c.text,
                 "photoUrl": c.photoUrl,
                 "createdAt": iso(c.createdAt),
-                "author": {"id": c.author.id, "name": c.author.name, "avatarUrl": c.author.avatarUrl} if c.author else None,
+                "author": {
+                    "id": c.author.id,
+                    "name": c.author.name,
+                    "avatarUrl": await resolve_avatar(getattr(c.author, "avatarStorageKey", None)),
+                }
+                if c.author
+                else None,
                 "reactions": comment_reaction_map.get(c.id, []),
             }
         )
 
     has_more_cooked = len(cooked_records) > cooked_limit
     cooked_records = cooked_records[:cooked_limit]
-    cooked = [
-        {
-            "id": e.id,
-            "rating": e.rating,
-            "note": e.note,
-            "createdAt": iso(e.createdAt),
-            "user": {"id": e.user.id, "name": e.user.name, "avatarUrl": e.user.avatarUrl} if e.user else None,
-        }
-        for e in cooked_records
-    ]
+    cooked = []
+    for e in cooked_records:
+        cooked.append(
+            {
+                "id": e.id,
+                "rating": e.rating,
+                "note": e.note,
+                "createdAt": iso(e.createdAt),
+                "user": {
+                    "id": e.user.id,
+                    "name": e.user.name,
+                    "avatarUrl": await resolve_avatar(getattr(e.user, "avatarStorageKey", None)),
+                }
+                if e.user
+                else None,
+            }
+        )
 
     courses_out = _parse_courses_from_recipe_details(post.recipeDetails) if hasattr(post, "recipeDetails") else []
 
@@ -288,7 +316,13 @@ async def _load_post_detail(
             "updatedAt": iso(post.updatedAt),
             "mainPhotoUrl": post.mainPhotoUrl,
             "isFavorited": is_favorited,
-            "author": {"id": post.author.id, "name": post.author.name, "avatarUrl": post.author.avatarUrl} if post.author else None,
+            "author": {
+                "id": post.author.id,
+                "name": post.author.name,
+                "avatarUrl": await resolve_avatar(getattr(post.author, "avatarStorageKey", None)),
+            }
+            if post.author
+            else None,
             "editor": {"id": post.editor.id, "name": post.editor.name} if post.editor else None,
             "lastEditNote": post.lastEditNote,
             "lastEditAt": iso(post.lastEditAt),
@@ -596,16 +630,24 @@ async def log_cooked(
         )
         has_more = len(cooked_page) > 5
         cooked_page = cooked_page[:5]
-        recent_cooked = [
-            {
-                "id": e.id,
-                "rating": e.rating,
-                "note": e.note,
-                "createdAt": iso(e.createdAt),
-                "user": {"id": e.user.id, "name": e.user.name, "avatarUrl": e.user.avatarUrl} if e.user else None,
-            }
-            for e in cooked_page
-        ]
+        resolve_avatar = create_signed_url_resolver()
+        recent_cooked = []
+        for e in cooked_page:
+            recent_cooked.append(
+                {
+                    "id": e.id,
+                    "rating": e.rating,
+                    "note": e.note,
+                    "createdAt": iso(e.createdAt),
+                    "user": {
+                        "id": e.user.id,
+                        "name": e.user.name,
+                        "avatarUrl": await resolve_avatar(getattr(e.user, "avatarStorageKey", None)),
+                    }
+                    if e.user
+                    else None,
+                }
+            )
         return {
             "cookedStats": {"timesCooked": times_cooked, "averageRating": average_rating},
             "recentCooked": recent_cooked,
@@ -633,17 +675,26 @@ async def list_cooked(
         )
         has_more = len(events) > limit_clamped
         events = events[:limit_clamped]
-        return {
-            "cookedEvents": [
+        resolve_avatar = create_signed_url_resolver()
+        cooked_events = []
+        for e in events:
+            cooked_events.append(
                 {
                     "id": e.id,
                     "rating": e.rating,
                     "note": e.note,
                     "createdAt": iso(e.createdAt),
-                    "user": e.user,
+                    "user": {
+                        "id": e.user.id,
+                        "name": e.user.name,
+                        "avatarUrl": await resolve_avatar(getattr(e.user, "avatarStorageKey", None)),
+                    }
+                    if e.user
+                    else None,
                 }
-                for e in events
-            ],
+            )
+        return {
+            "cookedEvents": cooked_events,
             "hasMore": has_more,
             "nextOffset": offset + len(events),
         }

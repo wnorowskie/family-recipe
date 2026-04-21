@@ -8,6 +8,7 @@ from ..dependencies import get_current_user
 from ..errors import bad_request, forbidden, internal_error, invalid_credentials
 from ..schemas.auth import AuthResponse, LoginRequest, SignupRequest, UserResponse
 from ..security import clear_session_cookie, hash_password, set_session_cookie, sign_token, verify_password
+from ..uploads import get_signed_upload_url
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ async def signup(payload: SignupRequest, response: Response):
             email=user.email,
             username=user.username,
             emailOrUsername=user.email,
-            avatarUrl=None,
+            avatarUrl=await get_signed_upload_url(getattr(user, "avatarStorageKey", None)),
             role=membership.role,
             familySpaceId=membership.familySpaceId,
             familySpaceName=family_space.name,
@@ -141,7 +142,7 @@ async def login(payload: LoginRequest, response: Response):
             email=user.email,
             username=user.username,
             emailOrUsername=user.email,
-            avatarUrl=None,
+            avatarUrl=await get_signed_upload_url(getattr(user, "avatarStorageKey", None)),
             role=membership.role,
             familySpaceId=membership.familySpaceId,
             familySpaceName=membership.familySpace.name if membership.familySpace else None,

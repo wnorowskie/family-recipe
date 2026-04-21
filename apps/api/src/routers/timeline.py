@@ -6,6 +6,7 @@ from ..db import prisma
 from ..dependencies import get_current_user
 from ..errors import internal_error
 from ..schemas.auth import UserResponse
+from ..uploads import create_signed_url_resolver
 from ..utils import iso
 
 logger = logging.getLogger(__name__)
@@ -111,24 +112,29 @@ async def get_timeline(
             }
             return mapping.get(entry_type, "shared")
 
-        items = [
-            {
+        resolve_avatar = create_signed_url_resolver()
+        items = []
+        for entry in slice_items:
+            actor = entry["actor"]
+            item = {
                 "id": entry["id"],
                 "type": entry["type"],
                 "timestamp": iso(entry["createdAt"]),
                 "actor": {
-                    "id": entry["actor"].id,
-                    "name": entry["actor"].name,
-                    "avatarUrl": entry["actor"].avatarUrl,
+                    "id": actor.id,
+                    "name": actor.name,
+                    "avatarUrl": await resolve_avatar(getattr(actor, "avatarStorageKey", None)),
                 },
                 "post": entry["post"],
                 "actionText": action_text(entry["type"]),
-                **({"comment": entry["comment"]} if "comment" in entry else {}),
-                **({"reaction": entry["reaction"]} if "reaction" in entry else {}),
-                **({"cooked": entry["cooked"]} if "cooked" in entry else {}),
             }
-            for entry in slice_items
-        ]
+            if "comment" in entry:
+                item["comment"] = entry["comment"]
+            if "reaction" in entry:
+                item["reaction"] = entry["reaction"]
+            if "cooked" in entry:
+                item["cooked"] = entry["cooked"]
+            items.append(item)
 
         return {"items": items, "hasMore": has_more, "nextOffset": offset + len(items)}
     except PrismaError as e:

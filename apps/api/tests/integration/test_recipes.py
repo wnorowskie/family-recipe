@@ -15,7 +15,7 @@ def _make_author(idx: int = 1, **overrides) -> SimpleNamespace:
     data = {
         "id": f"author-{idx}",
         "name": f"Chef {idx}",
-        "avatarUrl": f"https://cdn.test/avatar-{idx}.jpg",
+        "avatarStorageKey": f"avatars/avatar-{idx}.jpg",
     }
     data.update(overrides)
     return SimpleNamespace(**data)

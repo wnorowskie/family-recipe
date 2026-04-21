@@ -47,7 +47,7 @@ def _make_membership(user: SimpleNamespace, **overrides) -> SimpleNamespace:
 
 
 def test_list_members_success(client, mock_prisma, member_auth):
-    user = _make_user(idx=1, posts=[SimpleNamespace(id="p1")])
+    user = _make_user(idx=1, avatarStorageKey="avatars/avatar-1.jpg", posts=[SimpleNamespace(id="p1")])
     membership = _make_membership(user, role="admin")
     mock_prisma.familymembership.find_many = AsyncMock(return_value=[membership])
 
@@ -63,7 +63,7 @@ def test_list_members_success(client, mock_prisma, member_auth):
                 "email": user.email,
                 "username": user.username,
                 "emailOrUsername": user.email,
-                "avatarUrl": None,
+                "avatarUrl": "/uploads/avatars/avatar-1.jpg",
                 "role": "admin",
                 "joinedAt": _NOW.isoformat(),
                 "postCount": 1,

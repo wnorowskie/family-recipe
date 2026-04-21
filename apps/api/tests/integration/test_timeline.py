@@ -16,7 +16,7 @@ class TestTimelineRouter:
         return BASE_TIME + timedelta(minutes=minutes)
 
     def _actor(self, suffix: str = "1") -> SimpleNamespace:
-        return SimpleNamespace(id=f"user-{suffix}", name=f"User {suffix}", avatarUrl=f"https://cdn.test/{suffix}.jpg")
+        return SimpleNamespace(id=f"user-{suffix}", name=f"User {suffix}", avatarStorageKey=f"avatars/{suffix}.jpg")
 
     def _post(
         self,
@@ -235,7 +235,11 @@ class TestTimelineRouter:
 
         assert response.status_code == 200, response.json()
         item = response.json()["items"][0]
-        assert item["actor"] == {"id": actor.id, "name": actor.name, "avatarUrl": actor.avatarUrl}
+        assert item["actor"] == {
+            "id": actor.id,
+            "name": actor.name,
+            "avatarUrl": f"/uploads/{actor.avatarStorageKey}",
+        }
 
     def test_timeline_includes_post_summary(self, client, mock_prisma, member_auth):
         reaction = self._reaction(post=self._post_summary("post-summary", "Summary"), created_at=self._ts(4))

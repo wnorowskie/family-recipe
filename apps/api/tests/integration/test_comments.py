@@ -21,7 +21,7 @@ class TestListComments:
             text=text,
             photoUrl=None,
             createdAt=now,
-            author=SimpleNamespace(id=author_id, name=f"User {author_id}", avatarUrl=None),
+            author=SimpleNamespace(id=author_id, name=f"User {author_id}", avatarStorageKey=None),
         )
 
     def test_list_comments_success(self, client, mock_prisma, member_auth):
@@ -55,17 +55,17 @@ class TestListComments:
                 SimpleNamespace(
                     targetId="c1",
                     emoji="❤️",
-                    user=SimpleNamespace(id="u1", name="Alice", avatarUrl=None),
+                    user=SimpleNamespace(id="u1", name="Alice", avatarStorageKey=None),
                 ),
                 SimpleNamespace(
                     targetId="c1",
                     emoji="❤️",
-                    user=SimpleNamespace(id="u2", name="Bob", avatarUrl=None),
+                    user=SimpleNamespace(id="u2", name="Bob", avatarStorageKey=None),
                 ),
                 SimpleNamespace(
                     targetId="c1",
                     emoji="👍",
-                    user=SimpleNamespace(id="u3", name="Cara", avatarUrl=None),
+                    user=SimpleNamespace(id="u3", name="Cara", avatarStorageKey=None),
                 ),
             ]
         )
@@ -97,7 +97,7 @@ class TestCreateComment:
             text=text,
             photoUrl=photo_url,
             createdAt=now,
-            author=SimpleNamespace(id="user-1", name="Test User", avatarUrl=None),
+            author=SimpleNamespace(id="user-1", name="Test User", avatarStorageKey=None),
         )
 
     def test_create_comment_text_only(self, client, mock_prisma, member_auth):

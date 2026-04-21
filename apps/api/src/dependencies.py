@@ -4,6 +4,7 @@ from .db import prisma
 from .schemas.auth import UserResponse
 from .security import verify_token
 from .settings import settings
+from .uploads import get_signed_upload_url
 
 
 async def get_current_user(request: Request) -> UserResponse:
@@ -30,15 +31,14 @@ async def get_current_user(request: Request) -> UserResponse:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
     membership = user.memberships[0]
+    avatar_url = await get_signed_upload_url(getattr(user, "avatarStorageKey", None))
     return UserResponse(
         id=user.id,
         name=user.name,
         email=user.email,
         username=user.username,
         emailOrUsername=user.email,
-        # FastAPI lacks the signed-URL helper the Next app uses to resolve
-        # avatarStorageKey → signed URL; return None until that lands.
-        avatarUrl=None,
+        avatarUrl=avatar_url,
         role=membership.role,
         familySpaceId=membership.familySpaceId,
         familySpaceName=membership.familySpace.name if membership.familySpace else None,
