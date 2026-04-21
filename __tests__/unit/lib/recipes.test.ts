@@ -81,12 +81,14 @@ describe('Recipe Utilities', () => {
       expect(args.orderBy).toEqual([{ title: 'asc' }, { createdAt: 'desc' }]);
     });
 
-    it('fetches all matches (no skip/take) when sort is rating', async () => {
+    it('rating sort: fetches the bounded candidate set with no skip (paginates in memory)', async () => {
       await getRecipes({ ...baseInput, sort: 'rating', limit: 2, offset: 4 });
 
       const args = latestPostArgs();
       expect(args.orderBy).toEqual([{ createdAt: 'desc' }]);
-      expect(args.take).toBeUndefined();
+      // Hard cap on candidate fetch — matches RATING_SORT_CANDIDATE_LIMIT
+      // in src/lib/recipes.ts. Update both if the cap changes.
+      expect(args.take).toBe(500);
       expect(args.skip).toBeUndefined();
     });
 
@@ -618,7 +620,7 @@ describe('Recipe Utilities', () => {
       });
     });
 
-    it('sorts by rating desc with unrated last (compose with tag filter + pagination)', async () => {
+    it('sorts by rating desc with unrated last', async () => {
       // Four recipes: two rated (4.5 avg from two events, 3.5 avg from two
       // events), one with a single 5-star rating but an older createdAt, and
       // one fully unrated. Expected order: 5★, 4.5★, 3.5★, unrated.
@@ -771,6 +773,70 @@ describe('Recipe Utilities', () => {
       expect(page1.hasMore).toBe(true);
       expect(page2.items.map((i) => i.id)).toEqual(['p_35', 'p_unrated']);
       expect(page2.hasMore).toBe(false);
+    });
+
+    it('composes sort=rating with a tags filter and returns only tagged recipes', async () => {
+      // Two recipes carry the 'weeknight' tag: one rated 4.5, one unrated.
+      // The DB query is responsible for filtering by tag; the mock only
+      // returns the two tagged matches, so we also assert the where clause.
+      const base = (overrides: any) => ({
+        mainPhotoUrl: null,
+        author: { id: 'u_1', name: 'Alice', avatarUrl: null },
+        recipeDetails: {
+          courses: JSON.stringify(['dinner']),
+          course: 'dinner',
+        },
+        tags: [],
+        ...overrides,
+      });
+      prismaMock.post.findMany.mockResolvedValue([
+        base({
+          id: 'p_tagged_45',
+          title: 'Tagged 4.5',
+          createdAt: new Date('2026-02-01'),
+        }),
+        base({
+          id: 'p_tagged_unrated',
+          title: 'Tagged Unrated',
+          createdAt: new Date('2026-03-01'),
+        }),
+      ] as any);
+      mockCookedGroupBy.mockResolvedValue([
+        { postId: 'p_tagged_45', _count: { _all: 2 }, _avg: { rating: 4.5 } },
+      ] as any);
+
+      const result = await getRecipes({
+        familySpaceId: 'family_1',
+        limit: 10,
+        offset: 0,
+        sort: 'rating',
+        tags: ['weeknight'],
+      });
+
+      expect(result.items.map((i) => i.id)).toEqual([
+        'p_tagged_45',
+        'p_tagged_unrated',
+      ]);
+
+      const args = latestPostArgs();
+      expect(args.where?.AND).toContainEqual({
+        tags: { some: { tag: { name: 'weeknight' } } },
+      });
+    });
+
+    it('scopes sort=rating to the requesting familySpaceId (cross-family guard)', async () => {
+      prismaMock.post.findMany.mockResolvedValue([] as any);
+
+      await getRecipes({
+        familySpaceId: 'family_requester',
+        limit: 10,
+        offset: 0,
+        sort: 'rating',
+      });
+
+      const args = latestPostArgs();
+      expect(args.where?.familySpaceId).toBe('family_requester');
+      expect(args.where?.hasRecipeDetails).toBe(true);
     });
 
     it('calculates hasMore and slices extra record', async () => {

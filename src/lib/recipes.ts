@@ -331,9 +331,15 @@ export async function getRecipes(
 
   if (sort === 'rating') {
     // Rating sort joins against an aggregate from CookedEvent that Prisma
-    // cannot express in a single orderBy. Fetch all matching posts, compute
-    // stats, sort in memory, then paginate. Safe at V1 scale (one family).
-    const allPosts = (await prisma.post.findMany(baseQuery)) as RecipePost[];
+    // cannot express in a single orderBy. Fetch matching posts, compute
+    // stats, sort in memory, then paginate. The hard cap guards against a
+    // family with many recipes silently degrading this path — if we ever hit
+    // it, swap to a SQL-aggregate query.
+    const RATING_SORT_CANDIDATE_LIMIT = 500;
+    const allPosts = (await prisma.post.findMany({
+      ...baseQuery,
+      take: RATING_SORT_CANDIDATE_LIMIT,
+    })) as RecipePost[];
     cookedStatsMap = await fetchCookedStats(allPosts.map((p) => p.id));
     const sorted = [...allPosts].sort((a, b) => {
       const statsA = cookedStatsMap[a.id];

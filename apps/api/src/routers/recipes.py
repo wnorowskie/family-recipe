@@ -208,8 +208,7 @@ async def browse_recipes(
                 is_unrated = avg is None
                 avg_key = 0.0 if avg is None else -avg
                 cooked_key = -stats["timesCooked"]
-                created = getattr(post, "createdAt", None)
-                created_key = -created.timestamp() if created is not None else 0.0
+                created_key = -post.createdAt.timestamp()
                 return (is_unrated, avg_key, cooked_key, created_key)
 
             sorted_posts = sorted(all_posts, key=_sort_key)
