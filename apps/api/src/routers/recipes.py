@@ -8,6 +8,7 @@ from ..db import prisma
 from ..dependencies import get_current_user
 from ..errors import internal_error
 from ..schemas.auth import UserResponse
+from ..uploads import create_signed_url_resolver
 
 router = APIRouter(prefix="/recipes", tags=["recipes"])
 
@@ -220,6 +221,7 @@ async def browse_recipes(
             has_more = len(sorted_posts) > offset + limit
             posts = sorted_posts[offset : offset + limit]
 
+        resolve_avatar = create_signed_url_resolver()
         items = []
         for post in posts:
             courses = _parse_courses_from_recipe_details(post.recipeDetails)
@@ -230,7 +232,7 @@ async def browse_recipes(
                 "author": {
                     "id": post.author.id,
                     "name": post.author.name,
-                    "avatarUrl": post.author.avatarUrl,
+                    "avatarUrl": await resolve_avatar(getattr(post.author, "avatarStorageKey", None)),
                 },
                 "courses": courses,
                 "primaryCourse": courses[0] if courses else post.recipeDetails.course if getattr(post.recipeDetails, "course", None) else None,

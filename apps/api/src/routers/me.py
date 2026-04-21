@@ -7,6 +7,7 @@ from ..dependencies import get_current_user
 from ..errors import bad_request, internal_error
 from ..schemas.auth import UserResponse
 from ..security import hash_password, verify_password
+from ..uploads import get_signed_upload_url
 from ..utils import iso
 
 logger = logging.getLogger(__name__)
@@ -78,8 +79,7 @@ async def update_profile(
                 "email": updated.email,
                 "username": updated.username,
                 "emailOrUsername": updated.email,
-                # FastAPI lacks the signed-URL helper; see dependencies.py.
-                "avatarUrl": None,
+                "avatarUrl": await get_signed_upload_url(getattr(updated, "avatarStorageKey", None)),
             }
         }
     except PrismaError:

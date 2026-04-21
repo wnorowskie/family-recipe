@@ -10,7 +10,13 @@ from ..errors import forbidden, internal_error, not_found
 from ..permissions import can_delete_comment
 from ..schemas.auth import UserResponse
 from ..schemas.comments import CreateCommentRequest
-from ..uploads import ALLOWED_MIME_TYPES, delete_uploads, save_photo_file
+from ..uploads import (
+    ALLOWED_MIME_TYPES,
+    create_signed_url_resolver,
+    delete_uploads,
+    get_signed_upload_url,
+    save_photo_file,
+)
 from ..utils import iso, is_cuid
 
 router = APIRouter(prefix="/posts/{post_id}/comments", tags=["comments"])
@@ -62,6 +68,7 @@ async def list_comments(
         has_more = len(comments) > limit_clamped
         comments = comments[:limit_clamped]
         ids = [c.id for c in comments]
+        resolve_avatar = create_signed_url_resolver()
         reaction_map: Dict[str, List[ReactionSummary]] = {}
         if ids:
             reactions = await prisma.reaction.find_many(
@@ -79,20 +86,31 @@ async def list_comments(
                     lst.append(found)
                 found["count"] += 1
                 found["users"].append(
-                    {"id": r.user.id, "name": r.user.name, "avatarUrl": r.user.avatarUrl}
+                    {
+                        "id": r.user.id,
+                        "name": r.user.name,
+                        "avatarUrl": await resolve_avatar(getattr(r.user, "avatarStorageKey", None)),
+                    }
                 )
 
-        serialized = [
-            {
-                "id": c.id,
-                "text": c.text,
-                "photoUrl": c.photoUrl,
-                "createdAt": iso(c.createdAt),
-                "author": {"id": c.author.id, "name": c.author.name, "avatarUrl": c.author.avatarUrl} if c.author else None,
-                "reactions": reaction_map.get(c.id, []),
-            }
-            for c in reversed(comments)
-        ]
+        serialized = []
+        for c in reversed(comments):
+            serialized.append(
+                {
+                    "id": c.id,
+                    "text": c.text,
+                    "photoUrl": c.photoUrl,
+                    "createdAt": iso(c.createdAt),
+                    "author": {
+                        "id": c.author.id,
+                        "name": c.author.name,
+                        "avatarUrl": await resolve_avatar(getattr(c.author, "avatarStorageKey", None)),
+                    }
+                    if c.author
+                    else None,
+                    "reactions": reaction_map.get(c.id, []),
+                }
+            )
         return {"comments": serialized, "hasMore": has_more, "nextOffset": offset + len(serialized)}
     except PrismaError:
         return internal_error("Failed to load comments")
@@ -141,7 +159,15 @@ async def create_comment(
                 "text": comment.text,
                 "photoUrl": comment.photoUrl,
                 "createdAt": iso(comment.createdAt),
-                "author": {"id": comment.author.id, "name": comment.author.name, "avatarUrl": comment.author.avatarUrl} if comment.author else None,
+                "author": {
+                    "id": comment.author.id,
+                    "name": comment.author.name,
+                    "avatarUrl": await get_signed_upload_url(
+                        getattr(comment.author, "avatarStorageKey", None)
+                    ),
+                }
+                if comment.author
+                else None,
                 "reactions": [],
             }
         }

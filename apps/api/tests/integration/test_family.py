@@ -63,7 +63,7 @@ def test_list_members_success(client, mock_prisma, member_auth):
                 "email": user.email,
                 "username": user.username,
                 "emailOrUsername": user.email,
-                "avatarUrl": None,
+                "avatarUrl": f"/uploads/{user.avatarStorageKey}",
                 "role": "admin",
                 "joinedAt": _NOW.isoformat(),
                 "postCount": 1,

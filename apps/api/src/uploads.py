@@ -3,7 +3,7 @@ import hashlib
 import os
 import time
 from pathlib import Path
-from typing import List, Optional, TypedDict, Union
+from typing import Awaitable, Callable, Dict, List, Optional, TypedDict, Union
 from uuid import uuid4
 
 import httpx
@@ -242,3 +242,50 @@ async def delete_uploads(urls: List[Union[str, None, float, int]]) -> None:
                 path.unlink(missing_ok=True)  # type: ignore[arg-type]
             except Exception:
                 continue
+
+
+async def get_signed_upload_url(storage_key: Optional[str]) -> Optional[str]:
+    """Resolve a Prisma avatarStorageKey / postPhoto storageKey to a URL.
+
+    Mirrors src/lib/uploads.ts#getSignedUploadUrl: local-path passthrough
+    when no bucket is configured, else a time-limited V4 signed GCS URL.
+    """
+    if not storage_key:
+        return None
+
+    if not settings.uploads_bucket:
+        return f"/uploads/{storage_key}"
+
+    access_token = await _get_gcp_access_token()
+    service_account_email = await _fetch_metadata("instance/service-accounts/default/email")
+    private_key = os.environ.get("GCS_SIGNING_PRIVATE_KEY")
+
+    return await _generate_signed_url_v4(
+        bucket=settings.uploads_bucket,
+        object_key=storage_key,
+        expires_in_seconds=settings.uploads_signed_url_ttl_seconds,
+        access_token=access_token,
+        service_account_email=service_account_email,
+        private_key=private_key,
+    )
+
+
+def create_signed_url_resolver() -> Callable[[Optional[str]], Awaitable[Optional[str]]]:
+    """Return a resolver that memoizes get_signed_upload_url by storage key.
+
+    Use when a single request touches the same user / photo multiple times
+    (e.g. reactions + comments + cooked events in a post detail) so GCS is
+    only signed once per key.
+    """
+    cache: Dict[str, Optional[str]] = {}
+
+    async def resolve(storage_key: Optional[str]) -> Optional[str]:
+        if not storage_key:
+            return None
+        if storage_key in cache:
+            return cache[storage_key]
+        result = await get_signed_upload_url(storage_key)
+        cache[storage_key] = result
+        return result
+
+    return resolve
