@@ -34,16 +34,23 @@ A single change can touch multiple — run each relevant playbook. Prisma change
 
 ## Shared helpers
 
-**SQLite override for the Next dev server** — the checked-in `.env` points at local Postgres; if it isn't running, DB routes 500 silently. When working on UI or Next-API changes without touching Postgres-only features:
+**Local Postgres is mandatory** — SQLite support was dropped in #80. If the container isn't up, every DB-touching route 500s silently. Start it with:
 
 ```bash
-DATABASE_URL="file:./prisma/dev.db" npm run dev
+docker run -d --name family-recipe-pg \
+  -e POSTGRES_USER=family_app \
+  -e POSTGRES_PASSWORD=FamilyRecipe2025DbPass \
+  -e POSTGRES_DB=family_recipe_dev \
+  -p 5432:5432 postgres:16
+
+npm run db:push      # applies schema.postgres.node.prisma
+npm run db:seed      # seeds family + claude-test user
 ```
 
 **Start dev server in the background + wait for ready:**
 
 ```bash
-DATABASE_URL="file:./prisma/dev.db" npm run dev &
+npm run dev &
 until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
 echo "ready"
 ```

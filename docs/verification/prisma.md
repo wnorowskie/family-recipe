@@ -10,26 +10,25 @@ Schema changes are the single most cross-cutting thing in this repo. They can br
 - the Cloud Run docker image's startup migration
 - family-scoping invariants if a new relation is added without the right filter
 
-All three schemas must describe the same domain.
+Both schemas must describe the same domain.
 
-## Edit all three schemas in lock-step
+## Edit both schemas in lock-step
 
-| File                                                                                                 | Used by                            | Workflow                             |
-| ---------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------ |
-| [prisma/schema.prisma](../../prisma/schema.prisma) (sqlite)                                          | Local Next dev                     | `prisma db push` — no migration file |
-| [prisma/schema.postgres.prisma](../../prisma/schema.postgres.prisma) (postgres)                      | Local Postgres, Cloud SQL, FastAPI | `prisma migrate dev`                 |
-| [prisma/schema.postgres.node.prisma](../../prisma/schema.postgres.node.prisma) (postgres, JS client) | Docker / Cloud Run Next image      | `prisma migrate deploy`              |
+| File                                                                                                 | Used by                                       | Workflow                                                       |
+| ---------------------------------------------------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------- |
+| [prisma/schema.postgres.node.prisma](../../prisma/schema.postgres.node.prisma) (postgres, JS client) | Local Next dev, Docker / Cloud Run Next image | `prisma db push` locally; `prisma migrate deploy` in the image |
+| [prisma/schema.postgres.prisma](../../prisma/schema.postgres.prisma) (postgres)                      | FastAPI (Python client), Cloud SQL migration  | `prisma migrate dev`                                           |
 
-A new field/model/relation must appear in **all three** with the same name, shape, and `@map(...)` column name. Miss one and CI catches it only partway — the runtime fails at the boundary.
+A new field/model/relation must appear in **both** with the same name, shape, and `@map(...)` column name. Miss one and CI catches it only partway — the runtime fails at the boundary. SQLite support was dropped in #80; don't add a third schema back.
 
 ## After editing
 
 ```bash
 # 1. Generate clients
-npm run db:generate
-npx prisma generate --schema prisma/schema.postgres.prisma
+npm run db:generate                                           # Node client (schema.postgres.node.prisma)
+npx prisma generate --schema prisma/schema.postgres.prisma    # Python/FastAPI base schema
 
-# 2. Apply schema to local SQLite (no migration file)
+# 2. Apply schema to local Postgres (no migration file)
 npm run db:push
 
 # 3. Create a Postgres migration (commit the generated file)
@@ -86,12 +85,13 @@ Open the generated migration SQL before committing:
 
 ## Seeding
 
-`npm run db:seed` is idempotent — it skips if a `FamilySpace` already exists. After a schema change that affects seed data (new tag category, new default row), update [prisma/seed.ts](../../prisma/seed.ts) and re-run against a fresh SQLite DB:
+`npm run db:seed` is idempotent — it skips if a `FamilySpace` already exists. After a schema change that affects seed data (new tag category, new default row), update [prisma/seed.ts](../../prisma/seed.ts) and re-run against a fresh Postgres DB (drop and re-create the container or the `family_recipe_dev` database):
 
 ```bash
-rm -f prisma/dev.db
-DATABASE_URL="file:./prisma/dev.db" npm run db:push
-DATABASE_URL="file:./prisma/dev.db" npm run db:seed
+docker exec family-recipe-pg psql -U family_app -d postgres -c \
+  "DROP DATABASE IF EXISTS family_recipe_dev; CREATE DATABASE family_recipe_dev OWNER family_app;"
+npm run db:push
+npm run db:seed
 ```
 
 ## Before opening the PR

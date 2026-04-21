@@ -38,14 +38,14 @@ npm run test:coverage        # enforces 75% global threshold
 npx jest path/to/file.test.ts                  # single file
 npx jest -t "should reject unauthenticated"    # filter by name
 
-# Database (defaults to SQLite via prisma/schema.prisma)
+# Database (local dev = Postgres via prisma/schema.postgres.node.prisma)
 npm run db:generate          # prisma generate
-npm run db:push              # prisma db push (SQLite workflow — no migrations)
+npm run db:push              # prisma db push (no migration file)
 npm run db:seed              # tsx prisma/seed.ts; PRINTS the family master key
 npm run db:studio
 ```
 
-When working against Postgres locally, set `PRISMA_SCHEMA=prisma/schema.postgres.prisma` and pass `--schema $PRISMA_SCHEMA` to prisma commands. See [prisma/CLAUDE.md](prisma/CLAUDE.md).
+Spin up local Postgres with the one-liner in [docs/verification/next-api.md](docs/verification/next-api.md#start-the-dev-server). SQLite is no longer supported — see [prisma/CLAUDE.md](prisma/CLAUDE.md) for the remaining two Postgres schemas and when to edit which.
 
 ## Architecture (the things that span files)
 
