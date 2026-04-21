@@ -1,6 +1,13 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
@@ -448,12 +455,10 @@ export default function AddPostForm({
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importWarning, setImportWarning] = useState<string | null>(null);
-  const [pendingIngredientFocusId, setPendingIngredientFocusId] = useState<
-    string | null
-  >(null);
-  const [pendingStepFocusId, setPendingStepFocusId] = useState<string | null>(
-    null
-  );
+  // Refs (not state) so writing them after DOM focus doesn't trigger a re-render
+  // — the effects below fire on ingredients/steps changes and read the ref synchronously.
+  const pendingIngredientFocusIdRef = useRef<string | null>(null);
+  const pendingStepFocusIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -499,36 +504,38 @@ export default function AddPostForm({
   }, []);
 
   useEffect(() => {
-    if (!pendingIngredientFocusId) {
+    const id = pendingIngredientFocusIdRef.current;
+    if (!id) {
       return;
     }
 
     const input = document.querySelector<HTMLInputElement>(
-      `[data-ingredient-focus="${pendingIngredientFocusId}"]`
+      `[data-ingredient-focus="${id}"]`
     );
 
     if (input) {
       input.focus();
     }
 
-    setPendingIngredientFocusId(null);
-  }, [ingredients, pendingIngredientFocusId]);
+    pendingIngredientFocusIdRef.current = null;
+  }, [ingredients]);
 
   useEffect(() => {
-    if (!pendingStepFocusId) {
+    const id = pendingStepFocusIdRef.current;
+    if (!id) {
       return;
     }
 
     const textarea = document.querySelector<HTMLTextAreaElement>(
-      `[data-step-focus="${pendingStepFocusId}"]`
+      `[data-step-focus="${id}"]`
     );
 
     if (textarea) {
       textarea.focus();
     }
 
-    setPendingStepFocusId(null);
-  }, [steps, pendingStepFocusId]);
+    pendingStepFocusIdRef.current = null;
+  }, [steps]);
 
   const recipeHasAnyData = useMemo(() => {
     const hasIngredientContent = ingredients.some(
@@ -701,8 +708,10 @@ export default function AddPostForm({
 
   function addIngredientRow() {
     const newRow = createIngredientRow();
+    // Set the ref *before* setState so the focus effect (deps: [ingredients])
+    // reads a populated ref on the next commit. Don't reorder.
+    pendingIngredientFocusIdRef.current = newRow.id;
     setIngredients((prev) => [...prev, newRow]);
-    setPendingIngredientFocusId(newRow.id);
   }
 
   function handleIngredientDragEnd(event: DragEndEvent) {
@@ -740,8 +749,10 @@ export default function AddPostForm({
 
   function addStepRow() {
     const newRow = createStepRow();
+    // Set the ref *before* setState so the focus effect (deps: [steps])
+    // reads a populated ref on the next commit. Don't reorder.
+    pendingStepFocusIdRef.current = newRow.id;
     setSteps((prev) => [...prev, newRow]);
-    setPendingStepFocusId(newRow.id);
   }
 
   function handleStepDragEnd(event: DragEndEvent) {

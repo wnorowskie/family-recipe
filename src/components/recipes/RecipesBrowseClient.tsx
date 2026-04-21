@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -94,12 +94,10 @@ export default function RecipesBrowseClient({
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-
-  useEffect(() => {
-    setIsReady(true);
-  }, []);
+  // Skip the fetch effect on initial mount — initialItems are already provided
+  // by the server. Tracked as a ref to avoid an extra render-cycle bootstrap.
+  const hasMountedRef = useRef(false);
 
   const memberOptions = useMemo(
     () => [...members].sort((a, b) => a.name.localeCompare(b.name)),
@@ -174,7 +172,8 @@ export default function RecipesBrowseClient({
   ]);
 
   useEffect(() => {
-    if (!isReady) {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
       return;
     }
 
@@ -218,7 +217,7 @@ export default function RecipesBrowseClient({
       isCurrent = false;
       controller.abort();
     };
-  }, [queryString, isReady]);
+  }, [queryString]);
 
   const handleLoadMore = async () => {
     if (!hasMore || isLoadingMore) return;

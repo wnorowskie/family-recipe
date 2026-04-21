@@ -93,7 +93,9 @@ export default function NotificationsFeed() {
   };
 
   useEffect(() => {
+    // Mount-time: mark existing notifications read and fetch the first page.
     markAllRead();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only initial fetch for paginated list; SWR/RSC migration tracked in #57
     fetchNotifications(0);
   }, []);
 

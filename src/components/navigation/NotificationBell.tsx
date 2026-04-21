@@ -22,6 +22,8 @@ export default function NotificationBell() {
   };
 
   useEffect(() => {
+    // Mount-time fetch + 60s poll to keep the unread badge current.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only polling subscription; SWR/RSC migration tracked in #57
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 60000);
     return () => clearInterval(interval);
