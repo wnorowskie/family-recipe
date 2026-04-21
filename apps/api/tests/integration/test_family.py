@@ -19,8 +19,9 @@ def _make_user(idx: int = 1, **overrides) -> SimpleNamespace:
     data = {
         "id": overrides.get("id", f"user-{idx}"),
         "name": overrides.get("name", f"Member {idx}"),
-        "emailOrUsername": overrides.get("emailOrUsername", f"member{idx}@example.com"),
-        "avatarUrl": overrides.get("avatarUrl", f"https://cdn.test/avatar-{idx}.jpg"),
+        "email": overrides.get("email", f"member{idx}@example.com"),
+        "username": overrides.get("username", f"member{idx}"),
+        "avatarStorageKey": overrides.get("avatarStorageKey", f"avatars/avatar-{idx}.jpg"),
         "posts": overrides.get("posts", []),
     }
     data.update(overrides)
@@ -59,8 +60,10 @@ def test_list_members_success(client, mock_prisma, member_auth):
                 "userId": membership.userId,
                 "membershipId": membership.id,
                 "name": user.name,
-                "emailOrUsername": user.emailOrUsername,
-                "avatarUrl": user.avatarUrl,
+                "email": user.email,
+                "username": user.username,
+                "emailOrUsername": user.email,
+                "avatarUrl": None,
                 "role": "admin",
                 "joinedAt": _NOW.isoformat(),
                 "postCount": 1,

@@ -16,6 +16,8 @@ def member_user() -> UserResponse:
     return UserResponse(
         id="member-123",
         name="Member User",
+        email="member@example.com",
+        username="memberuser",
         emailOrUsername="member@example.com",
         avatarUrl=None,
         role="member",
@@ -29,6 +31,8 @@ def admin_user() -> UserResponse:
     return UserResponse(
         id="admin-456",
         name="Admin User",
+        email="admin@example.com",
+        username="adminuser",
         emailOrUsername="admin@example.com",
         avatarUrl=None,
         role="admin",
@@ -42,6 +46,8 @@ def owner_user() -> UserResponse:
     return UserResponse(
         id="owner-789",
         name="Owner User",
+        email="owner@example.com",
+        username="owneruser",
         emailOrUsername="owner@example.com",
         avatarUrl=None,
         role="owner",
