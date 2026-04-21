@@ -849,8 +849,18 @@ class TestCookedEvents:
     def test_list_cooked_success(self, client, mock_prisma, member_auth):
         mock_prisma.cookedevent.find_many = AsyncMock(
             return_value=[
-                self._event("e1", rating=5, note=None, user=SimpleNamespace(id="u1")),
-                self._event("e2", rating=None, note="nice", user=SimpleNamespace(id="u2")),
+                self._event(
+                    "e1",
+                    rating=5,
+                    note=None,
+                    user=SimpleNamespace(id="u1", name="Alice", avatarStorageKey="avatars/a.jpg", passwordHash="secret"),
+                ),
+                self._event(
+                    "e2",
+                    rating=None,
+                    note="nice",
+                    user=SimpleNamespace(id="u2", name="Bob", avatarStorageKey=None, passwordHash="secret"),
+                ),
             ]
         )
 
@@ -859,12 +869,25 @@ class TestCookedEvents:
         assert response.status_code == 200, response.json()
         body = response.json()
         assert len(body["cookedEvents"]) == 2
+        assert body["cookedEvents"][0]["user"] == {
+            "id": "u1",
+            "name": "Alice",
+            "avatarUrl": "/uploads/avatars/a.jpg",
+        }
+        assert body["cookedEvents"][1]["user"] == {"id": "u2", "name": "Bob", "avatarUrl": None}
+        # Confirm the raw User model is not leaked (no passwordHash / avatarStorageKey)
+        raw = response.text
+        assert "passwordHash" not in raw
+        assert "avatarStorageKey" not in raw
         assert body["hasMore"] is False
         assert body["nextOffset"] == 2
 
     def test_list_cooked_pagination(self, client, mock_prisma, member_auth):
         mock_prisma.cookedevent.find_many = AsyncMock(
-            return_value=[self._event("e1"), self._event("e2")]
+            return_value=[
+                self._event("e1", user=SimpleNamespace(id="u1", name="A", avatarStorageKey=None)),
+                self._event("e2", user=SimpleNamespace(id="u2", name="B", avatarStorageKey=None)),
+            ]
         )
 
         response = client.get(f"/posts/{POST_ID}/cooked?limit=1", headers=member_auth)

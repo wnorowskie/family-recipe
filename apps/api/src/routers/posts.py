@@ -675,17 +675,26 @@ async def list_cooked(
         )
         has_more = len(events) > limit_clamped
         events = events[:limit_clamped]
-        return {
-            "cookedEvents": [
+        resolve_avatar = create_signed_url_resolver()
+        cooked_events = []
+        for e in events:
+            cooked_events.append(
                 {
                     "id": e.id,
                     "rating": e.rating,
                     "note": e.note,
                     "createdAt": iso(e.createdAt),
-                    "user": e.user,
+                    "user": {
+                        "id": e.user.id,
+                        "name": e.user.name,
+                        "avatarUrl": await resolve_avatar(getattr(e.user, "avatarStorageKey", None)),
+                    }
+                    if e.user
+                    else None,
                 }
-                for e in events
-            ],
+            )
+        return {
+            "cookedEvents": cooked_events,
             "hasMore": has_more,
             "nextOffset": offset + len(events),
         }
