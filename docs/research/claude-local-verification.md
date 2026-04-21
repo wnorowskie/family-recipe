@@ -177,6 +177,48 @@ $ diff <(grep -o 'Log In[^<]*' /tmp/before.html) \
 
 This is pure L0 — no browser, no MCP, no test fixtures. It confirms a UI string change landed in server-rendered HTML. For a change that actually needs the browser (say, the mobile nav menu toggle), L1 is the right tool; the same dev server is already warm.
 
+## Field trial
+
+Trial run under [#62](https://github.com/wnorowskie/family-recipe/issues/62), while delivering [#69](https://github.com/wnorowskie/family-recipe/issues/69) (sort recipes by rating). The change touches all three services — Zod validation, the Next `getRecipes` query, the `RecipesBrowseClient` segmented control, and the FastAPI mirror — so it exercised every playbook. Findings below; concrete doc fixes landed in this PR's diff.
+
+### What worked
+
+- **Next API playbook (L0 curl+cookie).** Signup → cookie → authed `GET /api/recipes?sort=rating` round-trip ran exactly as documented once Postgres was up. Validation-error probe (`sort=popularity` → `400 VALIDATION_ERROR`) was a one-liner. Pagination invariants (`hasMore`, `nextOffset`) held across page breaks.
+- **UI playbook's L0→L1 escalation.** L0 `curl /recipes` confirmed the new **Top rated** button was in the server-rendered HTML; L1 via Playwright MCP confirmed the click fires `GET /api/recipes?sort=rating`, the list re-renders in the expected order, and the reset-to-`recent` path still works. No `claude --chrome` was available in this session, so the documented Playwright fallback ([docs/verification/ui.md](../verification/ui.md#l1-fallback--playwright-mcp)) was the primary tool — and it worked fine.
+- **FastAPI pytest suite.** All 41 tests (4 new ones covering rating ordering, pagination, and the invalid-sort regex) passed in 0.54 s. pytest with a mocked Prisma remains the fastest way to validate mirror parity.
+- **SQLite override caveat.** The playbook's `DATABASE_URL="file:./prisma/dev.db"` path is fine for UI-only read paths, but it cannot replace Postgres for this repo — see "SQLite is not actually usable" below.
+
+### Frictions that required improvisation
+
+- **Schema/generated-client trap.** `apps/api` documents `npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy` for the Python client, but the same invocation without `--generator clientPy` silently overwrites the Node `@prisma/client`. Then `npm run dev` starts, returns `401` on protected routes (auth short-circuits before a DB hit), and only when a real query lands do you see `the URL must start with postgresql://`. The playbooks assume one schema; there are three (`schema.prisma`, `schema.postgres.prisma`, `schema.postgres.node.prisma`), and only `schema.postgres.node.prisma` has the `Notification` model that the app layout calls. The dance to un-break local Next against Postgres was: start Postgres → `npx prisma generate --schema prisma/schema.postgres.node.prisma` → `npx prisma db push --schema prisma/schema.postgres.node.prisma` → restart `npm run dev`. This belongs in [prisma/CLAUDE.md](../../prisma/CLAUDE.md) and the UI/Next-API playbooks.
+- **SQLite is not actually usable.** `DATABASE_URL="file:./prisma/dev.db" npx prisma generate` fails on `Notification.emojiCounts: Json?` and `Notification.metadata: Json?` — SQLite connector rejects those types. So even for a local read-only UI spike, SQLite can't regenerate the JS client; you're forced onto Postgres. This is an important caveat the playbook sells the opposite way ("SQLite is fine if the change only reads data").
+- **FastAPI playbook uses the wrong route prefix.** [docs/verification/fastapi.md](../verification/fastapi.md) repeatedly shows `http://localhost:8000/api/posts`, but the actual routers mount at `/posts`, `/recipes`, etc. — no `/api/` prefix. Every curl example 404s until you strip it. (Contrast with Next, which is genuinely `/api/recipes`.) Fixed in this PR.
+- **FastAPI quality gates reference missing tools.** The playbook tells you to run `ruff check .` and `mypy src` locally, but `apps/api/requirements-dev.txt` only installs pytest + plugins. Neither ruff nor mypy lands in `apps/api/.venv`. CI installs them separately via its workflow; local Claude has to either install them manually or skip the step. Noted as a follow-up rather than a copy fix.
+- **Live contract parity blocked by a pre-existing FastAPI bug.** `apps/api/src/dependencies.py:36` reads `user.emailOrUsername`, which isn't a Prisma column — every authed FastAPI request 500s (`AttributeError: 'User' object has no attribute 'emailOrUsername'`). The pytest suite doesn't hit this because `tests/helpers/test_data.py` injects the attribute onto a `SimpleNamespace`. Net effect: the `diff <(curl Next) <(curl FastAPI)` step in the playbook can't run today. Pytest confirmed the mirror logic is correct; a live diff will only be possible once that bug is fixed. Filing as a follow-up — out of scope for #69.
+- **Jest picks up sibling Claude worktrees.** With parallel `.claude/worktrees/*` directories present, `npm test` runs 184 suites instead of 46 and surfaces failures from unrelated branches (14 failures in the trial, all from other worktrees). [jest.config.js](../../jest.config.js) needs `.claude/worktrees/` in `testPathIgnorePatterns`. Filing as a follow-up.
+
+### L0 / L1 / L2 usage in practice
+
+The doc's layered model held up. Specifically:
+
+- **Default to L0** for API changes worked — the sort-by-rating logic was fully validated by curl + Zod-validation probes + the integration test.
+- **L1 was unavoidable for the UI half**, because the segmented control is a hydrated client component. `curl` saw the button in the markup but couldn't tell me whether clicking it actually fires the correct XHR.
+- **L2 (headless Playwright) was the actual L1 tool this session**, via the `mcp__plugin_playwright_playwright__*` shimset. `claude --chrome` wasn't available; the MCP was. The research doc's prediction that L2 would become first-choice in headless sessions was correct.
+
+### Time cost
+
+End-to-end, playbook-driven: ~25 minutes of Claude time (most of it spent unblocking the schema/client dance). Ad-hoc ("just run `npm run dev` and poke the endpoint") would have been ~40% faster per probe but left the cross-family/pagination/validation edges untested. The playbook wins on coverage and loses on startup friction — exactly the tradeoff the doc predicted. Fixing the frictions above should close the gap.
+
+### Follow-ups opened
+
+- (this PR) fix FastAPI playbook's route prefix; clarify the Postgres-vs-SQLite story and three-schema dance in the verification playbooks.
+- (new) chore: add `.claude/worktrees` to `jest.config.js` `testPathIgnorePatterns`.
+- (new) chore: add `ruff`, `mypy` to `apps/api/requirements-dev.txt` so the FastAPI playbook's pre-PR gates run locally.
+- (new) bug: FastAPI `get_current_user` references `user.emailOrUsername` and 500s on every authed request against real Prisma.
+- (new) chore: make the default `prisma/schema.prisma` (SQLite) actually generate — `Notification.{emojiCounts,metadata}: Json?` need a SQLite-compatible shape or the SQLite schema needs to drop Notification.
+
+The original research-doc follow-ups ([#63](https://github.com/wnorowskie/family-recipe/issues/63) seed user, [#64](https://github.com/wnorowskie/family-recipe/issues/64) README note, [#65](https://github.com/wnorowskie/family-recipe/issues/65) Playwright MCP in `.claude/settings.json`) remain valid. The seed-user ticket should be expanded to auto-run `prisma db push` against the correct schema too.
+
 ## Implementation follow-ups
 
 This PR ships the research doc, the [docs/verification/](../verification/) playbooks, and the CLAUDE.md wiring. Tracked follow-ups:
