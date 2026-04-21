@@ -3,29 +3,31 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-export default function NotificationBell() {
-  const [unreadCount, setUnreadCount] = useState<number>(0);
+interface NotificationBellProps {
+  initialCount: number;
+}
 
-  const fetchUnreadCount = async () => {
-    try {
-      const response = await fetch('/api/notifications/unread-count', {
-        cache: 'no-store',
-      });
-      if (!response.ok) return;
-      const data = await response.json();
-      setUnreadCount(
-        typeof data.unreadCount === 'number' ? data.unreadCount : 0
-      );
-    } catch (error) {
-      console.error('Failed to fetch unread notifications', error);
-    }
-  };
+export default function NotificationBell({
+  initialCount,
+}: NotificationBellProps) {
+  const [unreadCount, setUnreadCount] = useState<number>(initialCount);
 
   useEffect(() => {
-    // Mount-time fetch + 60s poll to keep the unread badge current.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only polling subscription; SWR/RSC migration tracked in #57
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 60000);
+    const refresh = async () => {
+      try {
+        const response = await fetch('/api/notifications/unread-count', {
+          cache: 'no-store',
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        setUnreadCount(
+          typeof data.unreadCount === 'number' ? data.unreadCount : 0
+        );
+      } catch (error) {
+        console.error('Failed to fetch unread notifications', error);
+      }
+    };
+    const interval = setInterval(refresh, 60000);
     return () => clearInterval(interval);
   }, []);
 

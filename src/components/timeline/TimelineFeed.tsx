@@ -1,68 +1,45 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import TimelineCard from './TimelineCard';
 import EmptyState from './EmptyState';
 import { TimelineItem } from '@/lib/timeline';
 
-export default function TimelineFeed() {
-  const [items, setItems] = useState<TimelineItem[]>([]);
-  const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+interface TimelineFeedProps {
+  initialItems: TimelineItem[];
+  initialHasMore: boolean;
+  initialNextOffset: number;
+}
+
+export default function TimelineFeed({
+  initialItems,
+  initialHasMore,
+  initialNextOffset,
+}: TimelineFeedProps) {
+  const [items, setItems] = useState<TimelineItem[]>(initialItems);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [offset, setOffset] = useState(initialNextOffset);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState('');
 
-  const fetchTimeline = async (currentOffset: number = 0) => {
+  const handleLoadMore = async () => {
+    setIsLoadingMore(true);
     try {
-      const response = await fetch(
-        `/api/timeline?limit=20&offset=${currentOffset}`
-      );
-
+      const response = await fetch(`/api/timeline?limit=20&offset=${offset}`);
       if (!response.ok) {
         throw new Error('Failed to fetch timeline');
       }
-
       const data = await response.json();
-
-      if (currentOffset === 0) {
-        setItems(data.items);
-      } else {
-        setItems((prev) => [...prev, ...data.items]);
-      }
-
+      setItems((prev) => [...prev, ...data.items]);
       setHasMore(data.hasMore);
       setOffset(data.nextOffset);
     } catch (err) {
       setError('Failed to load timeline');
       console.error('Timeline fetch error:', err);
     } finally {
-      setIsLoading(false);
       setIsLoadingMore(false);
     }
   };
-
-  useEffect(() => {
-    // Mount-time fetch for the first timeline page.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only initial fetch for paginated list; SWR/RSC migration tracked in #57
-    fetchTimeline(0);
-  }, []);
-
-  const handleLoadMore = () => {
-    setIsLoadingMore(true);
-    fetchTimeline(offset);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (

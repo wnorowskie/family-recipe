@@ -36,85 +36,59 @@ interface ApiResponse {
   nextOffset: number;
 }
 
+interface NotificationsFeedProps {
+  initialNotifications: NotificationResponseItem[];
+  initialHasMore: boolean;
+  initialNextOffset: number;
+}
+
 const PAGE_SIZE = 20;
 
-export default function NotificationsFeed() {
-  const [notifications, setNotifications] = useState<
-    NotificationResponseItem[]
-  >([]);
-  const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+export default function NotificationsFeed({
+  initialNotifications,
+  initialHasMore,
+  initialNextOffset,
+}: NotificationsFeedProps) {
+  const [notifications, setNotifications] =
+    useState<NotificationResponseItem[]>(initialNotifications);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [offset, setOffset] = useState(initialNextOffset);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState('');
 
-  const markAllRead = async () => {
-    try {
-      await fetch('/api/notifications/mark-read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-    } catch (err) {
+  useEffect(() => {
+    // Fire-and-forget: mark notifications read once the feed has been opened.
+    // No state is set in this effect body; the bell refreshes via its own poll.
+    fetch('/api/notifications/mark-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }).catch((err) => {
       console.error('Failed to mark notifications as read', err);
-    }
-  };
+    });
+  }, []);
 
-  const fetchNotifications = async (currentOffset: number = 0) => {
+  const handleLoadMore = async () => {
+    setIsLoadingMore(true);
     try {
       const response = await fetch(
-        `/api/notifications?limit=${PAGE_SIZE}&offset=${currentOffset}`,
-        {
-          cache: 'no-store',
-        }
+        `/api/notifications?limit=${PAGE_SIZE}&offset=${offset}`,
+        { cache: 'no-store' }
       );
-
       if (!response.ok) {
         throw new Error('Failed to fetch notifications');
       }
-
       const data: ApiResponse = await response.json();
-
-      if (currentOffset === 0) {
-        setNotifications(data.notifications);
-      } else {
-        setNotifications((prev) => [...prev, ...data.notifications]);
-      }
-
+      setNotifications((prev) => [...prev, ...data.notifications]);
       setHasMore(data.hasMore);
       setOffset(data.nextOffset);
     } catch (err) {
       setError('Failed to load notifications');
       console.error('Notification fetch error:', err);
     } finally {
-      setIsLoading(false);
       setIsLoadingMore(false);
     }
   };
-
-  useEffect(() => {
-    // Mount-time: mark existing notifications read and fetch the first page.
-    markAllRead();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only initial fetch for paginated list; SWR/RSC migration tracked in #57
-    fetchNotifications(0);
-  }, []);
-
-  const handleLoadMore = () => {
-    setIsLoadingMore(true);
-    fetchNotifications(offset);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <div className="space-y-4">
-          <div className="h-4 w-32 animate-pulse rounded bg-gray-200" />
-          <div className="h-4 w-48 animate-pulse rounded bg-gray-200" />
-          <div className="h-24 w-full animate-pulse rounded bg-gray-100" />
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (

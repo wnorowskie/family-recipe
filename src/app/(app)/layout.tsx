@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import LogoutButton from '@/components/LogoutButton';
 import BottomNav from '@/components/navigation/BottomNav';
 import NotificationBell from '@/components/navigation/NotificationBell';
+import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/session';
 
 export default async function AppLayout({
@@ -29,6 +30,10 @@ export default async function AppLayout({
     redirect('/login');
   }
 
+  const initialUnreadCount = await prisma.notification.count({
+    where: { recipientId: user.id, readAt: null },
+  });
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur">
@@ -42,7 +47,7 @@ export default async function AppLayout({
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <NotificationBell />
+            <NotificationBell initialCount={initialUnreadCount} />
             <LogoutButton />
           </div>
         </div>
