@@ -36,7 +36,7 @@ Grep the diff and confirm each of these is still true:
 - [ ] Input goes through a Zod schema from [src/lib/validation.ts](../../src/lib/validation.ts) (not an inline schema)
 - [ ] Errors use helpers from [src/lib/apiErrors.ts](../../src/lib/apiErrors.ts) (not ad-hoc `NextResponse.json({error:...})`)
 - [ ] Every DB query filters by `user.familySpaceId` — missing = cross-family leak
-- [ ] Mutating routes call `revalidatePath(...)` for the affected list views
+- [ ] Mutations that change a feed or list view call `revalidatePath(...)` for the affected path(s) — not every mutation needs this; only the ones visible on `/timeline`, `/recipes`, etc.
 - [ ] Rate limiter applied (see [src/lib/rateLimit.ts](../../src/lib/rateLimit.ts))
 
 ## L0 — curl the route

@@ -11,7 +11,7 @@ DATABASE_URL="file:./prisma/dev.db" npm run dev &
 until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
 ```
 
-If the change only reads data, SQLite is fine. If it tests a Postgres-only feature (search, transactions), start the real Postgres instead.
+If the change only reads data, SQLite is fine. If it exercises a Postgres-specific feature (full-text search, `JSONB` operators, Postgres-only types or functions), start the real Postgres instead.
 
 ## L0 — server-rendered HTML / static strings
 

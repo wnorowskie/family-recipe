@@ -48,7 +48,7 @@ until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
 echo "ready"
 ```
 
-**Cookie-jar login** (pattern reused across playbooks):
+**Cookie-jar login** (pattern reused across playbooks). The `<user>` / `<pass>` placeholders are intentional — a dedicated `claude-test` seed user and `scripts/claude-login.sh` wrapper are tracked as a follow-up in [#63](https://github.com/wnorowskie/family-recipe/issues/63). Until that lands, log in as any seeded family member (the master key output of `npm run db:seed` lets you create one via `/signup`):
 
 ```bash
 curl -s -c /tmp/fr-cookies.txt \
@@ -56,8 +56,6 @@ curl -s -c /tmp/fr-cookies.txt \
   -d '{"emailOrUsername":"<user>","password":"<pass>"}' \
   http://localhost:3000/api/auth/login | jq .
 ```
-
-A `claude-test` seed user + wrapper script are a planned follow-up (see the research doc's "Implementation follow-ups"). Until then, log in as any seeded family member.
 
 **Stop any leftover dev servers:**
 

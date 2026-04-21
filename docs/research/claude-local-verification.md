@@ -12,16 +12,16 @@ Research output for [#59](https://github.com/wnorowskie/family-recipe/issues/59)
 
 **Reject** per-branch Cloud Run preview deploys for this repo (overkill for V1's one-family scope). **Reject** Chrome DevTools MCP as a default; keep it on hand for one-off performance or network debugging sessions only.
 
-**Also land two small repo changes**, documented below, that make L0 reliable:
+**Two operational patterns the playbooks need**, documented below:
 
-1. A `scripts/claude-login.sh` helper — curl-login with a cookie jar, usable against any dev/preview host.
-2. An explicit `DATABASE_URL="file:./prisma/dev.db"` override pattern for starting dev when local Postgres is down (the default `.env` points at Postgres and today Claude stalls when it isn't running).
+1. A `scripts/claude-login.sh` helper — curl-login with a cookie jar. **Deferred to a follow-up ticket** (see "Implementation follow-ups" below); the playbooks currently use inline `curl` with `<user>`/`<pass>` placeholders.
+2. An explicit `DATABASE_URL="file:./prisma/dev.db"` override pattern for starting dev when local Postgres is down (the default `.env` points at Postgres and today Claude stalls when it isn't running). **Documented in the playbooks that ship in this PR.**
 
 ## Why this option
 
 - **First-party tooling over third-party glue.** Claude Code's Chrome integration is supported by Anthropic, ships with every Claude Code release, and shares the dev's already-authenticated Chrome profile — no fake cookie jars, no test fixtures drifting from prod auth. MCPs are an escape hatch, not the default. ([code.claude.com/docs/en/chrome](https://code.claude.com/docs/en/chrome))
 - **Most V1 changes don't need a browser.** The app is ~70% server components ([src/lib/CLAUDE.md](../../src/lib/CLAUDE.md)), and every mutation goes through a JSON REST route under [src/app/api/](../../src/app/api/). For those, `curl` + a cookie jar is the fastest-to-spin-up check. Reserving the browser for genuine UI changes keeps the context window light and the feedback loop fast.
-- **No new infra.** Nothing deploys, nothing new to host, no test-account provisioning on GCS. The only persistent additions are one shell script and one documented env override.
+- **No new infra.** Nothing deploys, nothing new to host, no test-account provisioning on GCS. The persistent additions are documentation-only: the playbooks in `docs/verification/` and the env-override pattern they reference.
 - **Layered design matches the automated-testing spike ([#58](https://github.com/wnorowskie/family-recipe/issues/58)).** Both spikes converge on Playwright. When #58 picks its CI framework, this doc's L2 tooling reuses the same runner — the fixtures Claude needs locally are the same ones the CI suite needs.
 
 ## Alternatives considered
@@ -143,7 +143,7 @@ In addition to the pre-commit gate (`type-check` + `lint`), run the verification
 If the current session can't run a browser, fall back to Playwright MCP headless (`claude mcp add playwright npx @playwright/mcp@latest`) or state the gap explicitly in the PR body — do not claim UI success without running the UI.
 ```
 
-This is proposed, not committed in this PR — the CLAUDE.md edit lands in the follow-up implementation ticket so the research PR stays scope-pure.
+This block landed in this PR's second commit (alongside the per-service [docs/verification/](../verification/) playbooks). Root [CLAUDE.md](../../CLAUDE.md) and each service's CLAUDE.md now link to the matching playbook.
 
 ## Worked example (from this branch)
 
@@ -179,12 +179,12 @@ This is pure L0 — no browser, no MCP, no test fixtures. It confirms a UI strin
 
 ## Implementation follow-ups
 
-Open separate tickets for each — this PR ships the doc only.
+This PR ships the research doc, the [docs/verification/](../verification/) playbooks, and the CLAUDE.md wiring. Tracked follow-ups:
 
-1. **`chore: claude-test seed user + login helper`** — add an idempotent `seed:test-user` sub-task (dev-only) and `scripts/claude-login.sh` that wraps the curl flow. Unblocks Claude's L0 auth loop and #58's test fixtures.
-2. **`chore: document SQLite override in README`** — one-liner in the README Commands section so the Postgres-down case isn't rediscovered by every contributor.
-3. **`chore: add "Before opening a PR" section to CLAUDE.md`** — the block above. Small but durable.
-4. **`chore: install Playwright MCP in the project .claude/settings.json`** — once #58 lands on Playwright, both spikes share the install.
+1. [#62](https://github.com/wnorowskie/family-recipe/issues/62) **research: validate verification playbooks on a real change** — pressure-test the playbooks end-to-end on a real ticket before investing more in the workflow. Do this first.
+2. [#63](https://github.com/wnorowskie/family-recipe/issues/63) **chore: `claude-test` seed user + `scripts/claude-login.sh`** — add an idempotent dev-only seed step and a login wrapper. Replaces the `<user>`/`<pass>` placeholders in the playbooks.
+3. [#64](https://github.com/wnorowskie/family-recipe/issues/64) **chore: document SQLite override in README** — one-liner so non-Claude contributors discover the pattern too.
+4. [#65](https://github.com/wnorowskie/family-recipe/issues/65) **chore: install Playwright MCP in `.claude/settings.json`** — once #58 lands on Playwright, both spikes share the install.
 
 ## Sources
 
