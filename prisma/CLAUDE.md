@@ -40,3 +40,7 @@ To rotate the master key, do it manually via the DB — there is no API for it.
 ## After schema changes
 
 Always run `npm run type-check` — Prisma generates TS types and downstream code will fail to compile if a field name shifts.
+
+## Verification
+
+Before opening a PR that touches any schema or migration, run the [Prisma playbook](../docs/verification/prisma.md) — covers the three-schema lock-step edit, migration SQL review checklist, and the downstream Next + FastAPI checks.

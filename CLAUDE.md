@@ -86,6 +86,18 @@ When working against Postgres locally, set `PRISMA_SCHEMA=prisma/schema.postgres
 - **`bcrypt` vs `bcryptjs`**: prod uses native `bcrypt`; jest aliases it to `bcryptjs` (see [jest.config.js](jest.config.js)) so tests don't need native compilation. Don't import `bcryptjs` directly in app code.
 - **Server vs client components**: default to server components for data fetching; mark `'use client'` only for interactive forms/state. Server components reuse `getCurrentUser` by passing a `NextRequest`-shaped object.
 
+## Before opening a PR
+
+The pre-commit hook runs `type-check` + `lint-staged`; nothing else is automatic. Run the verification playbook matching what you changed — see [docs/verification/README.md](docs/verification/README.md) for the index. In short:
+
+- **UI** (anything under [src/app/](src/app/) or [src/components/](src/components/)) → [docs/verification/ui.md](docs/verification/ui.md)
+- **Next API** ([src/app/api/](src/app/api/)) → [docs/verification/next-api.md](docs/verification/next-api.md)
+- **FastAPI** ([apps/api/](apps/api/)) → [docs/verification/fastapi.md](docs/verification/fastapi.md)
+- **Recipe URL importer** ([apps/recipe-url-importer/](apps/recipe-url-importer/)) → [docs/verification/recipe-url-importer.md](docs/verification/recipe-url-importer.md)
+- **Prisma schema** ([prisma/](prisma/)) → [docs/verification/prisma.md](docs/verification/prisma.md)
+
+Always finish with `npm test` (the pre-commit hook doesn't run it). If the session can't run a tool a change needs (e.g., no browser for a hydration-sensitive UI change), say so in the PR body — don't claim UI success from `curl` alone.
+
 ## Branches and releases
 
 - `main` = **production**. `develop` = **dev environment**.

@@ -49,6 +49,10 @@ Routes that accept photos (`posts`, `comments`) use `multipart/form-data`:
 
 Mutations that change visible feed/list state call `revalidatePath('/timeline')`, `'/recipes'`, etc. Match the existing routes' patterns when adding new mutating endpoints.
 
+## Verification
+
+Before opening a PR that touches a `route.ts`, run the [Next API playbook](../../../docs/verification/next-api.md) — covers the curl+cookie loop, cross-family guard probe, multipart routes, and the Jest integration pattern.
+
 ## Mirror in FastAPI
 
 If you change request/response shape, status codes, or auth behavior, the equivalent endpoint in [apps/api/src/routers/](../../../apps/api/src/routers/) likely needs the same change. The migration plan ([docs/API_BACKEND_MIGRATION_PLAN.md](../../../docs/API_BACKEND_MIGRATION_PLAN.md)) is the source of truth for which endpoints have been ported.

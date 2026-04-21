@@ -21,3 +21,7 @@ Standalone Python service that fetches a public recipe URL and returns a normali
 ## Tests
 
 `PYTHONPATH=src pytest`. CI is [.github/workflows/recipe-url-importer-ci.yml](../../.github/workflows/recipe-url-importer-ci.yml).
+
+## Verification
+
+Before opening a PR that touches this service, run the [importer playbook](../../docs/verification/recipe-url-importer.md) — includes the `/v1/parse` loop, SSRF probes, and downstream-client check.
