@@ -74,7 +74,7 @@ export interface RecipeQueryInput {
   minServings?: number;
   maxServings?: number;
   ingredients?: string[];
-  sort?: 'recent' | 'alpha';
+  sort?: 'recent' | 'alpha' | 'rating';
 }
 
 export interface RecipeQueryResult {
@@ -274,7 +274,7 @@ export async function getRecipes(
         ]
       : [{ createdAt: 'desc' as const }];
 
-  const recipeQuery = {
+  const baseQuery = {
     where,
     include: {
       author: {
@@ -292,48 +292,23 @@ export async function getRecipes(
       },
     },
     orderBy,
-    take: limit + 1,
-    skip: offset,
   } satisfies Prisma.PostFindManyArgs;
+  type RecipePost = Prisma.PostGetPayload<typeof baseQuery>;
 
-  const posts = await prisma.post.findMany(recipeQuery);
-  type RecipePost = Prisma.PostGetPayload<typeof recipeQuery>;
-
-  const typedPosts = posts as RecipePost[];
-  const hasMore = typedPosts.length > limit;
-  const slice = hasMore ? typedPosts.slice(0, limit) : typedPosts;
-  const postIds = slice.map((post: any) => post.id);
-
-  let cookedStatsMap: Record<
-    string,
-    { timesCooked: number; averageRating: number | null }
-  > = {};
-
-  if (postIds.length > 0) {
+  async function fetchCookedStats(
+    ids: string[]
+  ): Promise<
+    Record<string, { timesCooked: number; averageRating: number | null }>
+  > {
+    if (ids.length === 0) return {};
     const cookedGroups = await prisma.cookedEvent.groupBy({
-      where: {
-        postId: {
-          in: postIds,
-        },
-      },
+      where: { postId: { in: ids } },
       by: ['postId'],
-      _count: {
-        _all: true,
-      },
-      _avg: {
-        rating: true,
-      },
+      _count: { _all: true },
+      _avg: { rating: true },
     });
-
-    const cookedGroupsArray = cookedGroups as any[];
-    cookedStatsMap = cookedGroupsArray.reduce(
-      (
-        acc: Record<
-          string,
-          { timesCooked: number; averageRating: number | null }
-        >,
-        group: any
-      ) => {
+    return (cookedGroups as any[]).reduce(
+      (acc, group: any) => {
         acc[group.postId] = {
           timesCooked: group._count._all,
           averageRating: group._avg.rating,
@@ -345,6 +320,48 @@ export async function getRecipes(
         { timesCooked: number; averageRating: number | null }
       >
     );
+  }
+
+  let slice: RecipePost[];
+  let hasMore: boolean;
+  let cookedStatsMap: Record<
+    string,
+    { timesCooked: number; averageRating: number | null }
+  >;
+
+  if (sort === 'rating') {
+    // Rating sort joins against an aggregate from CookedEvent that Prisma
+    // cannot express in a single orderBy. Fetch all matching posts, compute
+    // stats, sort in memory, then paginate. Safe at V1 scale (one family).
+    const allPosts = (await prisma.post.findMany(baseQuery)) as RecipePost[];
+    cookedStatsMap = await fetchCookedStats(allPosts.map((p) => p.id));
+    const sorted = [...allPosts].sort((a, b) => {
+      const statsA = cookedStatsMap[a.id];
+      const statsB = cookedStatsMap[b.id];
+      const avgA = statsA?.averageRating ?? null;
+      const avgB = statsB?.averageRating ?? null;
+      // Unrated posts always sink below rated ones.
+      if (avgA === null && avgB !== null) return 1;
+      if (avgA !== null && avgB === null) return -1;
+      if (avgA !== null && avgB !== null && avgA !== avgB) {
+        return avgB - avgA;
+      }
+      const cookedA = statsA?.timesCooked ?? 0;
+      const cookedB = statsB?.timesCooked ?? 0;
+      if (cookedA !== cookedB) return cookedB - cookedA;
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
+    hasMore = sorted.length > offset + limit;
+    slice = sorted.slice(offset, offset + limit);
+  } else {
+    const posts = (await prisma.post.findMany({
+      ...baseQuery,
+      take: limit + 1,
+      skip: offset,
+    })) as RecipePost[];
+    hasMore = posts.length > limit;
+    slice = hasMore ? posts.slice(0, limit) : posts;
+    cookedStatsMap = await fetchCookedStats(slice.map((p) => p.id));
   }
 
   const resolveUrl = createSignedUrlResolver();

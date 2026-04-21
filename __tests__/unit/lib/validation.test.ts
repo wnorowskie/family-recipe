@@ -301,11 +301,27 @@ describe('Validation Schemas', () => {
       }
     });
 
+    it('should accept valid sort option (rating)', () => {
+      const result = recipeFiltersSchema.safeParse({ sort: 'rating' });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.sort).toBe('rating');
+      }
+    });
+
     it('should reject invalid sort option', () => {
       const result = recipeFiltersSchema.safeParse({ sort: 'invalid' });
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.issues[0].message).toContain('recent');
+      }
+    });
+
+    it('should reject popularity as a sort value', () => {
+      const result = recipeFiltersSchema.safeParse({ sort: 'popularity' });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain('rating');
       }
     });
 

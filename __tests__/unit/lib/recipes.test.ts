@@ -81,6 +81,15 @@ describe('Recipe Utilities', () => {
       expect(args.orderBy).toEqual([{ title: 'asc' }, { createdAt: 'desc' }]);
     });
 
+    it('fetches all matches (no skip/take) when sort is rating', async () => {
+      await getRecipes({ ...baseInput, sort: 'rating', limit: 2, offset: 4 });
+
+      const args = latestPostArgs();
+      expect(args.orderBy).toEqual([{ createdAt: 'desc' }]);
+      expect(args.take).toBeUndefined();
+      expect(args.skip).toBeUndefined();
+    });
+
     it('adds trimmed search filter when search provided', async () => {
       await getRecipes({ ...baseInput, search: '  cake  ' });
 
@@ -607,6 +616,161 @@ describe('Recipe Utilities', () => {
         _count: { _all: true },
         _avg: { rating: true },
       });
+    });
+
+    it('sorts by rating desc with unrated last (compose with tag filter + pagination)', async () => {
+      // Four recipes: two rated (4.5 avg from two events, 3.5 avg from two
+      // events), one with a single 5-star rating but an older createdAt, and
+      // one fully unrated. Expected order: 5★, 4.5★, 3.5★, unrated.
+      const base = (overrides: any) => ({
+        mainPhotoUrl: null,
+        author: { id: 'u_1', name: 'Alice', avatarUrl: null },
+        recipeDetails: {
+          courses: JSON.stringify(['dinner']),
+          course: 'dinner',
+        },
+        tags: [],
+        ...overrides,
+      });
+      prismaMock.post.findMany.mockResolvedValue([
+        base({
+          id: 'p_45',
+          title: 'Mid-high',
+          createdAt: new Date('2026-04-10T00:00:00Z'),
+        }),
+        base({
+          id: 'p_35',
+          title: 'Middle',
+          createdAt: new Date('2026-04-09T00:00:00Z'),
+        }),
+        base({
+          id: 'p_5',
+          title: 'Top',
+          createdAt: new Date('2026-01-01T00:00:00Z'),
+        }),
+        base({
+          id: 'p_none',
+          title: 'Unrated',
+          createdAt: new Date('2026-04-15T00:00:00Z'),
+        }),
+      ] as any);
+
+      mockCookedGroupBy.mockResolvedValue([
+        { postId: 'p_45', _count: { _all: 2 }, _avg: { rating: 4.5 } },
+        { postId: 'p_35', _count: { _all: 2 }, _avg: { rating: 3.5 } },
+        { postId: 'p_5', _count: { _all: 1 }, _avg: { rating: 5 } },
+      ] as any);
+
+      const result = await getRecipes({
+        familySpaceId: 'family_1',
+        limit: 10,
+        offset: 0,
+        sort: 'rating',
+      });
+
+      expect(result.items.map((i) => i.id)).toEqual([
+        'p_5',
+        'p_45',
+        'p_35',
+        'p_none',
+      ]);
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('breaks ties in rating by timesCooked desc then createdAt desc', async () => {
+      const base = (overrides: any) => ({
+        mainPhotoUrl: null,
+        author: { id: 'u_1', name: 'Alice', avatarUrl: null },
+        recipeDetails: {
+          courses: JSON.stringify(['dinner']),
+          course: 'dinner',
+        },
+        tags: [],
+        ...overrides,
+      });
+      prismaMock.post.findMany.mockResolvedValue([
+        base({
+          id: 'p_older',
+          title: 'Older',
+          createdAt: new Date('2026-01-01T00:00:00Z'),
+        }),
+        base({
+          id: 'p_popular',
+          title: 'Popular',
+          createdAt: new Date('2026-03-01T00:00:00Z'),
+        }),
+        base({
+          id: 'p_newer',
+          title: 'Newer',
+          createdAt: new Date('2026-04-01T00:00:00Z'),
+        }),
+      ] as any);
+
+      // All three share avg=4, but p_popular has more cooks and p_newer is
+      // newer among the rest.
+      mockCookedGroupBy.mockResolvedValue([
+        { postId: 'p_older', _count: { _all: 2 }, _avg: { rating: 4 } },
+        { postId: 'p_popular', _count: { _all: 8 }, _avg: { rating: 4 } },
+        { postId: 'p_newer', _count: { _all: 2 }, _avg: { rating: 4 } },
+      ] as any);
+
+      const result = await getRecipes({
+        familySpaceId: 'family_1',
+        limit: 10,
+        offset: 0,
+        sort: 'rating',
+      });
+
+      expect(result.items.map((i) => i.id)).toEqual([
+        'p_popular',
+        'p_newer',
+        'p_older',
+      ]);
+    });
+
+    it('paginates rating-sorted results consistently across pages', async () => {
+      const base = (id: string, createdAt: Date) => ({
+        id,
+        title: id,
+        mainPhotoUrl: null,
+        createdAt,
+        author: { id: 'u_1', name: 'Alice', avatarUrl: null },
+        recipeDetails: {
+          courses: JSON.stringify(['dinner']),
+          course: 'dinner',
+        },
+        tags: [],
+      });
+      const allPosts = [
+        base('p_5', new Date('2026-01-01')),
+        base('p_45', new Date('2026-02-01')),
+        base('p_35', new Date('2026-03-01')),
+        base('p_unrated', new Date('2026-04-01')),
+      ];
+      prismaMock.post.findMany.mockResolvedValue(allPosts as any);
+      mockCookedGroupBy.mockResolvedValue([
+        { postId: 'p_5', _count: { _all: 1 }, _avg: { rating: 5 } },
+        { postId: 'p_45', _count: { _all: 2 }, _avg: { rating: 4.5 } },
+        { postId: 'p_35', _count: { _all: 2 }, _avg: { rating: 3.5 } },
+      ] as any);
+
+      const page1 = await getRecipes({
+        familySpaceId: 'family_1',
+        limit: 2,
+        offset: 0,
+        sort: 'rating',
+      });
+      const page2 = await getRecipes({
+        familySpaceId: 'family_1',
+        limit: 2,
+        offset: 2,
+        sort: 'rating',
+      });
+
+      expect(page1.items.map((i) => i.id)).toEqual(['p_5', 'p_45']);
+      expect(page1.hasMore).toBe(true);
+      expect(page2.items.map((i) => i.id)).toEqual(['p_35', 'p_unrated']);
+      expect(page2.hasMore).toBe(false);
     });
 
     it('calculates hasMore and slices extra record', async () => {
