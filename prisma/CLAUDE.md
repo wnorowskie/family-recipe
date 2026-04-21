@@ -9,9 +9,9 @@
 
 Local dev uses **the `.node.` schema** — it's what the Next runtime expects and it's the one the `npm run db:*` scripts point at. The plain `schema.postgres.prisma` exists for the Python client (FastAPI) and Cloud SQL migrations.
 
-**The two schemas must define the same models with the same field names and shape.** When adding/changing a model:
+**The two schemas should stay field-identical for every model both of them define**, with one documented carve-out: `Notification` currently lives only in `schema.postgres.node.prisma` (see the Notification batching gotcha below — FastAPI doesn't read notifications yet, so porting it to `schema.postgres.prisma` has been deferred). Anything else you add or change should land in both schemas in lock-step:
 
-1. Edit both schemas in lock-step.
+1. Edit both schemas together.
 2. Generate a migration against the Postgres schema: `npx prisma migrate dev --schema prisma/schema.postgres.prisma --name <change>`.
 3. Re-run `npm run db:generate` to refresh the Node client, and the Python client from `apps/api/` if FastAPI is in use.
 
