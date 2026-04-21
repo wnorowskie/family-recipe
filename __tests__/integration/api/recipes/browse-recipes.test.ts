@@ -817,6 +817,30 @@ describe('GET /api/recipes', () => {
       );
     });
 
+    it('accepts sort=rating and passes it through to getRecipes', async () => {
+      mockGetRecipes.mockResolvedValue({
+        items: [],
+        hasMore: false,
+        nextOffset: 0,
+      });
+
+      const request = new NextRequest(
+        'http://localhost/api/recipes?sort=rating',
+        {
+          method: 'GET',
+        }
+      );
+
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(mockGetRecipes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sort: 'rating',
+        })
+      );
+    });
+
     it('rejects invalid sort values', async () => {
       const request = new NextRequest(
         'http://localhost/api/recipes?sort=popularity',

@@ -7,9 +7,27 @@ These routes are the **current production backend**. When changing a contract he
 ## Start the dev server
 
 ```bash
-DATABASE_URL="file:./prisma/dev.db" npm run dev &
+# Default (Postgres via .env — required for any DB-touching route; see caveat below)
+npm run dev &
 until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
 ```
+
+**SQLite caveat.** The previously-documented `DATABASE_URL="file:./prisma/dev.db"` override boots the server but cannot regenerate the JS Prisma client today (`Notification.emojiCounts/metadata: Json?` aren't supported by the SQLite connector, and the `Notification` model is missing from `schema.postgres.prisma`). If local Postgres isn't running, start it:
+
+```bash
+docker run -d --name family-recipe-pg \
+  -e POSTGRES_USER=family_app \
+  -e POSTGRES_PASSWORD=FamilyRecipe2025DbPass \
+  -e POSTGRES_DB=family_recipe_dev \
+  -p 5432:5432 postgres:16
+
+# Generate the Node Prisma client against the schema the Next app actually uses
+npx prisma generate --schema prisma/schema.postgres.node.prisma
+npx prisma db push --schema prisma/schema.postgres.node.prisma
+npm run db:seed
+```
+
+If you previously ran the FastAPI setup step (`npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy`) the **Node** client may have been overwritten against `schema.postgres.prisma`, which lacks `Notification`. Re-generate against `schema.postgres.node.prisma` (above) to recover.
 
 ## Auth — log in and capture a cookie
 

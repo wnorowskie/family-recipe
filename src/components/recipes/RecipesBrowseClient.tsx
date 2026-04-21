@@ -90,7 +90,9 @@ export default function RecipesBrowseClient({
   const [ingredientInput, setIngredientInput] = useState('');
   const [ingredientFilters, setIngredientFilters] = useState<string[]>([]);
   const [selectedAuthorId, setSelectedAuthorId] = useState('');
-  const [sortMode, setSortMode] = useState<'recent' | 'alpha'>('recent');
+  const [sortMode, setSortMode] = useState<'recent' | 'alpha' | 'rating'>(
+    'recent'
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -444,6 +446,17 @@ export default function RecipesBrowseClient({
                 }`}
               >
                 A-Z title
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode('rating')}
+                className={`rounded-full px-3 py-1.5 transition ${
+                  sortMode === 'rating'
+                    ? 'bg-white text-gray-900 shadow'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Top rated
               </button>
             </div>
             <button

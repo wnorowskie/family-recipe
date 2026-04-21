@@ -7,11 +7,11 @@ Rule of thumb: **if the change adds, removes, or alters anything a user sees, do
 ## Start the dev server
 
 ```bash
-DATABASE_URL="file:./prisma/dev.db" npm run dev &
+npm run dev &
 until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
 ```
 
-If the change only reads data, SQLite is fine. If it exercises a Postgres-specific feature (full-text search, `JSONB` operators, Postgres-only types or functions), start the real Postgres instead.
+Postgres must be up — see the SQLite caveat in [next-api.md](next-api.md#start-the-dev-server). The `DATABASE_URL="file:./prisma/dev.db"` override that earlier versions of this doc recommended boots the server but can't regenerate the JS Prisma client today; use Postgres locally.
 
 ## L0 — server-rendered HTML / static strings
 

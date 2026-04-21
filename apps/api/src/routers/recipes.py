@@ -14,6 +14,9 @@ router = APIRouter(prefix="/recipes", tags=["recipes"])
 COURSE_VALUES = {"breakfast", "lunch", "dinner", "dessert", "snack", "other"}
 DIFFICULTY_VALUES = {"easy", "medium", "hard"}
 MAX_INGREDIENTS = 5
+# Mirror of RATING_SORT_CANDIDATE_LIMIT in src/lib/recipes.ts. Keep values
+# identical so the Node and Python services paginate the same candidate set.
+RATING_SORT_CANDIDATE_LIMIT = 500
 
 
 def _dedupe(values: Optional[List[str]]) -> List[str]:
@@ -64,7 +67,7 @@ async def browse_recipes(
     servingsMin: Optional[int] = Query(default=None, ge=1),
     servingsMax: Optional[int] = Query(default=None, ge=1),
     ingredients: Optional[List[str]] = Query(default=None),
-    sort: str = Query(default="recent", pattern="^(recent|alpha)$"),
+    sort: str = Query(default="recent", pattern="^(recent|alpha|rating)$"),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     user: UserResponse = Depends(get_current_user),
@@ -145,23 +148,39 @@ async def browse_recipes(
         if sort == "alpha":
             order_by = [{"title": "asc"}, {"createdAt": "desc"}]
 
-        posts = await prisma.post.find_many(
-            where=where,
-            order=order_by,
-            take=limit + 1,
-            skip=offset,
-            include={
-                "author": True,
-                "recipeDetails": True,
-                "tags": {"include": {"tag": True}},
-            },
-        )
+        include_shape = {
+            "author": True,
+            "recipeDetails": True,
+            "tags": {"include": {"tag": True}},
+        }
 
-        has_more = len(posts) > limit
-        posts = posts[:limit]
+        if sort == "rating":
+            # Rating sort joins against a CookedEvent aggregate that Prisma
+            # cannot express in a single order clause. Fetch bounded matches,
+            # compute stats, sort in memory, then paginate. The cap matches
+            # the Node service so both paginate the same candidate set.
+            all_posts = await prisma.post.find_many(
+                where=where,
+                order=[{"createdAt": "desc"}],
+                take=RATING_SORT_CANDIDATE_LIMIT,
+                include=include_shape,
+            )
+            ids = [item.id for item in all_posts]
+            posts = []  # Populated below after stats + sort.
+            has_more = False
+        else:
+            all_posts = None
+            posts = await prisma.post.find_many(
+                where=where,
+                order=order_by,
+                take=limit + 1,
+                skip=offset,
+                include=include_shape,
+            )
+            has_more = len(posts) > limit
+            posts = posts[:limit]
+            ids = [item.id for item in posts]
 
-        ids = [item.id for item in posts]
-        
         # Manually calculate grouped stats (Prisma Python doesn't have group_by with aggregates)
         cooked_map: dict = {}
         if ids:
@@ -183,6 +202,23 @@ async def browse_recipes(
                     "timesCooked": len(ratings),
                     "averageRating": sum(valid_ratings) / len(valid_ratings) if valid_ratings else None,
                 }
+
+        if sort == "rating" and all_posts is not None:
+            def _sort_key(post):
+                stats = cooked_map.get(post.id, {"timesCooked": 0, "averageRating": None})
+                avg = stats["averageRating"]
+                # Tuple places unrated (avg is None) last, then ranks by avg desc,
+                # timesCooked desc, createdAt desc. Negate numeric values to flip
+                # the default ascending sort to descending.
+                is_unrated = avg is None
+                avg_key = 0.0 if avg is None else -avg
+                cooked_key = -stats["timesCooked"]
+                created_key = -post.createdAt.timestamp()
+                return (is_unrated, avg_key, cooked_key, created_key)
+
+            sorted_posts = sorted(all_posts, key=_sort_key)
+            has_more = len(sorted_posts) > offset + limit
+            posts = sorted_posts[offset : offset + limit]
 
         items = []
         for post in posts:

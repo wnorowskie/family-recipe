@@ -37,28 +37,30 @@ COOKIES=/tmp/fastapi-cookies.txt
 curl -s -c "$COOKIES" \
   -H "Content-Type: application/json" \
   -d '{"emailOrUsername":"<user>","password":"<pass>"}' \
-  http://localhost:8000/api/auth/login | jq .
+  http://localhost:8000/auth/login | jq .
 ```
+
+> **Path note.** FastAPI routers mount **without** an `/api/` prefix (e.g. `/posts`, `/recipes`, `/auth/login`). Next mounts the same resources under `/api/*`. When diffing contracts, expect the path to differ even though the response body should match.
 
 ## L0 — curl the route
 
-Same patterns as [next-api.md](next-api.md) — just swap the host to `:8000`.
+Same patterns as [next-api.md](next-api.md) — just swap the host to `:8000` **and drop the `/api/` prefix**.
 
 ```bash
 # Unauthenticated → 401
-curl -s -w "\n%{http_code}\n" http://localhost:8000/api/posts
+curl -s -w "\n%{http_code}\n" http://localhost:8000/posts
 
 # Authenticated
-curl -s -b "$COOKIES" http://localhost:8000/api/posts | jq .
+curl -s -b "$COOKIES" http://localhost:8000/posts | jq .
 
 # Validation error
 curl -s -b "$COOKIES" -H "Content-Type: application/json" \
-  -d '{"garbage":true}' http://localhost:8000/api/posts | jq .
+  -d '{"garbage":true}' http://localhost:8000/posts | jq .
 ```
 
 ## Contract parity check
 
-When changing a shape or status code, diff both services against the same input:
+When changing a shape or status code, diff both services against the same input. Mind the prefix mismatch:
 
 ```bash
 NEXT=http://localhost:3000
@@ -66,7 +68,7 @@ API=http://localhost:8000
 
 # Log in against both (they can share the JWT cookie if JWT_SECRET matches)
 diff <(curl -s -b "$COOKIES" "$NEXT/api/posts" | jq -S .) \
-     <(curl -s -b "$COOKIES" "$API/api/posts" | jq -S .)
+     <(curl -s -b "$COOKIES" "$API/posts"     | jq -S .)
 ```
 
 Any non-empty diff is a parity bug unless intentional (rare — the migration plan is explicit that the contract should not change during cutover).

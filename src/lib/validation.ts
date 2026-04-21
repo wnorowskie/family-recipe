@@ -346,9 +346,9 @@ export const recipeFiltersSchema = paginationSchema
         return arr.length > 0 ? arr : undefined;
       }),
     sort: z
-      .enum(['recent', 'alpha'], {
+      .enum(['recent', 'alpha', 'rating'], {
         errorMap: () => ({
-          message: 'Sort must be either "recent" or "alpha"',
+          message: 'Sort must be "recent", "alpha", or "rating"',
         }),
       })
       .optional()

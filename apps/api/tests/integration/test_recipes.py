@@ -391,6 +391,82 @@ def test_browse_recipes_sort_alpha(client, mock_prisma, member_auth):
     assert order == [{"title": "asc"}, {"createdAt": "desc"}]
 
 
+def test_browse_recipes_sort_rating_orders_unrated_last(client, mock_prisma, member_auth):
+    import datetime
+
+    def _dated_post(post_id: str, title: str, created_at: datetime.datetime):
+        return _make_post(id=post_id, title=title, createdAt=created_at)
+
+    posts = [
+        _dated_post("p_5", "Top", datetime.datetime(2026, 1, 1)),
+        _dated_post("p_45", "Mid-high", datetime.datetime(2026, 2, 1)),
+        _dated_post("p_35", "Middle", datetime.datetime(2026, 3, 1)),
+        _dated_post("p_none", "Unrated", datetime.datetime(2026, 4, 15)),
+    ]
+    cooked = [
+        SimpleNamespace(postId="p_5", rating=5),
+        SimpleNamespace(postId="p_45", rating=5),
+        SimpleNamespace(postId="p_45", rating=4),
+        SimpleNamespace(postId="p_35", rating=3),
+        SimpleNamespace(postId="p_35", rating=4),
+    ]
+    _setup_posts(mock_prisma, posts, cooked_events=cooked)
+
+    response = client.get("/recipes?sort=rating", headers=member_auth)
+
+    assert response.status_code == 200
+    ids = [item["id"] for item in response.json()["items"]]
+    assert ids == ["p_5", "p_45", "p_35", "p_none"]
+
+
+def test_browse_recipes_sort_rating_pagination(client, mock_prisma, member_auth):
+    import datetime
+
+    posts = [
+        _make_post(id="p_5", title="Top", createdAt=datetime.datetime(2026, 1, 1)),
+        _make_post(id="p_45", title="Mid-high", createdAt=datetime.datetime(2026, 2, 1)),
+        _make_post(id="p_35", title="Middle", createdAt=datetime.datetime(2026, 3, 1)),
+        _make_post(id="p_none", title="Unrated", createdAt=datetime.datetime(2026, 4, 1)),
+    ]
+    cooked = [
+        SimpleNamespace(postId="p_5", rating=5),
+        SimpleNamespace(postId="p_45", rating=4),
+        SimpleNamespace(postId="p_45", rating=5),
+        SimpleNamespace(postId="p_35", rating=3),
+        SimpleNamespace(postId="p_35", rating=4),
+    ]
+    _setup_posts(mock_prisma, posts, cooked_events=cooked)
+
+    page1 = client.get("/recipes?sort=rating&limit=2&offset=0", headers=member_auth)
+    page2 = client.get("/recipes?sort=rating&limit=2&offset=2", headers=member_auth)
+
+    assert page1.status_code == 200
+    assert page2.status_code == 200
+    assert [i["id"] for i in page1.json()["items"]] == ["p_5", "p_45"]
+    assert page1.json()["hasMore"] is True
+    assert [i["id"] for i in page2.json()["items"]] == ["p_35", "p_none"]
+    assert page2.json()["hasMore"] is False
+
+
+def test_browse_recipes_sort_rating_rejects_invalid_pattern(client, mock_prisma, member_auth):
+    _setup_posts(mock_prisma, [])
+
+    response = client.get("/recipes?sort=popularity", headers=member_auth)
+
+    assert response.status_code == 422
+
+
+def test_browse_recipes_sort_rating_caps_candidate_fetch(client, mock_prisma, member_auth):
+    # Mirrors RATING_SORT_CANDIDATE_LIMIT in src/lib/recipes.ts. Keep both
+    # services in lockstep so pagination stays identical past the cap.
+    _setup_posts(mock_prisma, [])
+
+    response = client.get("/recipes?sort=rating", headers=member_auth)
+
+    assert response.status_code == 200
+    assert mock_prisma.post.find_many.await_args.kwargs["take"] == 500
+
+
 def test_browse_recipes_multiple_filters(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
     params = (
