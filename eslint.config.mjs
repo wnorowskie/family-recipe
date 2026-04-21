@@ -8,10 +8,6 @@ export default [
   {
     rules: {
       'react/jsx-props-no-spreading': 'off',
-      // Next 16 / eslint-plugin-react-hooks 7 introduced this rule; demoted to
-      // warn for the upgrade so pre-existing effect patterns don't block CI.
-      // Track cleanup separately.
-      'react-hooks/set-state-in-effect': 'warn',
     },
   },
 ];

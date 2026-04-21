@@ -43,6 +43,8 @@ export default function TimelineFeed() {
   };
 
   useEffect(() => {
+    // Mount-time fetch for the first timeline page.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only initial fetch for paginated list; SWR/RSC migration tracked in #57
     fetchTimeline(0);
   }, []);
 
