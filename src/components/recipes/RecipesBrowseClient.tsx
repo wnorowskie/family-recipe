@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
@@ -84,7 +84,9 @@ export default function RecipesBrowseClient({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedCookTimeKey, setSelectedCookTimeKey] = useState('any');
   const [selectedServingsKey, setSelectedServingsKey] = useState('any');
-  const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([]);
+  const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>(
+    []
+  );
   const [ingredientInput, setIngredientInput] = useState('');
   const [ingredientFilters, setIngredientFilters] = useState<string[]>([]);
   const [selectedAuthorId, setSelectedAuthorId] = useState('');
@@ -113,7 +115,8 @@ export default function RecipesBrowseClient({
   }, [searchInput]);
 
   const cookTimeSelection = useMemo(
-    () => COOK_TIME_OPTIONS.find((option) => option.key === selectedCookTimeKey),
+    () =>
+      COOK_TIME_OPTIONS.find((option) => option.key === selectedCookTimeKey),
     [selectedCookTimeKey]
   );
 
@@ -131,7 +134,9 @@ export default function RecipesBrowseClient({
       params.set('search', searchValue);
     }
     selectedCourses.forEach((course) => params.append('course', course));
-    selectedDifficulties.forEach((difficulty) => params.append('difficulty', difficulty));
+    selectedDifficulties.forEach((difficulty) =>
+      params.append('difficulty', difficulty)
+    );
     if (cookTimeSelection) {
       if (typeof cookTimeSelection.min === 'number') {
         params.set('totalTimeMin', String(cookTimeSelection.min));
@@ -149,7 +154,9 @@ export default function RecipesBrowseClient({
       }
     }
     selectedTags.forEach((tag) => params.append('tags', tag));
-    ingredientFilters.forEach((keyword) => params.append('ingredients', keyword));
+    ingredientFilters.forEach((keyword) =>
+      params.append('ingredients', keyword)
+    );
     if (selectedAuthorId) {
       params.set('authorId', selectedAuthorId);
     }
@@ -194,7 +201,9 @@ export default function RecipesBrowseClient({
       } catch (err) {
         if (!isCurrent) return;
         if ((err as Error).name !== 'AbortError') {
-          setError(err instanceof Error ? err.message : 'Failed to load recipes');
+          setError(
+            err instanceof Error ? err.message : 'Failed to load recipes'
+          );
         }
       } finally {
         if (isCurrent) {
@@ -230,7 +239,9 @@ export default function RecipesBrowseClient({
       setHasMore(data.hasMore);
       setNextOffset(data.nextOffset);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load more recipes');
+      setError(
+        err instanceof Error ? err.message : 'Failed to load more recipes'
+      );
     } finally {
       setIsLoadingMore(false);
     }
@@ -254,7 +265,9 @@ export default function RecipesBrowseClient({
       return;
     }
     setSelectedCourses((prev) =>
-      prev.includes(value) ? prev.filter((entry) => entry !== value) : [...prev, value]
+      prev.includes(value)
+        ? prev.filter((entry) => entry !== value)
+        : [...prev, value]
     );
   };
 
@@ -280,7 +293,9 @@ export default function RecipesBrowseClient({
       return;
     }
     setSelectedDifficulties((prev) =>
-      prev.includes(value) ? prev.filter((entry) => entry !== value) : [...prev, value]
+      prev.includes(value)
+        ? prev.filter((entry) => entry !== value)
+        : [...prev, value]
     );
   };
 
@@ -302,9 +317,7 @@ export default function RecipesBrowseClient({
     setIngredientInput('');
   };
 
-  const handleIngredientKeyDown = (
-    event: KeyboardEvent<HTMLInputElement>
-  ) => {
+  const handleIngredientKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       handleAddIngredient();
@@ -329,25 +342,34 @@ export default function RecipesBrowseClient({
     setSortMode('recent');
   };
 
-  const courseSummary = selectedCourses.length === 0
-    ? 'All courses'
-    : selectedCourses.length <= 2
-      ? selectedCourses
-          .map((course) => course.charAt(0).toUpperCase() + course.slice(1))
-          .join(', ')
-      : `${selectedCourses.length} selected`;
+  const courseSummary =
+    selectedCourses.length === 0
+      ? 'All courses'
+      : selectedCourses.length <= 2
+        ? selectedCourses
+            .map((course) => course.charAt(0).toUpperCase() + course.slice(1))
+            .join(', ')
+        : `${selectedCourses.length} selected`;
 
-  const cookTimeSummary = COOK_TIME_OPTIONS.find((option) => option.key === selectedCookTimeKey)?.label ?? 'Any cook time';
+  const cookTimeSummary =
+    COOK_TIME_OPTIONS.find((option) => option.key === selectedCookTimeKey)
+      ?.label ?? 'Any cook time';
 
-  const servingsSummary = SERVING_OPTIONS.find((option) => option.key === selectedServingsKey)?.label ?? 'Any servings';
+  const servingsSummary =
+    SERVING_OPTIONS.find((option) => option.key === selectedServingsKey)
+      ?.label ?? 'Any servings';
 
-  const difficultySummary = selectedDifficulties.length === 0
-    ? 'Any difficulty'
-    : selectedDifficulties.length <= 2
-      ? selectedDifficulties
-          .map((difficulty) => difficulty.charAt(0).toUpperCase() + difficulty.slice(1))
-          .join(', ')
-      : `${selectedDifficulties.length} selected`;
+  const difficultySummary =
+    selectedDifficulties.length === 0
+      ? 'Any difficulty'
+      : selectedDifficulties.length <= 2
+        ? selectedDifficulties
+            .map(
+              (difficulty) =>
+                difficulty.charAt(0).toUpperCase() + difficulty.slice(1)
+            )
+            .join(', ')
+        : `${selectedDifficulties.length} selected`;
 
   const ingredientSummary = ingredientFilters.length
     ? ingredientFilters.join(', ')
@@ -357,21 +379,38 @@ export default function RecipesBrowseClient({
     ? `${selectedTags.length}/${TAG_LIMIT} selected`
     : 'None selected';
 
-  const selectedAuthorName = memberOptions.find((member) => member.id === selectedAuthorId)?.name;
-  const authorSummary = selectedAuthorId ? selectedAuthorName ?? 'Selected member' : 'Any member';
+  const selectedAuthorName = memberOptions.find(
+    (member) => member.id === selectedAuthorId
+  )?.name;
+  const authorSummary = selectedAuthorId
+    ? (selectedAuthorName ?? 'Selected member')
+    : 'Any member';
 
   const pluralize = (count: number, singular: string, plural?: string) =>
-    count === 1 ? `${count} ${singular}` : `${count} ${plural ?? `${singular}s`}`;
+    count === 1
+      ? `${count} ${singular}`
+      : `${count} ${plural ?? `${singular}s`}`;
 
   const filterSummaryParts: string[] = [];
-  if (selectedCourses.length) filterSummaryParts.push(pluralize(selectedCourses.length, 'course'));
-  if (selectedDifficulties.length) filterSummaryParts.push(pluralize(selectedDifficulties.length, 'difficulty', 'difficulties'));
+  if (selectedCourses.length)
+    filterSummaryParts.push(pluralize(selectedCourses.length, 'course'));
+  if (selectedDifficulties.length)
+    filterSummaryParts.push(
+      pluralize(selectedDifficulties.length, 'difficulty', 'difficulties')
+    );
   if (selectedCookTimeKey !== 'any') filterSummaryParts.push('cook time set');
   if (selectedServingsKey !== 'any') filterSummaryParts.push('servings set');
-  if (ingredientFilters.length) filterSummaryParts.push(pluralize(ingredientFilters.length, 'ingredient keyword'));
-  if (selectedTags.length) filterSummaryParts.push(pluralize(selectedTags.length, 'tag'));
+  if (ingredientFilters.length)
+    filterSummaryParts.push(
+      pluralize(ingredientFilters.length, 'ingredient keyword')
+    );
+  if (selectedTags.length)
+    filterSummaryParts.push(pluralize(selectedTags.length, 'tag'));
   if (selectedAuthorId) filterSummaryParts.push('author selected');
-  const filterSummary = filterSummaryParts.length > 0 ? filterSummaryParts.join(' · ') : 'No filters applied';
+  const filterSummary =
+    filterSummaryParts.length > 0
+      ? filterSummaryParts.join(' · ')
+      : 'No filters applied';
 
   return (
     <div className="space-y-6">
@@ -379,7 +418,9 @@ export default function RecipesBrowseClient({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Recipes</h2>
-            <p className="text-sm text-gray-500">Browse the family cookbook and find what to cook next.</p>
+            <p className="text-sm text-gray-500">
+              Browse the family cookbook and find what to cook next.
+            </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 lg:justify-end">
             <div className="inline-flex rounded-full border border-gray-200 bg-gray-50 p-1 text-xs font-semibold">
@@ -423,7 +464,9 @@ export default function RecipesBrowseClient({
             placeholder="Search by recipe title"
             className="w-full rounded-2xl border border-gray-200 px-5 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
           />
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+            ⌕
+          </span>
         </div>
       </section>
 
@@ -457,210 +500,221 @@ export default function RecipesBrowseClient({
         {filtersOpen && (
           <div className="border-t border-gray-100 p-6 space-y-3">
             <FilterGroup title="Course" summary={courseSummary}>
-            <div className="flex flex-wrap gap-2">
-              {COURSE_OPTIONS.map((option) => {
-                const isAllOption = option.value === '';
-                const isSelected = isAllOption
-                  ? selectedCourses.length === 0
-                  : selectedCourses.includes(option.value);
-                return (
-                  <button
-                    key={option.value || 'all'}
-                    type="button"
-                    onClick={() => toggleCourse(option.value)}
-                    className={`rounded-full border px-4 py-2 text-sm font-medium ${
-                      isSelected
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </FilterGroup>
-
-          <FilterGroup title="Cook time" summary={cookTimeSummary}>
-            <div className="flex flex-wrap gap-2">
-              {COOK_TIME_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => handleCookTimeSelect(option.key)}
-                  className={`rounded-full border px-4 py-2 text-sm font-medium ${
-                    selectedCookTimeKey === option.key
-                      ? 'bg-gray-900 text-white border-gray-900'
-                      : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </FilterGroup>
-
-          <FilterGroup title="Servings" summary={servingsSummary}>
-            <div className="flex flex-wrap gap-2">
-              {SERVING_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => handleServingsSelect(option.key)}
-                  className={`rounded-full border px-4 py-2 text-sm font-medium ${
-                    selectedServingsKey === option.key
-                      ? 'bg-gray-900 text-white border-gray-900'
-                      : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </FilterGroup>
-
-          <FilterGroup title="Difficulty" summary={difficultySummary}>
-            <div className="flex flex-wrap gap-2">
-              {DIFFICULTY_OPTIONS.map((option) => {
-                const isAllOption = option.value === '';
-                const isSelected = isAllOption
-                  ? selectedDifficulties.length === 0
-                  : selectedDifficulties.includes(option.value);
-                return (
-                  <button
-                    key={option.value || 'any'}
-                    type="button"
-                    onClick={() => toggleDifficulty(option.value)}
-                    className={`rounded-full border px-4 py-2 text-sm font-medium ${
-                      isSelected
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </FilterGroup>
-
-          <FilterGroup title="Family member" summary={authorSummary}>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedAuthorId('')}
-                className={`rounded-full border px-4 py-2 text-sm font-medium ${
-                  selectedAuthorId === ''
-                    ? 'bg-gray-900 text-white border-gray-900'
-                    : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                All members
-              </button>
-              {memberOptions.map((member) => {
-                const isSelected = selectedAuthorId === member.id;
-                return (
-                  <button
-                    key={member.id}
-                    type="button"
-                    onClick={() =>
-                      setSelectedAuthorId((prev) => (prev === member.id ? '' : member.id))
-                    }
-                    className={`rounded-full border px-4 py-2 text-sm font-medium ${
-                      isSelected
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    {member.name}
-                  </button>
-                );
-              })}
-            </div>
-          </FilterGroup>
-
-          <FilterGroup title="Ingredients" summary={ingredientSummary}>
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={ingredientInput}
-                  onChange={(event) => setIngredientInput(event.target.value)}
-                  onKeyDown={handleIngredientKeyDown}
-                  placeholder="Add an ingredient keyword"
-                  className="flex-1 rounded-2xl border border-gray-200 px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddIngredient}
-                  disabled={!ingredientInput.trim() || ingredientFilters.length >= INGREDIENT_LIMIT}
-                  className="rounded-2xl border border-gray-900 px-4 py-2 text-sm font-semibold text-gray-900 disabled:opacity-40"
-                >
-                  Add
-                </button>
-              </div>
-              {ingredientFilters.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {ingredientFilters.map((keyword) => (
-                    <span
-                      key={keyword}
-                      className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700"
+              <div className="flex flex-wrap gap-2">
+                {COURSE_OPTIONS.map((option) => {
+                  const isAllOption = option.value === '';
+                  const isSelected = isAllOption
+                    ? selectedCourses.length === 0
+                    : selectedCourses.includes(option.value);
+                  return (
+                    <button
+                      key={option.value || 'all'}
+                      type="button"
+                      onClick={() => toggleCourse(option.value)}
+                      className={`rounded-full border px-4 py-2 text-sm font-medium ${
+                        isSelected
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
                     >
-                      {keyword}
-                      <button
-                        type="button"
-                        onClick={() => removeIngredient(keyword)}
-                        className="text-gray-500 hover:text-gray-900"
-                        aria-label={`Remove ingredient filter ${keyword}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              <p className="text-xs text-gray-500">
-                Up to {INGREDIENT_LIMIT} ingredient keywords. Results must include all of them.
-              </p>
-            </div>
-          </FilterGroup>
-
-          <FilterGroup title="Tags" summary={tagsSummary}>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span className="font-semibold text-gray-700">Pick up to {TAG_LIMIT} tags</span>
-                <span>{selectedTags.length}/{TAG_LIMIT} selected</span>
+                      {option.label}
+                    </button>
+                  );
+                })}
               </div>
-              {Object.entries(tagGroups).map(([groupName, tags]) => (
-                <div key={groupName} className="space-y-2">
-                  <p className="text-xs font-semibold uppercase text-gray-500">
-                    {groupName.replace(/-/g, ' ')}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {tags.map((tag) => {
-                      const selected = selectedTags.includes(tag.name);
-                      const disabled = !selected && selectedTags.length >= TAG_LIMIT;
-                      return (
-                        <button
-                          key={tag.id}
-                          type="button"
-                          onClick={() => toggleTag(tag.name)}
-                          disabled={disabled}
-                          className={`rounded-full border px-3 py-1 text-sm font-medium ${
-                            selected
-                              ? 'bg-gray-900 text-white border-gray-900'
-                              : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                          } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                        >
-                          #{tag.name}
-                        </button>
-                      );
-                    })}
-                  </div>
+            </FilterGroup>
+
+            <FilterGroup title="Cook time" summary={cookTimeSummary}>
+              <div className="flex flex-wrap gap-2">
+                {COOK_TIME_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => handleCookTimeSelect(option.key)}
+                    className={`rounded-full border px-4 py-2 text-sm font-medium ${
+                      selectedCookTimeKey === option.key
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </FilterGroup>
+
+            <FilterGroup title="Servings" summary={servingsSummary}>
+              <div className="flex flex-wrap gap-2">
+                {SERVING_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => handleServingsSelect(option.key)}
+                    className={`rounded-full border px-4 py-2 text-sm font-medium ${
+                      selectedServingsKey === option.key
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </FilterGroup>
+
+            <FilterGroup title="Difficulty" summary={difficultySummary}>
+              <div className="flex flex-wrap gap-2">
+                {DIFFICULTY_OPTIONS.map((option) => {
+                  const isAllOption = option.value === '';
+                  const isSelected = isAllOption
+                    ? selectedDifficulties.length === 0
+                    : selectedDifficulties.includes(option.value);
+                  return (
+                    <button
+                      key={option.value || 'any'}
+                      type="button"
+                      onClick={() => toggleDifficulty(option.value)}
+                      className={`rounded-full border px-4 py-2 text-sm font-medium ${
+                        isSelected
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </FilterGroup>
+
+            <FilterGroup title="Family member" summary={authorSummary}>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedAuthorId('')}
+                  className={`rounded-full border px-4 py-2 text-sm font-medium ${
+                    selectedAuthorId === ''
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  All members
+                </button>
+                {memberOptions.map((member) => {
+                  const isSelected = selectedAuthorId === member.id;
+                  return (
+                    <button
+                      key={member.id}
+                      type="button"
+                      onClick={() =>
+                        setSelectedAuthorId((prev) =>
+                          prev === member.id ? '' : member.id
+                        )
+                      }
+                      className={`rounded-full border px-4 py-2 text-sm font-medium ${
+                        isSelected
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      {member.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </FilterGroup>
+
+            <FilterGroup title="Ingredients" summary={ingredientSummary}>
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={ingredientInput}
+                    onChange={(event) => setIngredientInput(event.target.value)}
+                    onKeyDown={handleIngredientKeyDown}
+                    placeholder="Add an ingredient keyword"
+                    className="flex-1 rounded-2xl border border-gray-200 px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddIngredient}
+                    disabled={
+                      !ingredientInput.trim() ||
+                      ingredientFilters.length >= INGREDIENT_LIMIT
+                    }
+                    className="rounded-2xl border border-gray-900 px-4 py-2 text-sm font-semibold text-gray-900 disabled:opacity-40"
+                  >
+                    Add
+                  </button>
                 </div>
-              ))}
-            </div>
-          </FilterGroup>
+                {ingredientFilters.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {ingredientFilters.map((keyword) => (
+                      <span
+                        key={keyword}
+                        className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700"
+                      >
+                        {keyword}
+                        <button
+                          type="button"
+                          onClick={() => removeIngredient(keyword)}
+                          className="text-gray-500 hover:text-gray-900"
+                          aria-label={`Remove ingredient filter ${keyword}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-gray-500">
+                  Up to {INGREDIENT_LIMIT} ingredient keywords. Results must
+                  include all of them.
+                </p>
+              </div>
+            </FilterGroup>
+
+            <FilterGroup title="Tags" summary={tagsSummary}>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span className="font-semibold text-gray-700">
+                    Pick up to {TAG_LIMIT} tags
+                  </span>
+                  <span>
+                    {selectedTags.length}/{TAG_LIMIT} selected
+                  </span>
+                </div>
+                {Object.entries(tagGroups).map(([groupName, tags]) => (
+                  <div key={groupName} className="space-y-2">
+                    <p className="text-xs font-semibold uppercase text-gray-500">
+                      {groupName.replace(/-/g, ' ')}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map((tag) => {
+                        const selected = selectedTags.includes(tag.name);
+                        const disabled =
+                          !selected && selectedTags.length >= TAG_LIMIT;
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => toggleTag(tag.name)}
+                            disabled={disabled}
+                            className={`rounded-full border px-3 py-1 text-sm font-medium ${
+                              selected
+                                ? 'bg-gray-900 text-white border-gray-900'
+                                : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                            } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                          >
+                            #{tag.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </FilterGroup>
           </div>
         )}
       </section>
@@ -672,13 +726,15 @@ export default function RecipesBrowseClient({
       )}
 
       <section className="space-y-4">
-        {isLoading && (
-          <p className="text-sm text-gray-500">Loading recipes…</p>
-        )}
+        {isLoading && <p className="text-sm text-gray-500">Loading recipes…</p>}
         {!isLoading && items.length === 0 && (
           <div className="rounded-2xl border border-dashed border-gray-200 p-8 text-center">
-            <p className="text-lg font-semibold text-gray-900">No recipes found</p>
-            <p className="text-sm text-gray-500 mt-1">Try adjusting your search or filters.</p>
+            <p className="text-lg font-semibold text-gray-900">
+              No recipes found
+            </p>
+            <p className="text-sm text-gray-500 mt-1">
+              Try adjusting your search or filters.
+            </p>
           </div>
         )}
         {items.length > 0 && (
@@ -710,10 +766,12 @@ export default function RecipesBrowseClient({
                     <p className="text-sm text-gray-500">
                       {recipe.courses.length > 0
                         ? recipe.courses.join(' · ')
-                        : recipe.primaryCourse ?? 'Recipe'}
+                        : (recipe.primaryCourse ?? 'Recipe')}
                       {recipe.difficulty ? ` · ${recipe.difficulty}` : ''}
                     </p>
-                    <h3 className="text-lg font-semibold text-gray-900 mt-1">{recipe.title}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mt-1">
+                      {recipe.title}
+                    </h3>
                     <div className="mt-2 flex items-center gap-2">
                       <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-semibold text-gray-600 overflow-hidden">
                         {recipe.author.avatarUrl ? (
@@ -726,7 +784,9 @@ export default function RecipesBrowseClient({
                             unoptimized
                           />
                         ) : (
-                          <span>{recipe.author.name.charAt(0).toUpperCase()}</span>
+                          <span>
+                            {recipe.author.name.charAt(0).toUpperCase()}
+                          </span>
                         )}
                       </div>
                       <div className="min-w-0">
@@ -747,17 +807,26 @@ export default function RecipesBrowseClient({
                       </span>
                     ))}
                     {recipe.tags.length > 4 && (
-                      <span className="text-xs text-gray-500">+{recipe.tags.length - 4} more</span>
+                      <span className="text-xs text-gray-500">
+                        +{recipe.tags.length - 4} more
+                      </span>
                     )}
                   </div>
                   <div className="mt-auto flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600">
                     <span>
-                      {recipe.totalTime ? `${recipe.totalTime} min` : 'Time n/a'} ·{' '}
-                      {recipe.servings ? `${recipe.servings} servings` : 'Servings n/a'}
+                      {recipe.totalTime
+                        ? `${recipe.totalTime} min`
+                        : 'Time n/a'}{' '}
+                      ·{' '}
+                      {recipe.servings
+                        ? `${recipe.servings} servings`
+                        : 'Servings n/a'}
                     </span>
                     <span>
                       Cooked {recipe.cookedStats.timesCooked}x ·{' '}
-                      {recipe.cookedStats.averageRating ? `${recipe.cookedStats.averageRating.toFixed(1)} ★` : 'No ratings'}
+                      {recipe.cookedStats.averageRating
+                        ? `${recipe.cookedStats.averageRating.toFixed(1)} ★`
+                        : 'No ratings'}
                     </span>
                   </div>
                 </div>
@@ -790,7 +859,12 @@ interface FilterGroupProps {
   defaultOpen?: boolean;
 }
 
-function FilterGroup({ title, summary, children, defaultOpen = false }: FilterGroupProps) {
+function FilterGroup({
+  title,
+  summary,
+  children,
+  defaultOpen = false,
+}: FilterGroupProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
@@ -822,9 +896,7 @@ function FilterGroup({ title, summary, children, defaultOpen = false }: FilterGr
         </svg>
       </button>
       {isOpen && (
-        <div className="border-t border-gray-100 px-4 py-4">
-          {children}
-        </div>
+        <div className="border-t border-gray-100 px-4 py-4">{children}</div>
       )}
     </div>
   );
