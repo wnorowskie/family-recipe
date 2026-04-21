@@ -31,20 +31,15 @@ If you previously ran the FastAPI setup step (`npx prisma generate --schema ../.
 
 ## Auth — log in and capture a cookie
 
-Every authenticated route needs a `session` cookie. Log in once per session.
+Every authenticated route needs a `session` cookie. Log in once per session using the `claude-test` seed user + [scripts/claude-login.sh](../../scripts/claude-login.sh):
 
 ```bash
-COOKIES=/tmp/fr-cookies.txt
-
-curl -s -c "$COOKIES" \
-  -H "Content-Type: application/json" \
-  -d '{"emailOrUsername":"<seeded-user>","password":"<pass>"}' \
-  http://localhost:3000/api/auth/login | jq .
+COOKIES=$(scripts/claude-login.sh)        # writes /tmp/fr-cookies.txt by default
 ```
 
-Success: `200` with a `user` object, and `$COOKIES` contains a `session` entry. Failure: `401` invalid credentials, `403` no membership, `429` rate-limited.
+The script reads `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD` from env or `.env.local` (seeded by `npm run db:seed`; see [.env.example](../../.env.example)). Pass `--host http://localhost:8000` to target FastAPI.
 
-Reuse with `-b "$COOKIES"` on every subsequent call.
+Reuse with `-b "$COOKIES"` on every subsequent call. Failure modes: `401` invalid credentials (re-run `npm run db:seed`), `403` no membership, `429` rate-limited.
 
 ## Invariants every handler must preserve
 

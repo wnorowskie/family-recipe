@@ -29,16 +29,13 @@ FastAPI requires **Postgres** — it uses the Python Prisma client generated aga
 
 The session cookie format is identical to Next — same JWT, same `JWT_SECRET`, same cookie name. A cookie obtained by logging in via Next `/api/auth/login` (see [next-api.md](next-api.md)) also works against FastAPI. Useful for contract parity checks.
 
-Login through FastAPI directly:
+Login through FastAPI directly via [scripts/claude-login.sh](../../scripts/claude-login.sh):
 
 ```bash
-COOKIES=/tmp/fastapi-cookies.txt
-
-curl -s -c "$COOKIES" \
-  -H "Content-Type: application/json" \
-  -d '{"emailOrUsername":"<user>","password":"<pass>"}' \
-  http://localhost:8000/auth/login | jq .
+COOKIES=$(COOKIES=/tmp/fastapi-cookies.txt scripts/claude-login.sh --host http://localhost:8000)
 ```
+
+The script routes to `/auth/login` when the host targets `:8000` and to `/api/auth/login` otherwise. Credentials come from `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD` (seeded by `npm run db:seed`).
 
 > **Path note.** FastAPI routers mount **without** an `/api/` prefix (e.g. `/posts`, `/recipes`, `/auth/login`). Next mounts the same resources under `/api/*`. When diffing contracts, expect the path to differ even though the response body should match.
 
