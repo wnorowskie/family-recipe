@@ -2,6 +2,8 @@
 
 Decision doc for the refresh-token backing store that Phase 1 of the FastAPI migration ([API_BACKEND_MIGRATION_PLAN.md](../API_BACKEND_MIGRATION_PLAN.md)) needs before handler code is written. Unblocks [#35](https://github.com/wnorowskie/family-recipe/issues/35). Spike ticket: [#40](https://github.com/wnorowskie/family-recipe/issues/40).
 
+Sibling decision: [feature-flag-store.md](feature-flag-store.md) — the flag system that gates when Phase 1 handlers are actually reachable.
+
 ## Decision (TL;DR)
 
 Add a single `RefreshToken` table to all three Prisma schemas, keyed by an opaque `jti` prefix and storing an **HMAC-SHA-256 hash** of the token (pepper in secret manager). Every `/refresh` **always rotates** and emits a new row in the same `chain_id`. Reuse of an already-rotated `jti` revokes the **whole chain** (not the user's other sessions). Expired/revoked rows are purged by a daily Cloud Scheduler job. No admin denylist table — per-user `/logout-all` plus a global `AUTH_EPOCH` env var cover the "nuclear" cases.
@@ -54,13 +56,13 @@ Back-relations on `User` and `FamilySpace`: `refreshTokens RefreshToken[]`.
 
 Hot path is `/refresh`: `SELECT … WHERE jti = ?`. The `@unique` on `jti` creates a b-tree → O(log n) per lookup at any realistic scale.
 
-| Index                    | Serves                                                        |
-| ------------------------ | ------------------------------------------------------------- |
-| `jti` (unique)           | `/refresh` lookup                                             |
-| `(user_id, revoked_at)`  | `/logout-all`, session-list queries                           |
-| `chain_id`               | Chain revocation on reuse detection                           |
-| `family_space_id`        | Admin queries and future multi-tenant scoping                 |
-| `expires_at`             | Nightly cleanup job                                           |
+| Index                   | Serves                                        |
+| ----------------------- | --------------------------------------------- |
+| `jti` (unique)          | `/refresh` lookup                             |
+| `(user_id, revoked_at)` | `/logout-all`, session-list queries           |
+| `chain_id`              | Chain revocation on reuse detection           |
+| `family_space_id`       | Admin queries and future multi-tenant scoping |
+| `expires_at`            | Nightly cleanup job                           |
 
 At family-app scale (≤50 rows/user, ≤100 users) the indexes cost more than they save on read, but they're free insurance for when the same table powers multi-tenant use. Storage overhead is ~a few KB per user and isn't worth optimizing.
 
@@ -120,7 +122,7 @@ Use constant-time comparison (`hmac.compare_digest` in Python, `crypto.timingSaf
 
 Issue [#35](https://github.com/wnorowskie/family-recipe/issues/35)'s AC requires that concurrent `/refresh` calls don't issue duplicate tokens or lose reuse detection. Two recipes both work; pick one at implementation time:
 
-- **Preferred: `SELECT … FOR UPDATE` inside a transaction.** The lookup at step 2 becomes `SELECT … WHERE jti = ? FOR UPDATE`, and the revoke + insert at step 5 run in the same transaction. The second concurrent caller blocks on the row lock, then sees `revoked_reason = 'rotated'` when it unblocks and correctly triggers chain-reuse detection. **Provider-aware code required:** Prisma's `$transaction` will accept a `FOR UPDATE` raw query against Postgres but is a no-op parse on SQLite — the SQLite path silently loses the row lock. The implementer needs a branch: `$queryRaw\`… FOR UPDATE\`` on Postgres, `BEGIN IMMEDIATE` (which serializes the whole DB) on SQLite. Don't ship a single unqualified `FOR UPDATE` statement.
+- **Preferred: `SELECT … FOR UPDATE` inside a transaction.** The lookup at step 2 becomes `SELECT … WHERE jti = ? FOR UPDATE`, and the revoke + insert at step 5 run in the same transaction. The second concurrent caller blocks on the row lock, then sees `revoked_reason = 'rotated'` when it unblocks and correctly triggers chain-reuse detection. **Provider-aware code required:** Prisma's `$transaction` will accept a `FOR UPDATE` raw query against Postgres but is a no-op parse on SQLite — the SQLite path silently loses the row lock. The implementer needs a branch: `$queryRaw\`… FOR UPDATE\``on Postgres,`BEGIN IMMEDIATE`(which serializes the whole DB) on SQLite. Don't ship a single unqualified`FOR UPDATE` statement.
 - **Alternative: short grace window.** Allow a just-rotated row to still mint one successor if used within e.g. 5s of its own rotation, as long as the successor's hash matches. Avoids false positives from legitimate double-submits (tab re-opens, retry-on-transient-error) without opening a meaningful attacker window. More moving parts; only worth it if we see reuse-detection false positives in practice.
 
 ### Reuse escalation — narrower case

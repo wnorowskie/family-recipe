@@ -63,9 +63,11 @@ isEnabled(userId: string, key: string) -> boolean:
   return bucket < flag.rolloutPercent
 ```
 
-Hash must be **stable across languages** so the same user lands in the same bucket on Next and FastAPI (otherwise a single request can write to one backend and read from the other). FNV-1a 32-bit is trivial to reimplement identically; `hashlib.md5` truncated to 4 bytes works too. Pick one and lock it in.
+Hash must be **stable across languages** so the same user lands in the same bucket on Next and FastAPI (otherwise a single request can write to one backend and read from the other). **Use FNV-1a 32-bit** (offset basis `0x811c9dc5`, prime `0x01000193`, input bytes = UTF-8 of `userId + ':' + key`). Chosen over a truncated cryptographic hash (MD5/SHA-256) because it's trivially identical to reimplement in TS and Python without crypto imports, and because keeping security-signaling algorithms out of non-security code is a readability win. The evaluator test fixture must cover at least one known `(userId, key) → bucket` pair so a drift in either implementation fails CI.
 
 **Fail closed** on unknown flag keys: if somebody adds `USE_NEW_FOO` in code without a migration, it evaluates to `false` until the row exists. Matches what env-var defaults would have given us.
+
+`enabled` is a hard kill-switch evaluated **before** the allowlist: `enabled=false` short-circuits to `false` regardless of `enabledUserIds`. Dogfooding yourself therefore requires `enabled=true, enabledUserIds=["<you>"], rolloutPercent=0` — not the seed default of `enabled=false`. Flipping `enabled` to `true` with an empty allowlist and `rolloutPercent=0` is also safe (everyone evaluates to `false`), which is the state between seeding and first rollout step.
 
 ## Caching & Hot-Reload
 
@@ -83,6 +85,7 @@ loadFlag(key):
 - **30s TTL** → a flip propagates to every instance within 30s without any polling background job. Well under the migration plan's 60s target and 5min rollback SLA.
 - **Lazy on read** means zero queries when no one is checking flags, and one query per instance per flag per 30s when traffic exists. At 1 Cloud Run instance × 3 flags that's 360 queries/hour — negligible, and the row is 1 KB.
 - **Not lazy on write**: flag writers (admin endpoint, seed) should also bust their own local cache so the UI round-trip after save reflects the new value.
+- **DB-unreachable behavior**: on a DB error during refresh, return the last cached value if one exists (serve stale rather than fail the user's request); if the cache is empty (cold start, DB still down), return `false`. This keeps a flag flip from becoming a request-path outage and preserves the fail-closed default when we have no signal at all. Log the error via `logError`/Python equivalent so the condition is visible.
 - No distributed cache / no pub-sub. Current prod is single-instance Cloud Run. If we ever scale horizontally, 30s is still the staleness budget; if that becomes too loose, the fix is to shorten TTL (not to add Redis).
 
 Acceptable edge case: during the 30s window after a flip, different instances (or different requests hitting a rolling deploy) can return different values for the same user. At 5 users this is invisible; the migration plan's dual-stack write protection ([API_BACKEND_MIGRATION_PLAN.md, "Dual‑Stack Without Data Drift"](../API_BACKEND_MIGRATION_PLAN.md)) already assumes brief inconsistency during a flip.
@@ -119,17 +122,17 @@ End-to-end: **< 60s** from the click to every in-flight instance. Migration plan
 
 Next.js evaluates flags **server-side** (in server components and server actions) using the authenticated user's ID. Results are passed to client components as props — the client never queries the flag table directly.
 
-For client-initiated fetches that need to know which backend to call (e.g. after a `USE_FASTAPI_DATA` flip during an active session), add **`GET /api/flags/me`** (Phase 0) / **`GET /v1/flags/me`** (post-cutover): returns the caller's evaluated flag map. Client caches for 30s. This keeps flag evaluation on the server where the cache lives.
+For client-initiated fetches that need to know which backend to call (e.g. after a `USE_FASTAPI_DATA` flip during an active session), add **`GET /api/flags/me`** (Phase 0) / **`GET /v1/flags/me`** (post-cutover): returns the caller's evaluated flag map. **Auth required** — wrap with `withAuth` on the Next side and the FastAPI equivalent; an unauthenticated caller gets `401 UNAUTHORIZED`, not an empty `{}`. Rationale: the evaluator needs a real `userId` for bucketing, and we don't want to expose even the set of flag _keys_ to pre-login traffic. Client caches the response for 30s.
 
 ## Implementation Checklist (for Phase 0 ticket #34)
 
-1. Add `FeatureFlag` to all three Prisma schemas; generate Postgres migration via `npx prisma migrate dev --schema prisma/schema.postgres.prisma --name add_feature_flags`. `npm run db:push` for SQLite.
+1. Add `FeatureFlag` (identical fields) to all three schemas in lock-step — [prisma/schema.prisma](../../prisma/schema.prisma) (SQLite), [prisma/schema.postgres.prisma](../../prisma/schema.postgres.prisma) (Postgres / FastAPI), and [prisma/schema.postgres.node.prisma](../../prisma/schema.postgres.node.prisma) (Docker / Cloud Run Next image). Generate the Postgres migration via `npx prisma migrate dev --schema prisma/schema.postgres.prisma --name add_feature_flags`; `npm run db:push` picks up the SQLite change.
 2. Add `src/lib/featureFlags.ts` with `isEnabled(userId, key)` + 30s cache.
 3. Add `apps/api/src/services/feature_flags.py` with identical semantics and the **same hash function**.
 4. Extend [prisma/seed.ts](../../prisma/seed.ts) to upsert the three migration-plan flags as disabled.
 5. Add `GET /api/flags/me` returning `{ USE_FASTAPI_AUTH: bool, ... }` for the authenticated user; mirror to FastAPI as `/v1/flags/me`.
 6. Unit test the evaluator against a fixed hash fixture to guarantee TS/Python bucketing agrees.
-7. Update [docs/API_BACKEND_MIGRATION_PLAN.md §"Feature Flag Enforcement Source"](../API_BACKEND_MIGRATION_PLAN.md) to replace "environment‑backed config (`FASTAPI_FEATURE_FLAGS`) loaded on startup and reloaded on interval" with a pointer to this doc.
+7. Update [docs/API_BACKEND_MIGRATION_PLAN.md](../API_BACKEND_MIGRATION_PLAN.md): (a) replace §"Feature Flag Enforcement Source" ("environment‑backed config (`FASTAPI_FEATURE_FLAGS`) loaded on startup and reloaded on interval") with a pointer to this doc, and (b) soften §"Per‑Environment Cutover" to describe the real rollout path at 5-user scale — allowlist one user, then a second, then `rolloutPercent=100` — and note that the 5%/25%/50%/100% sequence is retained for future scale only.
 
 ## Alternatives Considered (and Rejected)
 
