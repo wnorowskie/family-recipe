@@ -57,8 +57,9 @@ lerna-debug.log*
 .env.sandbox
 
 # Terraform
+# .terraform.lock.hcl IS committed (HashiCorp best practice — pins provider
+# hashes across envs + CI for reproducible `terraform init`).
 **/.terraform/*
-**/.terraform.lock.hcl
 **/terraform.tfstate
 **/terraform.tfstate.*
 **/*.tfvars
@@ -105,8 +106,9 @@ logs
 *.log
 
 # Terraform
+# .terraform.lock.hcl IS committed (HashiCorp best practice — pins provider
+# hashes across envs + CI for reproducible `terraform init`).
 **/.terraform/*
-**/.terraform.lock.hcl
 **/terraform.tfstate
 **/terraform.tfstate.*
 **/*.tfvars
