@@ -1,11 +1,6 @@
 name: Recipe URL Importer CI
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'apps/recipe-url-importer/**'
-      - '.github/workflows/recipe-url-importer-ci.yml'
   pull_request:
     branches: [main, develop]
     paths:
