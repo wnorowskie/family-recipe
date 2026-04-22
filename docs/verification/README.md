@@ -34,23 +34,19 @@ A single change can touch multiple — run each relevant playbook. Prisma change
 
 ## Shared helpers
 
-**Local Postgres is mandatory** — SQLite support was dropped in #80. If the container isn't up, every DB-touching route 500s silently. Start it with:
+**Bring up the local stack (one command).** [scripts/local-stack-up.sh](../../scripts/local-stack-up.sh) spins up a sandbox Postgres container on port **5434** (won't clash with anything on the default `:5432`), runs Prisma generate + push + seed against it, generates the Python Prisma client for FastAPI, and writes `.env.sandbox` — without ever touching your `.env` or `.env.local`. Safe to re-run; already-warm stacks are a no-op.
 
 ```bash
-docker run -d --name family-recipe-pg \
-  -e POSTGRES_USER=family_app \
-  -e POSTGRES_PASSWORD=FamilyRecipe2025DbPass \
-  -e POSTGRES_DB=family_recipe_dev \
-  -p 5432:5432 postgres:16
-
-npm run db:push      # applies schema.postgres.node.prisma
-npm run db:seed      # seeds family + claude-test user
+scripts/local-stack-up.sh
 ```
 
-**Start dev server in the background + wait for ready:**
+The script prints the seeded family master key and `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD` when it finishes — these are the values referenced in the curl snippets below.
+
+**Run dev servers against the sandbox.** Use [scripts/with-local-stack.sh](../../scripts/with-local-stack.sh) as a prefix so `npm run dev` / `uvicorn` pick up the sandbox `DATABASE_URL` without mutating shell state:
 
 ```bash
-npm run dev &
+scripts/with-local-stack.sh npm run dev &                                     # Next on :3000
+scripts/with-local-stack.sh uvicorn apps.api.src.main:app --port 8000 &       # FastAPI on :8000
 until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
 echo "ready"
 ```
@@ -58,17 +54,24 @@ echo "ready"
 **Cookie-jar login** — use [scripts/claude-login.sh](../../scripts/claude-login.sh), which logs in as the `claude-test` seed user and writes a session cookie to `/tmp/fr-cookies.txt`:
 
 ```bash
-COOKIES=$(scripts/claude-login.sh)                          # Next on :3000
+COOKIES=$(scripts/claude-login.sh)                               # Next on :3000
 COOKIES=$(scripts/claude-login.sh --host http://localhost:8000)  # FastAPI
 ```
 
-The user is created (and its password refreshed) every time `npm run db:seed` runs outside `NODE_ENV=production`. Credentials come from `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD` in env or `.env.local` (see [.env.example](../../.env.example)). This is the canonical auth path — playbook snippets assume it.
+Credentials come from `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD`, which the login script reads from env, `.env.local`, or `.env.sandbox` (in that order). If `local-stack-up.sh` wrote the sandbox file, you're covered with zero extra setup.
 
 **Stop any leftover dev servers:**
 
 ```bash
 lsof -ti :3000 | xargs -r kill -9 2>/dev/null
 lsof -ti :8000 | xargs -r kill -9 2>/dev/null
+```
+
+**Tear down the sandbox stack when done:**
+
+```bash
+scripts/local-stack-down.sh            # stop the container, keep the data volume
+scripts/local-stack-down.sh --purge    # also drop the data volume
 ```
 
 ## When verification isn't possible
