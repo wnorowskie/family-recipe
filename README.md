@@ -64,7 +64,7 @@ cp .env.example .env
 Edit `.env` and update the values:
 
 ```
-DATABASE_URL="postgresql://family_app:FamilyRecipe2025DbPass@localhost:5432/family_recipe_dev"
+DATABASE_URL="postgresql://family_app:dev-only-password@localhost:5432/family_recipe_dev"
 JWT_SECRET="jwt-secret-placeholder"
 ```
 
@@ -81,7 +81,7 @@ Local dev is Postgres-only (SQLite support was removed — see issue #80). Spin 
 ```
 docker run -d --name family-recipe-pg \
   -e POSTGRES_USER=family_app \
-  -e POSTGRES_PASSWORD=FamilyRecipe2025DbPass \
+  -e POSTGRES_PASSWORD=dev-only-password \
   -e POSTGRES_DB=family_recipe_dev \
   -p 5432:5432 postgres:16
 
