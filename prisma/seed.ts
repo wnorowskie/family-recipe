@@ -84,13 +84,16 @@ async function main() {
     familySpaceId = existingFamily.id;
   }
 
-  await seedTestUser(familySpaceId);
+  const testUserId = await seedTestUser(familySpaceId);
+  if (testUserId) {
+    await seedE2EFixtures(familySpaceId, testUserId);
+  }
 }
 
-async function seedTestUser(familySpaceId: string) {
+async function seedTestUser(familySpaceId: string): Promise<string | null> {
   if (process.env.NODE_ENV === 'production') {
     console.log('⏭️  Skipping claude-test user (NODE_ENV=production)');
-    return;
+    return null;
   }
 
   const username =
@@ -126,6 +129,119 @@ async function seedTestUser(familySpaceId: string) {
   });
 
   console.log(`🧪 Seeded claude-test user (username="${username}")`);
+  return user.id;
+}
+
+// Deterministic fixture IDs — Playwright specs assert by content/ID.
+const E2E_POST_ID = 'e2e-post-001';
+const E2E_COMMENT_ID = 'e2e-comment-001';
+const E2E_REACTION_ID = 'e2e-reaction-001';
+const E2E_RECIPE_POST_ID = 'e2e-recipe-001';
+const E2E_RECIPE_DETAILS_ID = 'e2e-recipe-details-001';
+const E2E_COOKED_EVENT_ID = 'e2e-cooked-001';
+const E2E_NOTIFICATION_ID = 'e2e-notification-001';
+
+async function seedE2EFixtures(familySpaceId: string, userId: string) {
+  if (process.env.SEED_E2E !== '1') return;
+  if (process.env.NODE_ENV === 'production') {
+    console.log('⏭️  Skipping E2E fixtures (NODE_ENV=production)');
+    return;
+  }
+
+  const postData = {
+    familySpaceId,
+    authorId: userId,
+    title: 'E2E Seed Post',
+    caption: 'Deterministic post for Playwright smoke suite',
+    hasRecipeDetails: false,
+  };
+  await prisma.post.upsert({
+    where: { id: E2E_POST_ID },
+    update: postData,
+    create: { id: E2E_POST_ID, ...postData },
+  });
+
+  const commentData = {
+    postId: E2E_POST_ID,
+    authorId: userId,
+    text: 'E2E seed comment',
+  };
+  await prisma.comment.upsert({
+    where: { id: E2E_COMMENT_ID },
+    update: commentData,
+    create: { id: E2E_COMMENT_ID, ...commentData },
+  });
+
+  const reactionData = {
+    targetType: 'post',
+    targetId: E2E_POST_ID,
+    userId,
+    emoji: '❤️',
+    postId: E2E_POST_ID,
+  };
+  await prisma.reaction.upsert({
+    where: { id: E2E_REACTION_ID },
+    update: reactionData,
+    create: { id: E2E_REACTION_ID, ...reactionData },
+  });
+
+  const recipePostData = {
+    familySpaceId,
+    authorId: userId,
+    title: 'E2E Seed Recipe',
+    caption: 'Deterministic recipe for Playwright smoke suite',
+    hasRecipeDetails: true,
+  };
+  await prisma.post.upsert({
+    where: { id: E2E_RECIPE_POST_ID },
+    update: recipePostData,
+    create: { id: E2E_RECIPE_POST_ID, ...recipePostData },
+  });
+
+  const recipeDetailsData = {
+    postId: E2E_RECIPE_POST_ID,
+    ingredients: '1 cup flour\n1 cup sugar',
+    steps: '1. Mix.\n2. Bake at 350F for 20 minutes.',
+    totalTime: 30,
+    servings: 4,
+    difficulty: 'easy',
+  };
+  await prisma.recipeDetails.upsert({
+    where: { id: E2E_RECIPE_DETAILS_ID },
+    update: recipeDetailsData,
+    create: { id: E2E_RECIPE_DETAILS_ID, ...recipeDetailsData },
+  });
+
+  const cookedEventData = {
+    postId: E2E_RECIPE_POST_ID,
+    userId,
+    rating: 5,
+    note: 'E2E seed cooked event',
+  };
+  await prisma.cookedEvent.upsert({
+    where: { id: E2E_COOKED_EVENT_ID },
+    update: cookedEventData,
+    create: { id: E2E_COOKED_EVENT_ID, ...cookedEventData },
+  });
+
+  // V1 only seeds one user, so actor == recipient here. The DB allows it;
+  // UI business logic that filters self-notifications is validated in tests,
+  // not at seed time.
+  const notificationData = {
+    familySpaceId,
+    recipientId: userId,
+    actorId: userId,
+    type: 'comment',
+    postId: E2E_POST_ID,
+    commentId: E2E_COMMENT_ID,
+  };
+  await prisma.notification.upsert({
+    where: { id: E2E_NOTIFICATION_ID },
+    update: notificationData,
+    create: { id: E2E_NOTIFICATION_ID, ...notificationData },
+  });
+
+  console.log('🧪 Seeded E2E fixtures (SEED_E2E=1)');
 }
 
 function generateMasterKey() {
