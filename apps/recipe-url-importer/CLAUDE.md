@@ -7,6 +7,7 @@ Standalone Python service that fetches a public recipe URL and returns a normali
 - **No database access.** This service only reads URLs from the public internet. Don't import Prisma here; don't add DB-backed features.
 - **Called by the Next backend**, not the browser directly. The client lives in [src/lib/recipeImporter.ts](../../src/lib/recipeImporter.ts). Authentication in production is via Cloud Run OIDC (only the main API service account is invoker).
 - **Stateless aside from caching.** The optional response cache and per-IP / per-domain rate limits are in-process — fine for a single Cloud Run instance, would need redis if scaled.
+- **Health endpoint is `/health`, not `/healthz`.** Google Frontend on `*.run.app` blackholes the exact lowercase path `/healthz` at the edge — the request never reaches the container, so the endpoint is unreachable regardless of what's registered in FastAPI. Any other casing/suffix passes through. See #113.
 
 ## Module layout
 
