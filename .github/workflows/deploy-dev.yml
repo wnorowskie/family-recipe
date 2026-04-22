@@ -104,6 +104,23 @@ jobs:
 
           npx prisma migrate deploy --schema "${PRISMA_SCHEMA}"
 
+      - name: Capture currently-serving revision (for rollback)
+        run: |
+          # status.traffic[0] assumes a single revision serves 100%
+          # (current setup). If traffic is ever split across revisions,
+          # this capture will only grab the first split and rollback
+          # will be partial.
+          PREV_REVISION="$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --format='value(status.traffic[0].revisionName)' 2>/dev/null || true)"
+          if [ -n "$PREV_REVISION" ]; then
+            echo "Previously-serving revision: $PREV_REVISION"
+          else
+            echo "No previously-serving revision found (first deploy or service missing); rollback will be skipped."
+          fi
+          echo "PREV_REVISION=$PREV_REVISION" >> "$GITHUB_ENV"
+
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
 
@@ -135,3 +152,43 @@ jobs:
             --set-env-vars PRISMA_SCHEMA=${PRISMA_SCHEMA},UPLOADS_BUCKET=${UPLOADS_BUCKET},UPLOADS_BASE_URL=${UPLOADS_BASE_URL},RECIPE_IMPORTER_URL=${RECIPE_IMPORTER_URL},RECIPE_IMPORTER_AUDIENCE=${RECIPE_IMPORTER_AUDIENCE},RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL=${RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL} \
             --ingress all \
             --no-allow-unauthenticated
+
+      - name: Print service URL
+        run: |
+          URI="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          echo "Cloud Run URL: $URI"
+          echo "Healthcheck:  $URI/api/health"
+
+      - name: Smoke check /api/health
+        id: smoke_check
+        run: |
+          URI="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          # Dev service requires auth (--no-allow-unauthenticated); mint an ID token for the deployer SA.
+          TOKEN="$(gcloud auth print-identity-token --audiences="$URI")"
+          for i in {1..20}; do
+            STATUS="$(curl -sS -H "Authorization: Bearer $TOKEN" -o /dev/null -w '%{http_code}' "$URI/api/health" || true)"
+            if [ "$STATUS" = "200" ]; then
+              echo "Healthcheck OK (200)"
+              exit 0
+            fi
+            echo "Healthcheck not ready yet (status=$STATUS), retrying..."
+            sleep 3
+          done
+          echo "Healthcheck did not return 200 within timeout."
+          exit 1
+
+      - name: Rollback traffic on smoke-check failure
+        if: failure() && steps.smoke_check.conclusion == 'failure'
+        run: |
+          if [ -z "${PREV_REVISION:-}" ]; then
+            echo "No previous revision was captured (first deploy?); cannot roll back."
+            exit 1
+          fi
+          echo "Smoke check failed. Rolling traffic back to previous revision: $PREV_REVISION"
+          gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --to-revisions="$PREV_REVISION=100" \
+            --quiet
+          echo "Rollback complete. Job will fail so the broken deploy is surfaced."
+          exit 1

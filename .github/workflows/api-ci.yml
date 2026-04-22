@@ -1,14 +1,6 @@
 name: FastAPI CI
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'apps/api/**'
-      - '.github/workflows/api-ci.yml'
-      - 'prisma/**'
-      - 'docker-compose.yml'
-      - 'apps/api/Dockerfile'
   pull_request:
     branches: [main, develop]
     paths:
