@@ -100,8 +100,11 @@ npm run db:seed
 npm run type-check                   # catches TS client drift
 npx prisma validate --schema prisma/schema.postgres.prisma
 npx prisma format --check prisma/schema.postgres.prisma   # CI runs this
+npm run db:drift-check               # replays migrations, diffs vs both schemas (CI-enforced)
 npm test
 ```
+
+`db:drift-check` needs a throwaway Postgres — set `DATABASE_URL` to a DB you don't care about (not `family_recipe_dev`). In CI, the `prisma-drift-check` job spins up a fresh `postgres:16` service container for this.
 
 If FastAPI tests also exist for the affected model:
 
