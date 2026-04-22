@@ -23,7 +23,7 @@ Pricing is approximate and vendor-subject-to-change — check current pricing be
 
 ## Proposed Prisma Schema
 
-Copy into all three schemas ([prisma/schema.prisma](../../prisma/schema.prisma), [prisma/schema.postgres.prisma](../../prisma/schema.postgres.prisma), [prisma/schema.postgres.node.prisma](../../prisma/schema.postgres.node.prisma)) — per [prisma/CLAUDE.md](../../prisma/CLAUDE.md) the three schemas must stay field-identical.
+Copy into both schemas ([prisma/schema.postgres.node.prisma](../../prisma/schema.postgres.node.prisma), [prisma/schema.postgres.prisma](../../prisma/schema.postgres.prisma)) — per [prisma/CLAUDE.md](../../prisma/CLAUDE.md) the two schemas must stay field-identical. (SQLite support was dropped in #80.)
 
 ```prisma
 model FeatureFlag {
@@ -126,7 +126,7 @@ For client-initiated fetches that need to know which backend to call (e.g. after
 
 ## Implementation Checklist (for Phase 0 ticket #34)
 
-1. Add `FeatureFlag` (identical fields) to all three schemas in lock-step — [prisma/schema.prisma](../../prisma/schema.prisma) (SQLite), [prisma/schema.postgres.prisma](../../prisma/schema.postgres.prisma) (Postgres / FastAPI), and [prisma/schema.postgres.node.prisma](../../prisma/schema.postgres.node.prisma) (Docker / Cloud Run Next image). Generate the Postgres migration via `npx prisma migrate dev --schema prisma/schema.postgres.prisma --name add_feature_flags`; `npm run db:push` picks up the SQLite change.
+1. Add `FeatureFlag` (identical fields) to both Postgres schemas in lock-step — [prisma/schema.postgres.node.prisma](../../prisma/schema.postgres.node.prisma) (local Next + Docker / Cloud Run Next image) and [prisma/schema.postgres.prisma](../../prisma/schema.postgres.prisma) (FastAPI / Cloud SQL migrations). Generate the migration via `npx prisma migrate dev --schema prisma/schema.postgres.prisma --name add_feature_flags`; `npm run db:push` applies to local Postgres.
 2. Add `src/lib/featureFlags.ts` with `isEnabled(userId, key)` + 30s cache.
 3. Add `apps/api/src/services/feature_flags.py` with identical semantics and the **same hash function**.
 4. Extend [prisma/seed.ts](../../prisma/seed.ts) to upsert the three migration-plan flags as disabled.

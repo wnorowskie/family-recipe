@@ -10,7 +10,7 @@ Add a single `RefreshToken` table to all three Prisma schemas, keyed by an opaqu
 
 ## Proposed Prisma Schema
 
-Copy into all three schemas ([prisma/schema.prisma](../../prisma/schema.prisma), [prisma/schema.postgres.prisma](../../prisma/schema.postgres.prisma), [prisma/schema.postgres.node.prisma](../../prisma/schema.postgres.node.prisma)) — per [prisma/CLAUDE.md](../../prisma/CLAUDE.md), the three schemas must stay field-identical.
+Copy into both schemas ([prisma/schema.postgres.node.prisma](../../prisma/schema.postgres.node.prisma), [prisma/schema.postgres.prisma](../../prisma/schema.postgres.prisma)) — per [prisma/CLAUDE.md](../../prisma/CLAUDE.md), the two schemas must stay field-identical. (SQLite support was dropped in #80, so there's no longer a third schema to update.)
 
 ```prisma
 model RefreshToken {
@@ -180,13 +180,13 @@ A separate denylist table would add a lookup on every `/refresh` for a feature w
 
 ## Schema-Variant Consistency
 
-Per [prisma/CLAUDE.md](../../prisma/CLAUDE.md), edit all three schemas in lock-step. No SQLite-incompatible types used here (`DateTime`, `String`, `Boolean` all portable).
+Per [prisma/CLAUDE.md](../../prisma/CLAUDE.md), edit both Postgres schemas in lock-step.
 
 **Implementation checklist** (for the Phase 1 ticket that consumes this doc):
 
-1. Add the `RefreshToken` model + back-relations to `schema.prisma`, `schema.postgres.prisma`, `schema.postgres.node.prisma`.
+1. Add the `RefreshToken` model + back-relations to `schema.postgres.node.prisma` and `schema.postgres.prisma`.
 2. `npx prisma migrate dev --schema prisma/schema.postgres.prisma --name add_refresh_tokens` — commits a migration under [prisma/migrations/](../../prisma/migrations/).
-3. `npm run db:push` to pick it up locally on SQLite.
+3. `npm run db:push` to apply against local Postgres.
 4. `npm run db:generate` (Next) and `prisma generate --schema prisma/schema.postgres.prisma` (FastAPI picks up via `clientPy` generator).
 5. `npm run type-check`.
 6. Add `REFRESH_PEPPER` to Secret Manager, env config for Next, and the FastAPI settings module. Dev fallback acceptable; production must fail-fast if unset.

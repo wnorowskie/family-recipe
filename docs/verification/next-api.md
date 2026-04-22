@@ -6,13 +6,7 @@ These routes are the **current production backend**. When changing a contract he
 
 ## Start the dev server
 
-```bash
-# Default (Postgres via .env — required for any DB-touching route; see caveat below)
-npm run dev &
-until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
-```
-
-**SQLite caveat.** The previously-documented `DATABASE_URL="file:./prisma/dev.db"` override boots the server but cannot regenerate the JS Prisma client today (`Notification.emojiCounts/metadata: Json?` aren't supported by the SQLite connector, and the `Notification` model is missing from `schema.postgres.prisma`). If local Postgres isn't running, start it:
+Local dev requires Postgres — SQLite was dropped in #80. If the container isn't up:
 
 ```bash
 docker run -d --name family-recipe-pg \
@@ -21,13 +15,19 @@ docker run -d --name family-recipe-pg \
   -e POSTGRES_DB=family_recipe_dev \
   -p 5432:5432 postgres:16
 
-# Generate the Node Prisma client against the schema the Next app actually uses
-npx prisma generate --schema prisma/schema.postgres.node.prisma
-npx prisma db push --schema prisma/schema.postgres.node.prisma
-npm run db:seed
+npm run db:generate   # prisma generate against schema.postgres.node.prisma
+npm run db:push       # applies the schema (no migration file)
+npm run db:seed       # seeds family + claude-test user
 ```
 
-If you previously ran the FastAPI setup step (`npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy`) the **Node** client may have been overwritten against `schema.postgres.prisma`, which lacks `Notification`. Re-generate against `schema.postgres.node.prisma` (above) to recover.
+Then:
+
+```bash
+npm run dev &
+until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
+```
+
+If you previously ran the FastAPI setup step (`npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy`) the **Node** client may have been overwritten against `schema.postgres.prisma`, which lacks `Notification`. Re-run `npm run db:generate` to regenerate against `schema.postgres.node.prisma`.
 
 ## Auth — log in and capture a cookie
 
