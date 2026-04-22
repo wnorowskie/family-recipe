@@ -139,7 +139,7 @@ Shared settings on both branches:
 - **Required approving reviews: 0** — as a solo maintainer, self-merge is allowed
 - **Admins not enforced** — the repo owner can bypass in genuine emergencies (use sparingly)
 
-Required status checks (from [ci.yml](workflows/ci.yml), the only workflow that runs on every PR): `typecheck`, `lint`, `test`, `e2e`, `build`, `container-scan`, `prisma-validate`, `dependency-scan`, `sast-semgrep`, `iac-scan`, `secrets-scan`. Job names in [api-ci.yml](workflows/api-ci.yml) and [recipe-url-importer-ci.yml](workflows/recipe-url-importer-ci.yml) are path-filtered, so they are **not** listed as required (a path-filtered required check that never runs would permanently block merges). They share names (`lint`, `typecheck`, etc.) with ci.yml jobs, so when they do run and fail, the shared-name required check fails too — effectively required when the relevant paths change.
+Required status checks (from [ci.yml](workflows/ci.yml), the only workflow that runs on every PR): `typecheck`, `lint`, `test`, `e2e`, `build`, `container-scan`, `prisma-validate`, `prisma-drift-check`, `dependency-scan`, `sast-semgrep`, `iac-scan`, `secrets-scan`. Job names in [api-ci.yml](workflows/api-ci.yml) and [recipe-url-importer-ci.yml](workflows/recipe-url-importer-ci.yml) are path-filtered, so they are **not** listed as required (a path-filtered required check that never runs would permanently block merges). They share names (`lint`, `typecheck`, etc.) with ci.yml jobs, so when they do run and fail, the shared-name required check fails too — effectively required when the relevant paths change.
 
 Difference between branches:
 
