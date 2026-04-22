@@ -4,7 +4,7 @@ terraform {
 
   required_providers {
     google = {
-      source  = "hashicorp/google"
+      source = "hashicorp/google"
       # `~> 7.12` allows >= 7.12, < 8.0 — narrow enough to keep dashboard
       # JSON serialization consistent across envs and to avoid a silent
       # major-version bump. Widen deliberately if upgrading to 8.x.
