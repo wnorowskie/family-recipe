@@ -161,10 +161,18 @@ jobs:
 
       - name: Smoke check /api/health
         id: smoke_check
+        env:
+          DEPLOYER_SA_EMAIL: ${{ secrets.DEV_GCP_DEPLOYER_SA }}
         run: |
           URI="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
-          # Dev service requires auth (--no-allow-unauthenticated); mint an ID token for the deployer SA.
-          TOKEN="$(gcloud auth print-identity-token --audiences="$URI")"
+          # Dev service requires auth (--no-allow-unauthenticated). Under WIF the active
+          # gcloud credential is an access token, which `print-identity-token --audiences`
+          # rejects; --impersonate-service-account routes the mint through the
+          # iamcredentials.generateIdToken API instead (authorized by the deployer SA's
+          # self-binding of roles/iam.serviceAccountTokenCreator).
+          TOKEN="$(gcloud auth print-identity-token \
+            --impersonate-service-account="$DEPLOYER_SA_EMAIL" \
+            --audiences="$URI")"
           for i in {1..20}; do
             STATUS="$(curl -sS -H "Authorization: Bearer $TOKEN" -o /dev/null -w '%{http_code}' "$URI/api/health" || true)"
             if [ "$STATUS" = "200" ]; then
