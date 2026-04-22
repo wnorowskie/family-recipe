@@ -33,6 +33,9 @@ def _stub_prisma() -> None:
 
     models_stub = types.ModuleType("prisma.models")
 
+    # `recipes.py` does `cast(List[CookedEvent], ...)` at module load,
+    # so this symbol must resolve to a real class — a MagicMock breaks
+    # the typing machinery during import.
     class _CookedEvent:
         postId: str
         rating: int | None
