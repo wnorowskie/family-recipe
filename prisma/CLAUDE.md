@@ -9,7 +9,7 @@
 
 Local dev uses **the `.node.` schema** — it's what the Next runtime expects and it's the one the `npm run db:*` scripts point at. The plain `schema.postgres.prisma` exists for the Python client (FastAPI) and Cloud SQL migrations.
 
-**The two schemas should stay field-identical for every model both of them define**, with one documented carve-out: `Notification` currently lives only in `schema.postgres.node.prisma` (see the Notification batching gotcha below — FastAPI doesn't read notifications yet, so porting it to `schema.postgres.prisma` has been deferred). Anything else you add or change should land in both schemas in lock-step:
+**The two schemas must stay field-identical** — every model, field, `@map(...)` column name, `@db.*` type annotation, and `@@index(..., map: "...")` name has to appear in both. Anything you add or change should land in both schemas in lock-step:
 
 1. Edit both schemas together.
 2. Generate a migration against the Postgres schema: `npx prisma migrate dev --schema prisma/schema.postgres.prisma --name <change>`.
@@ -36,7 +36,7 @@ To rotate the master key, do it manually via the DB — there is no API for it.
 - **Field naming**: TypeScript camelCase (`familySpaceId`) maps to snake_case columns (`@map("family_space_id")`). Always set both when adding fields.
 - **Storage keys**: photo/avatar columns store opaque storage keys but historically were named `*_url` in the DB (`@map("avatar_url")`, `@map("url")`, `@map("photo_url")`). Don't rename the column — the property is what code uses.
 - **Reaction polymorphism**: `Reaction` has both `targetType`/`targetId` (the canonical pair, with the unique constraint) AND nullable `postId`/`commentId` FKs (for join performance). When inserting, set both representations.
-- **Notification batching**: reactions roll up into one `Notification` per `(recipientId, postId)` with `emojiCounts` JSON; comments and cooked events are 1:1. The `Notification` model currently lives only in `schema.postgres.node.prisma` — FastAPI doesn't read notifications yet, so the Python schema hasn't needed it.
+- **Notification batching**: reactions roll up into one `Notification` per `(recipientId, postId)` with `emojiCounts` JSON; comments and cooked events are 1:1.
 - **Cascades**: most relations cascade on user/post/comment delete. `FeedbackSubmission` uses `SetNull` so feedback survives user deletion.
 
 ## After schema changes
