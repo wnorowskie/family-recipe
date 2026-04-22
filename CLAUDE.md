@@ -98,6 +98,8 @@ The pre-commit hook runs `type-check` + `lint-staged`; nothing else is automatic
 
 Always finish with `npm test` (the pre-commit hook doesn't run it). If the session can't run a tool a change needs (e.g., no browser for a hydration-sensitive UI change), say so in the PR body — don't claim UI success from `curl` alone.
 
+**Before merging a `develop → main` release PR**, also run the dev-deployment playbook at [docs/verification/dev-deployments.md](docs/verification/dev-deployments.md) — it exercises the live Cloud Run build, migration, and env wiring that local verification can't catch. Check whether the dev Postgres is running first (it can be manually stopped between sessions); the playbook has the `gcloud sql instances` commands. The [`/release-testing`](.claude/skills/release-testing/SKILL.md) skill drives this end-to-end and posts results back on the PR.
+
 ## Branches and releases
 
 - `main` = **production**. `develop` = **dev environment**.
