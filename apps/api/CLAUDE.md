@@ -35,6 +35,19 @@ npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator cli
 
 `pytest tests/unit/` for unit tests, `pytest tests/integration/` for integration. CI runs both plus ruff, mypy, trivy, pip-audit, semgrep, gitleaks ([.github/workflows/api-ci.yml](../../.github/workflows/api-ci.yml)).
 
+## OpenAPI contract snapshot
+
+[openapi.snapshot.json](openapi.snapshot.json) is a committed copy of the FastAPI app's `/openapi.json`. The `openapi-diff` job in [api-ci.yml](../../.github/workflows/api-ci.yml) regenerates the spec on every PR and fails if it drifts from the snapshot. This catches accidental contract changes (renamed field, removed endpoint, altered status code) that unit tests would miss — and forces intentional changes to surface in PR review.
+
+When you change a router, schema, or anything else that affects the public contract, regenerate the snapshot in the same PR:
+
+```bash
+cd apps/api
+python scripts/dump_openapi.py > openapi.snapshot.json
+```
+
+The script stubs `prisma` in-process (no client generation or DB needed) and writes deterministic, sort-key JSON. Reviewers should treat snapshot diffs as the contract changelog.
+
 ## Verification
 
 Before opening a PR that touches this service, run the [FastAPI playbook](../../docs/verification/fastapi.md) — includes the curl+cookie loop, contract parity check against the Next mirror, and the local quality gates.
