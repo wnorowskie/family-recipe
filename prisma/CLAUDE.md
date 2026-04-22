@@ -1,19 +1,21 @@
 # CLAUDE.md — `prisma/`
 
-## Three schemas, one domain
+## Two schemas, one domain
 
-| File                                                       | Provider                   | Used by                                                            | Workflow                                                           |
-| ---------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| [schema.prisma](schema.prisma)                             | sqlite                     | Local Next dev (default)                                           | `prisma db push` (no migrations)                                   |
-| [schema.postgres.prisma](schema.postgres.prisma)           | postgresql                 | Local Postgres dev, Cloud SQL, FastAPI ([apps/api/](../apps/api/)) | `prisma migrate deploy` — migrations in [migrations/](migrations/) |
-| [schema.postgres.node.prisma](schema.postgres.node.prisma) | postgresql, JS client only | Docker / Cloud Run Next.js image                                   | `prisma migrate deploy` — uses same migrations                     |
+| File                                                       | Provider                   | Used by                                                  | Workflow                                                           |
+| ---------------------------------------------------------- | -------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
+| [schema.postgres.node.prisma](schema.postgres.node.prisma) | postgresql, JS client only | Local Next dev, Docker / Cloud Run Next.js image         | `prisma db push` locally; `prisma migrate deploy` in the image     |
+| [schema.postgres.prisma](schema.postgres.prisma)           | postgresql                 | FastAPI ([apps/api/](../apps/api/)), Cloud SQL migration | `prisma migrate deploy` — migrations in [migrations/](migrations/) |
 
-**The three schemas must define the same models with the same field names and shape.** When adding/changing a model:
+Local dev uses **the `.node.` schema** — it's what the Next runtime expects and it's the one the `npm run db:*` scripts point at. The plain `schema.postgres.prisma` exists for the Python client (FastAPI) and Cloud SQL migrations.
 
-1. Edit all three schemas in lock-step.
-2. For Postgres, generate a migration: `npx prisma migrate dev --schema prisma/schema.postgres.prisma --name <change>`.
-3. SQLite picks up changes via `npm run db:push` — no migration file is committed for SQLite.
-4. Re-run `npm run db:generate` (uses default schema) and the postgres equivalent if Python client is in use.
+**The two schemas should stay field-identical for every model both of them define**, with one documented carve-out: `Notification` currently lives only in `schema.postgres.node.prisma` (see the Notification batching gotcha below — FastAPI doesn't read notifications yet, so porting it to `schema.postgres.prisma` has been deferred). Anything else you add or change should land in both schemas in lock-step:
+
+1. Edit both schemas together.
+2. Generate a migration against the Postgres schema: `npx prisma migrate dev --schema prisma/schema.postgres.prisma --name <change>`.
+3. Re-run `npm run db:generate` to refresh the Node client, and the Python client from `apps/api/` if FastAPI is in use.
+
+> SQLite support was removed in #80. `Notification.emojiCounts` and `metadata` are `Json?`, which the SQLite connector rejects — the default schema was non-functional and nothing at runtime depended on it.
 
 ## Selecting a schema at runtime
 
@@ -34,7 +36,7 @@ To rotate the master key, do it manually via the DB — there is no API for it.
 - **Field naming**: TypeScript camelCase (`familySpaceId`) maps to snake_case columns (`@map("family_space_id")`). Always set both when adding fields.
 - **Storage keys**: photo/avatar columns store opaque storage keys but historically were named `*_url` in the DB (`@map("avatar_url")`, `@map("url")`, `@map("photo_url")`). Don't rename the column — the property is what code uses.
 - **Reaction polymorphism**: `Reaction` has both `targetType`/`targetId` (the canonical pair, with the unique constraint) AND nullable `postId`/`commentId` FKs (for join performance). When inserting, set both representations.
-- **Notification batching**: reactions roll up into one `Notification` per `(recipientId, postId)` with `emojiCounts` JSON; comments and cooked events are 1:1.
+- **Notification batching**: reactions roll up into one `Notification` per `(recipientId, postId)` with `emojiCounts` JSON; comments and cooked events are 1:1. The `Notification` model currently lives only in `schema.postgres.node.prisma` — FastAPI doesn't read notifications yet, so the Python schema hasn't needed it.
 - **Cascades**: most relations cascade on user/post/comment delete. `FeedbackSubmission` uses `SetNull` so feedback survives user deletion.
 
 ## After schema changes
@@ -43,4 +45,4 @@ Always run `npm run type-check` — Prisma generates TS types and downstream cod
 
 ## Verification
 
-Before opening a PR that touches any schema or migration, run the [Prisma playbook](../docs/verification/prisma.md) — covers the three-schema lock-step edit, migration SQL review checklist, and the downstream Next + FastAPI checks.
+Before opening a PR that touches any schema or migration, run the [Prisma playbook](../docs/verification/prisma.md) — covers the two-schema lock-step edit, migration SQL review checklist, and the downstream Next + FastAPI checks.

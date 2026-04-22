@@ -2,6 +2,13 @@
 
 Research output for [#59](https://github.com/wnorowskie/family-recipe/issues/59).
 
+> **Superseded detail — #80.** The `DATABASE_URL="file:./prisma/dev.db"` override
+> discussed throughout this doc was removed when SQLite support was dropped. The
+> playbooks under [docs/verification/](../verification/) are now the source of
+> truth; local dev is Postgres-only. The decision framing (three-layer L0/L1/L2,
+> `claude-login.sh`, etc.) still applies — only the "SQLite fallback" escape
+> hatch is gone.
+
 ## Decision
 
 **Adopt a three-layer verification workflow that Claude runs before handing off a PR.** Keep the layers independent so Claude can stop at the first one that gives sufficient signal for the change at hand.

@@ -11,7 +11,7 @@ npm run dev &
 until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
 ```
 
-Postgres must be up — see the SQLite caveat in [next-api.md](next-api.md#start-the-dev-server). The `DATABASE_URL="file:./prisma/dev.db"` override that earlier versions of this doc recommended boots the server but can't regenerate the JS Prisma client today; use Postgres locally.
+Postgres must be up — see the setup block in [next-api.md](next-api.md#start-the-dev-server). SQLite was dropped in #80; local dev is Postgres-only.
 
 ## L0 — server-rendered HTML / static strings
 

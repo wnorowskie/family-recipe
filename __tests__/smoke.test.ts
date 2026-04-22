@@ -24,7 +24,7 @@ describe('Jest Setup', () => {
 
   it('should have DATABASE_URL configured', () => {
     expect(process.env.DATABASE_URL).toBeDefined();
-    expect(process.env.DATABASE_URL).toBe('file:./test.db');
+    expect(process.env.DATABASE_URL).toMatch(/^postgresql:\/\//);
   });
 });
 
