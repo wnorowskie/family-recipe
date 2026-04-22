@@ -12,11 +12,11 @@ Decision rationale and tool alternatives: [docs/research/claude-local-verificati
 
 Pick the lowest layer that gives enough signal for the change. Stack layers only when a single one is insufficient.
 
-| Layer  | Tool                                                                                                                   | Best for                                                                 |
-| ------ | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **L0** | `curl` against `npm run dev` / `uvicorn`                                                                               | API routes, server components, HTML strings, auth gating, response shape |
-| **L1** | [`claude --chrome`](https://code.claude.com/docs/en/chrome) (first-party Chrome integration)                           | Client components, forms, photo uploads, nav flows, hydration            |
-| **L2** | [Playwright MCP](https://github.com/microsoft/playwright-mcp) (`claude mcp add playwright npx @playwright/mcp@latest`) | Headless fallback when L1 isn't available (remote/background agents)     |
+| Layer  | Tool                                                                                                                                                            | Best for                                                                 |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **L0** | `curl` against `npm run dev` / `uvicorn`                                                                                                                        | API routes, server components, HTML strings, auth gating, response shape |
+| **L1** | [`claude --chrome`](https://code.claude.com/docs/en/chrome) (first-party Chrome integration)                                                                    | Client components, forms, photo uploads, nav flows, hydration            |
+| **L2** | [Playwright MCP](https://github.com/microsoft/playwright-mcp) — auto-installed via [`.mcp.json`](../../.mcp.json) at repo root; approve the server on first use | Headless fallback when L1 isn't available (remote/background agents)     |
 
 Always finish with `npm run type-check && npm run lint && npm test` for Next changes, or the equivalent pytest for Python services.
 
