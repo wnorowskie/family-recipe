@@ -161,7 +161,7 @@ DATABASE_URL=<local-postgres-url> npm run test:e2e
 3. **feat: smoke flows — post+photo, comment+react, cooked event, signup** — one ticket per flow, landable in any order after (1) and (2).
 4. **chore: post-deploy smoke step in `deploy-dev.yml`** — reuses the specs behind a `@smoke` grep.
 5. **chore: FastAPI OpenAPI snapshot diff in `api-ci.yml`** — independent of the above, can land in parallel.
-6. **chore: install Playwright MCP in `.claude/settings.json`** — already filed as [#65](https://github.com/wnorowskie/family-recipe/issues/65); this spike unblocks it.
+6. ~~**chore: install Playwright MCP in `.claude/settings.json`**~~ — filed as [#65](https://github.com/wnorowskie/family-recipe/issues/65), **landed in this PR** alongside the framework pick. Note: the canonical location is `.mcp.json` at repo root, not `.claude/settings.json` ([Claude Code docs](https://docs.claude.com/en/docs/claude-code/mcp#project-scope)); the ticket wording was slightly off.
 7. **(stretch) feat: recipe-URL-import smoke flow** — only flow that exercises [apps/recipe-url-importer/](../../apps/recipe-url-importer/). Useful signal for that service's deploy, but off the critical path.
 
 ## Sources
