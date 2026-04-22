@@ -18,6 +18,13 @@
 test.db
 test.db-journal
 
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/e2e/.auth/
+
 # Next.js
 /.next/
 /out/
