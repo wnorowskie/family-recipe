@@ -72,6 +72,13 @@ case "$(container_state)" in
     docker start "$CONTAINER_NAME" >/dev/null
     ;;
   missing)
+    # Fail fast if something else already owns :${HOST_PORT}. Without this,
+    # `docker run` succeeds but the container immediately exits on the bind
+    # failure, and the pg_isready loop below burns 60s before surfacing a
+    # confusing error.
+    if command -v lsof >/dev/null 2>&1 && lsof -iTCP:"${HOST_PORT}" -sTCP:LISTEN -n -P >/dev/null 2>&1; then
+      die "port ${HOST_PORT} is already in use — stop the conflicting process or edit HOST_PORT in this script"
+    fi
     info "creating container"
     docker run -d \
       --name "$CONTAINER_NAME" \
@@ -137,7 +144,6 @@ cat > "$ENV_FILE" <<EOF
 # before running \`npm run dev\` or \`uvicorn\` so the servers target the
 # sandbox Postgres on :${HOST_PORT} rather than the default :5432.
 DATABASE_URL="${DATABASE_URL}"
-PRISMA_SCHEMA="prisma/schema.postgres.node.prisma"
 JWT_SECRET="${JWT_SECRET}"
 FAMILY_MASTER_KEY="${FAMILY_MASTER_KEY}"
 CLAUDE_TEST_USER="${CLAUDE_TEST_USER}"
