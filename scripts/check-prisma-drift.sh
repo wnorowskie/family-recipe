@@ -26,6 +26,25 @@ cd "$REPO_ROOT"
 
 : "${DATABASE_URL:?DATABASE_URL must point at a throwaway Postgres DB}"
 
+# Refuse obviously non-throwaway DBs. This script's first action is
+# `DROP SCHEMA public CASCADE`, so running it against the local dev DB or a
+# prod-shaped URL would wipe real data.
+URL_NO_QUERY="${DATABASE_URL%%\?*}"
+DB_NAME="${URL_NO_QUERY##*/}"
+BLOCKED_DBS=(
+  "family_recipe_dev"
+  "family_recipe_prod"
+  "family-recipe-prod"
+)
+for blocked in "${BLOCKED_DBS[@]}"; do
+  if [ "$DB_NAME" = "$blocked" ]; then
+    echo "ERROR: refusing to run against DATABASE_URL with db name '$DB_NAME'." >&2
+    echo "This script begins with 'DROP SCHEMA public CASCADE'. Point DATABASE_URL" >&2
+    echo "at a throwaway DB (e.g. drift_check) before re-running." >&2
+    exit 1
+  fi
+done
+
 SCHEMAS=(
   "prisma/schema.postgres.prisma"
   "prisma/schema.postgres.node.prisma"
@@ -63,8 +82,12 @@ while [ "${#PENDING[@]}" -gt 0 ]; do
       echo "  - $f" >&2
     done
     echo ""
-    echo "Re-running the first failing migration with output to surface the error:" >&2
-    npx --no-install prisma db execute --url "$DATABASE_URL" --file "${FAILED[0]}" >&2 || true
+    echo "Re-running each failing migration with output to surface the error(s):" >&2
+    for f in "${FAILED[@]}"; do
+      echo "" >&2
+      echo "--- $f ---" >&2
+      npx --no-install prisma db execute --url "$DATABASE_URL" --file "$f" >&2 || true
+    done
     exit 1
   fi
   PENDING=(${FAILED[@]+"${FAILED[@]}"})
