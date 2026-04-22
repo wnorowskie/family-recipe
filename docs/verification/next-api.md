@@ -30,6 +30,16 @@ The script reads `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD` from env or `.env.l
 
 Reuse with `-b "$COOKIES"` on every subsequent call. Failure modes: `401` invalid credentials (re-run `npm run db:seed`), `403` no membership, `429` rate-limited.
 
+### Deterministic fixtures for Playwright (`SEED_E2E=1`)
+
+When you need the full timeline population a browser smoke run asserts against (one post, one comment, one reaction, one recipe, one cooked event, one notification — all with known IDs / titles), set the flag on top of the normal seed:
+
+```bash
+SEED_E2E=1 npm run db:seed
+```
+
+Idempotent — re-running won't duplicate rows. See [prisma/CLAUDE.md](../../prisma/CLAUDE.md#seed_e2e1--playwright-fixture-bundle) for the list of IDs and titles.
+
 ## Invariants every handler must preserve
 
 Grep the diff and confirm each of these is still true:

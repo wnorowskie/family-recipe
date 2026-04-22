@@ -28,8 +28,22 @@ The `DATABASE_URL` env var picks the connection. `PRISMA_SCHEMA` is read by Pris
 - Creates one `FamilySpace` if none exists, hashing `FAMILY_MASTER_KEY` (or generating one and **printing it** — save the output).
 - Loads the curated tag catalog (diet/allergen/heat/flavor/cuisine).
 - Will not overwrite an existing family or rotate the master key.
+- Skipped in `NODE_ENV=production`: seeds the `claude-test` dev user (credentials from `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD`, defaults in [seed.ts](seed.ts)).
 
 To rotate the master key, do it manually via the DB — there is no API for it.
+
+### `SEED_E2E=1` — Playwright fixture bundle
+
+Setting `SEED_E2E=1` (alongside the default non-prod `NODE_ENV`) adds a deterministic fixture set on top of the baseline seed, for the Playwright smoke suite (#58 / #102):
+
+- one post (`id='e2e-post-001'`, title `E2E Seed Post`) authored by `claude-test`
+- one comment on that post (`id='e2e-comment-001'`)
+- one reaction on that post (`id='e2e-reaction-001'`, emoji `❤️`)
+- one recipe post (`id='e2e-recipe-001'`, title `E2E Seed Recipe`, `hasRecipeDetails=true`) with `RecipeDetails`
+- one cooked event against the recipe (`id='e2e-cooked-001'`, rating 5)
+- one notification for `claude-test` (`id='e2e-notification-001'`, type `comment`)
+
+All upserts keyed on the deterministic IDs, so re-running `SEED_E2E=1 npm run db:seed` does not duplicate rows. Specs assert by ID or content (`E2E Seed Post`, etc.). Ignored when `NODE_ENV=production` or `SEED_E2E` is unset.
 
 ## Schema gotchas
 
