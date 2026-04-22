@@ -8,6 +8,8 @@ Decision rationale and tool alternatives: [docs/research/claude-local-verificati
 
 **Before opening any PR.** The pre-commit hook runs `type-check` + `lint-staged`; nothing else is automatic. Verification catches what the type checker can't: wrong response shapes, broken gating, silent 500s, hydration bugs, cross-family data leaks.
 
+**What CI covers for you.** The `e2e` job in [ci.yml](../../.github/workflows/ci.yml) runs the Playwright smoke suite in [e2e/](../../e2e/) against an ephemeral Postgres + `next start` on every PR (fails uploads the `playwright-report/` artifact). That catches login + protected-route regressions automatically; the local playbooks below still cover everything the smoke suite doesn't yet.
+
 ## Local vs dev deployment
 
 | Stage                           | Target                                          | Playbook                                 |
