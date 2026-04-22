@@ -102,8 +102,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
-@app.get("/healthz")
-async def healthz():
+@app.get("/health")
+async def health():
     return {"status": "ok"}
 
 

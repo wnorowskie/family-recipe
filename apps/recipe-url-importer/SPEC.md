@@ -167,7 +167,7 @@ Includes `request_id` echoed back for support/correlation.
 - `HEURISTIC_EXTRACTION_USED`
 
 **Health Endpoint**
-GET `/healthz`
+GET `/health`
 
 - 200 OK if service is healthy
 
