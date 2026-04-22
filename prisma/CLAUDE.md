@@ -45,6 +45,22 @@ Setting `SEED_E2E=1` (alongside the default non-prod `NODE_ENV`) adds a determin
 
 All upserts keyed on the deterministic IDs, so re-running `SEED_E2E=1 npm run db:seed` does not duplicate rows. Specs assert by ID or content (`E2E Seed Post`, etc.). Ignored when `NODE_ENV=production` or `SEED_E2E` is unset.
 
+## Drift check (CI-enforced)
+
+Every PR runs [scripts/check-prisma-drift.sh](../scripts/check-prisma-drift.sh) via the `prisma-drift-check` job in [ci.yml](../.github/workflows/ci.yml). The script replays `prisma/migrations/` into a throwaway Postgres, then runs `prisma migrate diff` against both Postgres schemas. A non-empty diff in either direction fails the job, which is how we enforce the two-schemas-in-lockstep rule (and catches missing `@db.Timestamptz(6)`, forgotten `@default(now())`, divergent cascade actions, index-name mismatches, etc.).
+
+To reproduce locally:
+
+```bash
+# any throwaway Postgres; `public` schema is dropped/recreated by the script
+DATABASE_URL=postgresql://family_app:dev-only-password@localhost:5434/drift_check \
+  npm run db:drift-check
+```
+
+When CI fails, the diff is printed as SQL — apply the suggested fix to whichever side is wrong (usually the schema, sometimes a follow-up migration).
+
+**Migration apply order**: the script applies migrations lexicographically with a retry pass, so a migration that references tables created by a later-named migration (e.g. `20250225210000_add_feedback_submissions` referencing `users`/`family_spaces` from `20251130224838_add_recipe_courses`) still applies. If you add a new migration that only works after a later one, it'll apply on pass 2. A migration that can't apply after any number of passes — a genuine error — fails the job with the underlying Postgres error.
+
 ## Schema gotchas
 
 - **Field naming**: TypeScript camelCase (`familySpaceId`) maps to snake_case columns (`@map("family_space_id")`). Always set both when adding fields.
