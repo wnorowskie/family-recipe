@@ -6,28 +6,17 @@ These routes are the **current production backend**. When changing a contract he
 
 ## Start the dev server
 
-Local dev requires Postgres — SQLite was dropped in #80. If the container isn't up:
+Bring up the sandbox stack (idempotent — see [README.md#shared-helpers](README.md#shared-helpers) for what this does), then start Next against it:
 
 ```bash
-docker run -d --name family-recipe-pg \
-  -e POSTGRES_USER=family_app \
-  -e POSTGRES_PASSWORD=FamilyRecipe2025DbPass \
-  -e POSTGRES_DB=family_recipe_dev \
-  -p 5432:5432 postgres:16
-
-npm run db:generate   # prisma generate against schema.postgres.node.prisma
-npm run db:push       # applies the schema (no migration file)
-npm run db:seed       # seeds family + claude-test user
-```
-
-Then:
-
-```bash
-npm run dev &
+scripts/local-stack-up.sh
+scripts/with-local-stack.sh npm run dev &
 until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
 ```
 
-If you previously ran the FastAPI setup step (`npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy`) the **Node** client may have been overwritten against `schema.postgres.prisma`, which lacks `Notification`. Re-run `npm run db:generate` to regenerate against `schema.postgres.node.prisma`.
+`with-local-stack.sh` sources `.env.sandbox` for this process only, so the dev server targets the sandbox Postgres on `:5434` without mutating your `.env`.
+
+If you previously ran the FastAPI setup step (`npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy`) the **Node** client may have been overwritten against `schema.postgres.prisma`, which lacks `Notification`. Re-run `scripts/local-stack-up.sh` (or `npm run db:generate`) to regenerate against `schema.postgres.node.prisma`.
 
 ## Auth — log in and capture a cookie
 
