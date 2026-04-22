@@ -35,9 +35,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Load .env.local if present (without clobbering already-set env vars).
-ENV_FILE="$(dirname "$0")/../.env.local"
-if [[ -f "$ENV_FILE" ]]; then
+# Load .env.local (user-owned) or .env.sandbox (written by scripts/local-stack-up.sh)
+# without clobbering already-set env vars. .env.local wins when both exist.
+for candidate in "$(dirname "$0")/../.env.local" "$(dirname "$0")/../.env.sandbox"; do
+  [[ -f "$candidate" ]] || continue
   while IFS='=' read -r key value; do
     [[ -z "$key" || "$key" =~ ^# ]] && continue
     value="${value%\"}"
@@ -47,8 +48,8 @@ if [[ -f "$ENV_FILE" ]]; then
     elif [[ "$key" == "CLAUDE_TEST_PASSWORD" && -z "${CLAUDE_TEST_PASSWORD:-}" ]]; then
       export CLAUDE_TEST_PASSWORD="$value"
     fi
-  done < "$ENV_FILE"
-fi
+  done < "$candidate"
+done
 
 USER="${CLAUDE_TEST_USER:-claude-test}"
 PASSWORD="${CLAUDE_TEST_PASSWORD:-claude-test-password}"

@@ -6,24 +6,29 @@ FastAPI mirrors the Next API contract. A change here almost always pairs with a 
 
 ## Start the service
 
+Bring up the sandbox stack first — [scripts/local-stack-up.sh](../../scripts/local-stack-up.sh) also generates the Python Prisma client so FastAPI can start. Then run uvicorn through the wrapper so it picks up the sandbox `DATABASE_URL`:
+
 ```bash
-cd apps/api
-source .venv/bin/activate
-uvicorn apps.api.src.main:app --reload --port 8000 &
+scripts/local-stack-up.sh
+scripts/with-local-stack.sh bash -c '
+  source apps/api/.venv/bin/activate
+  uvicorn apps.api.src.main:app --reload --port 8000
+' &
 until curl -sf http://localhost:8000/health >/dev/null; do sleep 0.5; done
 ```
 
-If `.venv` doesn't exist:
+If `apps/api/.venv` doesn't exist:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+cd apps/api && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
-npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy
+cd ../..
+scripts/local-stack-up.sh   # (re)generates the Python Prisma client
 ```
 
 FastAPI listens on `:8000`. The recipe-url-importer also defaults to `:8000` — don't run both at once. Pick a different port (`--port 8001`) if you need both.
 
-FastAPI requires **Postgres** — it uses the Python Prisma client generated against `schema.postgres.prisma`. There is no SQLite path. If local Postgres isn't running, start it (docker-compose or native) before running the API.
+FastAPI requires **Postgres** — it uses the Python Prisma client generated against `schema.postgres.prisma`. There is no SQLite path. If the sandbox stack isn't up, run `scripts/local-stack-up.sh`.
 
 ## Auth and cookie flow
 
