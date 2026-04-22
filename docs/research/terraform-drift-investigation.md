@@ -119,7 +119,7 @@ Alternatives considered:
 
 ## Action items (in priority order)
 
-- [ ] Add `client` and `client_version` to `ignore_changes` on both Cloud Run service modules (Q2). Zero-risk, eliminates the biggest recurring drift source on every plan.
-- [ ] Pick Option A or B for `IMPORTER_SERVICE_NAME` (Q1) and implement. If Option A, also prune the `IMPORTER_*` env blocks from TF.
-- [ ] Un-gitignore `**/.terraform.lock.hcl`, commit both lock files, and pin the `google` provider to a shared minor (Q3). Apply once per env.
-- [ ] After the above, run `terraform plan` on dev and prod with no code changes; confirm either zero diffs or explainable diffs only. If anything else appears, file a follow-up.
+- [x] Add `client` and `client_version` to `ignore_changes` on both Cloud Run service modules (Q2). _Bundled into this PR — zero-risk, eliminates the biggest recurring drift source on every plan._
+- [x] Un-gitignore `**/.terraform.lock.hcl`, commit both lock files, and pin the `google` provider to `~> 7.12` in both envs (Q3). _Bundled into this PR. Apply once per env to materialize the new state._
+- [ ] Pick Option A or B for `IMPORTER_SERVICE_NAME` (Q1) and implement. Tracked as [#110](https://github.com/wnorowskie/family-recipe/issues/110) — either removing the env blocks from TF and owning env vars entirely from the deploy workflow (Option A, preferred), or adding `ignore_changes` on `env` and switching to `--update-env-vars` (Option B).
+- [ ] After #71 and the follow-up above land, run `terraform plan` on dev and prod with no code changes; confirm either zero diffs or explainable diffs only. If anything else appears, file a follow-up.
