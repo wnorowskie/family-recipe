@@ -54,7 +54,12 @@ if [[ -f "$ENV_FILE" ]]; then
     value="${value#\"}"
     case "$key" in
       DEV_NEXT_URL|DEV_DEPLOYER_SA|CLAUDE_TEST_USER|CLAUDE_TEST_PASSWORD)
-        eval "if [[ -z \"\${$key:-}\" ]]; then export $key=\"\$value\"; fi"
+        # Indirect expansion + printf -v avoids eval — a value containing
+        # $(…) or backticks won't execute during load.
+        if [[ -z "${!key:-}" ]]; then
+          printf -v "$key" '%s' "$value"
+          export "$key"
+        fi
         ;;
     esac
   done < "$ENV_FILE"

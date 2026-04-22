@@ -130,10 +130,11 @@ __pycache__/
 .husky/_
 
 # CLAUDE
-# Local-only bits — never commit.
+# Local-only state — never commit.
 /.claude/settings.local.json
 /.claude/scheduled_tasks.lock
 /.claude/worktrees/
-# /.claude/skills/ is versioned. Individual skills are tracked by
-# explicit `git add .claude/skills/<name>/` — personal skills dropped
-# into that directory stay untracked until you opt in.
+# Everything else under /.claude/ is NOT ignored. Project skills live in
+# /.claude/skills/<name>/ and are versioned (add them with `git add`).
+# For personal skills that shouldn't ship in the repo, put them in your
+# user-scope dir (~/.claude/skills/<name>/) rather than the project one.
