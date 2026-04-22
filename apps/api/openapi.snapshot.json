@@ -7,7 +7,9 @@
             "$ref": "#/components/schemas/UserResponse"
           }
         },
-        "required": ["user"],
+        "required": [
+          "user"
+        ],
         "title": "AuthResponse",
         "type": "object"
       },
@@ -30,7 +32,9 @@
             "title": "Photo"
           }
         },
-        "required": ["payload"],
+        "required": [
+          "payload"
+        ],
         "title": "Body_create_comment_posts__post_id__comments_post",
         "type": "object"
       },
@@ -49,7 +53,9 @@
             "type": "array"
           }
         },
-        "required": ["payload"],
+        "required": [
+          "payload"
+        ],
         "title": "Body_create_post_posts_post",
         "type": "object"
       },
@@ -68,7 +74,9 @@
             "type": "array"
           }
         },
-        "required": ["payload"],
+        "required": [
+          "payload"
+        ],
         "title": "Body_update_post_posts__post_id__put",
         "type": "object"
       },
@@ -109,7 +117,9 @@
             "type": "boolean"
           }
         },
-        "required": ["favorited"],
+        "required": [
+          "favorited"
+        ],
         "title": "FavoriteResponse",
         "type": "object"
       },
@@ -146,7 +156,10 @@
             "type": "boolean"
           }
         },
-        "required": ["emailOrUsername", "password"],
+        "required": [
+          "emailOrUsername",
+          "password"
+        ],
         "title": "LoginRequest",
         "type": "object"
       },
@@ -169,7 +182,11 @@
             "type": "string"
           }
         },
-        "required": ["targetType", "targetId", "emoji"],
+        "required": [
+          "targetType",
+          "targetId",
+          "emoji"
+        ],
         "title": "ReactionRequest",
         "type": "object"
       },
@@ -312,7 +329,11 @@
             "type": "string"
           }
         },
-        "required": ["loc", "msg", "type"],
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
         "title": "ValidationError",
         "type": "object"
       }
@@ -360,7 +381,9 @@
           }
         },
         "summary": "Login",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/auth/logout": {
@@ -383,7 +406,9 @@
           }
         },
         "summary": "Logout",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/auth/me": {
@@ -402,7 +427,9 @@
           }
         },
         "summary": "Me",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/auth/signup": {
@@ -441,7 +468,9 @@
           }
         },
         "summary": "Signup",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/comments/{comment_id}": {
@@ -480,7 +509,9 @@
           }
         },
         "summary": "Delete Comment",
-        "tags": ["comments"]
+        "tags": [
+          "comments"
+        ]
       }
     },
     "/family/members": {
@@ -497,7 +528,9 @@
           }
         },
         "summary": "List Members",
-        "tags": ["family"]
+        "tags": [
+          "family"
+        ]
       }
     },
     "/family/members/{user_id}": {
@@ -536,7 +569,9 @@
           }
         },
         "summary": "Remove Member",
-        "tags": ["family"]
+        "tags": [
+          "family"
+        ]
       }
     },
     "/health": {
@@ -559,7 +594,9 @@
           }
         },
         "summary": "Healthcheck",
-        "tags": ["health"]
+        "tags": [
+          "health"
+        ]
       }
     },
     "/me/favorites": {
@@ -608,7 +645,9 @@
           }
         },
         "summary": "My Favorites",
-        "tags": ["me"]
+        "tags": [
+          "me"
+        ]
       }
     },
     "/me/password": {
@@ -647,7 +686,9 @@
           }
         },
         "summary": "Change Password",
-        "tags": ["me"]
+        "tags": [
+          "me"
+        ]
       }
     },
     "/me/profile": {
@@ -686,7 +727,9 @@
           }
         },
         "summary": "Update Profile",
-        "tags": ["me"]
+        "tags": [
+          "me"
+        ]
       }
     },
     "/posts": {
@@ -723,7 +766,9 @@
           }
         },
         "summary": "Create Post",
-        "tags": ["posts"]
+        "tags": [
+          "posts"
+        ]
       }
     },
     "/posts/{post_id}": {
@@ -762,7 +807,9 @@
           }
         },
         "summary": "Delete Post",
-        "tags": ["posts"]
+        "tags": [
+          "posts"
+        ]
       },
       "get": {
         "operationId": "get_post_posts__post_id__get",
@@ -839,7 +886,9 @@
           }
         },
         "summary": "Get Post",
-        "tags": ["posts"]
+        "tags": [
+          "posts"
+        ]
       },
       "put": {
         "operationId": "update_post_posts__post_id__put",
@@ -886,7 +935,9 @@
           }
         },
         "summary": "Update Post",
-        "tags": ["posts"]
+        "tags": [
+          "posts"
+        ]
       }
     },
     "/posts/{post_id}/comments": {
@@ -945,7 +996,9 @@
           }
         },
         "summary": "List Comments",
-        "tags": ["comments"]
+        "tags": [
+          "comments"
+        ]
       },
       "post": {
         "operationId": "create_comment_posts__post_id__comments_post",
@@ -992,7 +1045,9 @@
           }
         },
         "summary": "Create Comment",
-        "tags": ["comments"]
+        "tags": [
+          "comments"
+        ]
       }
     },
     "/posts/{post_id}/cooked": {
@@ -1051,7 +1106,9 @@
           }
         },
         "summary": "List Cooked",
-        "tags": ["posts"]
+        "tags": [
+          "posts"
+        ]
       },
       "post": {
         "operationId": "log_cooked_posts__post_id__cooked_post",
@@ -1098,7 +1155,9 @@
           }
         },
         "summary": "Log Cooked",
-        "tags": ["posts"]
+        "tags": [
+          "posts"
+        ]
       }
     },
     "/posts/{post_id}/favorite": {
@@ -1139,7 +1198,9 @@
           }
         },
         "summary": "Unfavorite Post",
-        "tags": ["posts"]
+        "tags": [
+          "posts"
+        ]
       },
       "post": {
         "operationId": "favorite_post_posts__post_id__favorite_post",
@@ -1178,7 +1239,9 @@
           }
         },
         "summary": "Favorite Post",
-        "tags": ["posts"]
+        "tags": [
+          "posts"
+        ]
       }
     },
     "/profile/cooked": {
@@ -1230,7 +1293,9 @@
           }
         },
         "summary": "My Cooked",
-        "tags": ["profile"]
+        "tags": [
+          "profile"
+        ]
       }
     },
     "/profile/favorites": {
@@ -1282,7 +1347,9 @@
           }
         },
         "summary": "My Favorites",
-        "tags": ["profile"]
+        "tags": [
+          "profile"
+        ]
       }
     },
     "/profile/posts": {
@@ -1334,7 +1401,9 @@
           }
         },
         "summary": "My Posts",
-        "tags": ["profile"]
+        "tags": [
+          "profile"
+        ]
       }
     },
     "/reactions": {
@@ -1371,7 +1440,9 @@
           }
         },
         "summary": "Toggle Reaction",
-        "tags": ["reactions"]
+        "tags": [
+          "reactions"
+        ]
       }
     },
     "/recipes": {
@@ -1614,7 +1685,9 @@
           }
         },
         "summary": "Browse Recipes",
-        "tags": ["recipes"]
+        "tags": [
+          "recipes"
+        ]
       }
     },
     "/tags": {
@@ -1631,7 +1704,9 @@
           }
         },
         "summary": "List Tags",
-        "tags": ["tags"]
+        "tags": [
+          "tags"
+        ]
       }
     },
     "/timeline": {
@@ -1683,7 +1758,9 @@
           }
         },
         "summary": "Get Timeline",
-        "tags": ["timeline"]
+        "tags": [
+          "timeline"
+        ]
       }
     }
   }
