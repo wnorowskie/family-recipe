@@ -73,7 +73,7 @@ Map the file list to areas:
 | -------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
 | `src/app/api/**/route.ts`                                                  | Next API | **Covered by `smoke:dev`** (login + post + comment + reaction + cleanup)                         |
 | `src/app/**` (non-api), `src/components/**`                                | UI       | Partial — see "UI limitations" below                                                             |
-| `apps/recipe-url-importer/**`                                              | Importer | Manual `/version` probe (see step 5)                                                             |
+| `apps/recipe-url-importer/**`                                              | Importer | Manual `/health` probe (see step 5)                                                              |
 | `apps/api/**`                                                              | FastAPI  | Not deployed to dev yet — skip with a note                                                       |
 | `prisma/schema*.prisma`, `prisma/migrations/**`                            | Prisma   | Migration already ran during `deploy-dev.yml`; smoke writes exercise it                          |
 | `.github/workflows/deploy-*.yml`, `infra/**`                               | Infra    | **Inspect the workflow diff carefully** — a change here changes the pipeline you're about to use |
@@ -134,8 +134,8 @@ source .env.dev.local
 IMP_TOKEN=$(gcloud auth print-identity-token \
   --impersonate-service-account="$DEV_DEPLOYER_SA" \
   --audiences="$DEV_IMPORTER_URL")
-curl -sS -H "Authorization: Bearer $IMP_TOKEN" "$DEV_IMPORTER_URL/version"
-# → {"service":"recipe-url-importer","version":"...","git_sha":"..."}
+curl -sS -H "Authorization: Bearer $IMP_TOKEN" "$DEV_IMPORTER_URL/health"
+# → {"status":"ok"}
 
 # Read-only Next probes (reuse the smoke script's login flow if you need
 # a session; otherwise just check unauthenticated gating)
@@ -181,7 +181,7 @@ Absolute. Violating any of these turns the skill into a liability:
 - **Never mint a fake ID token or re-use a stale one across audiences.** The `--audiences` flag must match the target Cloud Run URL exactly; a token for `$DEV_NEXT_URL` will 401 against `$DEV_IMPORTER_URL`.
 - **Never suppress a non-zero smoke exit.** If `npm run smoke:dev` exits non-zero, that's the headline of the report — capture the failing step and stop. Cleanup already ran via the trap.
 - **Never stop the dev DB as a "tidy up" step.** Leaving it running is the default; stopping disrupts the next session and costs a 60s restart.
-- **Never invent endpoints.** If a probe returns 404, first verify the endpoint exists in the source (`grep -rn "app.get\|@app.post\|export const POST" apps/recipe-url-importer/src/ src/app/api/`). The importer's `/healthz` returned 404 during this skill's construction because the deployed revision didn't include it yet — the skill probes `/version` instead, which both code and the live revision have.
+- **Never invent endpoints.** If a probe returns 404, first verify the endpoint exists in the source (`grep -rn "app.get\|@app.post\|export const POST" apps/recipe-url-importer/src/ src/app/api/`). One non-obvious trap: Google Frontend on `*.run.app` blackholes the exact path `/healthz` at the edge — a 404 there with no `server: Google Frontend` header means the request never reached the container. The importer's health endpoint is `/health`.
 - **Never paper over a missing prerequisite.** If `roles/iam.serviceAccountTokenCreator` isn't granted or `.env.dev.local` isn't populated, stop and surface the exact command from [dev-deployments.md](../../../docs/verification/dev-deployments.md). Silent fallbacks lead to later confusion.
 
 ## Report template
@@ -218,7 +218,7 @@ _(or paste the failure line + stderr if any step failed)_
 
 ### Additional probes
 
-- **Importer `/version`**: `{"service":"recipe-url-importer","version":"...","git_sha":"<sha>"}` ✅
+- **Importer `/health`**: `{"status":"ok"}` ✅
 - **Timeline unauth gating**: `401` ✅ / `200` ❌ (leak!)
 - **HTML-grep /timeline**: found `<title>` ✅ / markup changed ❌
 
