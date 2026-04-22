@@ -128,4 +128,10 @@ __pycache__/
 .husky/_
 
 # CLAUDE
-/.claude
+# Local-only bits — never commit.
+/.claude/settings.local.json
+/.claude/scheduled_tasks.lock
+/.claude/worktrees/
+# /.claude/skills/ is versioned. Individual skills are tracked by
+# explicit `git add .claude/skills/<name>/` — personal skills dropped
+# into that directory stay untracked until you opt in.

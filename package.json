@@ -24,7 +24,8 @@
     "db:generate": "prisma generate --schema prisma/schema.postgres.node.prisma",
     "db:push": "prisma db push --schema prisma/schema.postgres.node.prisma",
     "db:studio": "prisma studio --schema prisma/schema.postgres.node.prisma",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "smoke:dev": "scripts/smoke-dev.sh"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

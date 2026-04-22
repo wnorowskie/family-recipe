@@ -8,6 +8,15 @@ Decision rationale and tool alternatives: [docs/research/claude-local-verificati
 
 **Before opening any PR.** The pre-commit hook runs `type-check` + `lint-staged`; nothing else is automatic. Verification catches what the type checker can't: wrong response shapes, broken gating, silent 500s, hydration bugs, cross-family data leaks.
 
+## Local vs dev deployment
+
+| Stage                           | Target                                          | Playbook                                 |
+| ------------------------------- | ----------------------------------------------- | ---------------------------------------- |
+| Feature branch → `develop` PR   | **Local** (the service(s) touched in the diff)  | The per-service playbooks below          |
+| **`develop → main` release PR** | **Dev deployment** (`develop` branch Cloud Run) | [dev-deployments.md](dev-deployments.md) |
+
+Local catches "did my code work?"; dev catches "did the build+migrate+deploy pipeline work?". Run local for every branch; add dev before merging a release. The `/release-testing` skill automates the dev step.
+
 ## The three layers
 
 Pick the lowest layer that gives enough signal for the change. Stack layers only when a single one is insufficient.
