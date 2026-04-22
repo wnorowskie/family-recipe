@@ -169,6 +169,11 @@ resource "google_cloud_run_v2_service" "app" {
     ignore_changes = [
       # CI/CD updates the image; keep Terraform from rolling it back.
       template[0].containers[0].image,
+      # `gcloud run deploy` stamps these on every deploy; TF doesn't model
+      # them in config, so without this it would try to clear them on
+      # every plan only for the next deploy to write them back. See #89.
+      client,
+      client_version,
     ]
   }
 
