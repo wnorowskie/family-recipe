@@ -112,6 +112,10 @@ jobs:
 
       - name: Capture currently-serving revision (for rollback)
         run: |
+          # status.traffic[0] assumes a single revision serves 100%
+          # (current setup). If traffic is ever split across revisions,
+          # this capture will only grab the first split and rollback
+          # will be partial.
           PREV_REVISION="$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
             --project "$PROJECT_ID" \
             --region "$REGION" \
