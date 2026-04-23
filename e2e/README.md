@@ -6,8 +6,19 @@ This directory currently contains:
 
 - [auth.spec.ts](auth.spec.ts) — login + protected-route gating (PoC flow from #58).
 - [signup.spec.ts](signup.spec.ts) — signup via family master key (#106). Tagged `@smoke @destructive`; CI-only (see [Tags](#tags)).
+- [post-with-photo.spec.ts](post-with-photo.spec.ts) — create a post with a photo upload (#103). Tagged `@smoke`; uses shared storageState (see [Authentication](#authentication)).
 
 Further smoke flows land in follow-up tickets (see the research doc for the list).
+
+## Authentication
+
+[global-setup.ts](global-setup.ts) logs in the seeded `claude-test` user once per run and saves the session cookie to `e2e/.auth/claude-test.json` (gitignored). Authenticated specs opt in with:
+
+```ts
+test.use({ storageState: 'e2e/.auth/claude-test.json' });
+```
+
+Specs that need a logged-out context (`auth.spec.ts`, `signup.spec.ts`) simply don't opt in.
 
 ## Tags
 

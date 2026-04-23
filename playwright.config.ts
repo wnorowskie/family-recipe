@@ -19,6 +19,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['html', { open: 'never' }], ['github']] : 'list',
+  globalSetup: require.resolve('./e2e/global-setup'),
   use: {
     baseURL,
     trace: 'on-first-retry',
