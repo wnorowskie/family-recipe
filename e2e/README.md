@@ -2,7 +2,19 @@
 
 Playwright smoke suite. Picked in [docs/research/automated-testing.md](../docs/research/automated-testing.md) ([#58](https://github.com/wnorowskie/family-recipe/issues/58)).
 
-This directory currently contains **one** PoC flow — login + protected-route gating. The full suite lands in follow-up tickets (see the research doc for the list).
+This directory currently contains:
+
+- [auth.spec.ts](auth.spec.ts) — login + protected-route gating (PoC flow from #58).
+- [signup.spec.ts](signup.spec.ts) — signup via family master key (#106). Tagged `@smoke @destructive`; CI-only (see [Tags](#tags)).
+
+Further smoke flows land in follow-up tickets (see the research doc for the list).
+
+## Tags
+
+Specs use Playwright test tags to steer grep filters:
+
+- `@smoke` — included in the smoke subset.
+- `@destructive` — creates/mutates data that persists beyond the test (e.g. a new user row). Run in the CI job against the ephemeral Postgres, but **invert** in the post-deploy grep (#107) so we don't accumulate rows against the live dev DB.
 
 ## Run locally
 
