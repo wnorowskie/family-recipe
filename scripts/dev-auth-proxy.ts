@@ -33,7 +33,11 @@ type TokenState = {
 };
 
 const ENV_FILE = path.resolve(__dirname, '..', '.env.dev.local');
-const TOKEN_TTL_MS = 50 * 60 * 1000; // refresh a bit before Google's 1h cap
+// Google ID tokens are valid for ~1h. These constants are our internal
+// staleness window (mintedAt + TOKEN_TTL_MS) and the buffer before that at
+// which we proactively refresh — so a mint happens every ~45 min, well
+// before the real expiry. Not the upstream TTL itself.
+const TOKEN_TTL_MS = 50 * 60 * 1000;
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 loadEnvFile(ENV_FILE);
