@@ -16,6 +16,7 @@ prisma/*.db-journal
 # Ignore generated files
 *.tsbuildinfo
 next-env.d.ts
+apps/api/openapi.snapshot.json
 
 # Ignore lock files
 package-lock.json

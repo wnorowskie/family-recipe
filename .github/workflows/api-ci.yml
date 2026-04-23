@@ -48,6 +48,33 @@ jobs:
       - run: pip install mypy==1.11.2
       - run: mypy src --ignore-missing-imports --show-error-codes --pretty
 
+  openapi-diff:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: apps/api/requirements.txt
+      - run: pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - name: Regenerate OpenAPI spec from app
+        run: python scripts/dump_openapi.py > /tmp/openapi.live.json
+      - name: Diff against committed snapshot
+        run: |
+          if ! diff -u openapi.snapshot.json /tmp/openapi.live.json; then
+            echo ""
+            echo "::error::FastAPI OpenAPI spec drifted from apps/api/openapi.snapshot.json."
+            echo "If the change is intentional, regenerate locally and commit:"
+            echo "  cd apps/api && python scripts/dump_openapi.py > openapi.snapshot.json"
+            exit 1
+          fi
+
   test:
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
