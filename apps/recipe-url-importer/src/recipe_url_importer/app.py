@@ -9,7 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 
 from . import __version__
 from .cache.memory_cache import MemoryCache
-from .config import Settings
+from .config import SERVICE_NAME, Settings
 from .exceptions import ImporterError, ParseFailed
 from .models import ErrorResponse, ParseRequest, ParseResponse, RecipeDraft
 from .parse.pipeline import run_pipeline
@@ -61,7 +61,7 @@ async def request_context_middleware(request: Request, call_next):
             logger,
             "request_complete",
             {
-                "service": settings.service_name,
+                "service": SERVICE_NAME,
                 "version": settings.service_version,
                 "request_id": request_id,
                 "correlation_id": correlation_id,
@@ -109,7 +109,7 @@ async def health():
 
 @app.get("/version")
 async def version():
-    return {"service": settings.service_name, "version": settings.service_version, "git_sha": settings.git_sha}
+    return {"service": SERVICE_NAME, "version": settings.service_version, "git_sha": settings.git_sha}
 
 
 @app.post("/v1/parse", response_model=ParseResponse)
@@ -148,7 +148,7 @@ async def parse_recipe(
         logger,
         "parse_complete",
         {
-            "service": settings.service_name,
+            "service": SERVICE_NAME,
             "version": settings.service_version,
             "request_id": request_id,
             "correlation_id": request.headers.get("x-correlation-id"),
