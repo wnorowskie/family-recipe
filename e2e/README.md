@@ -37,6 +37,8 @@ Headed / debug:
 npm run test:e2e:ui   # Playwright UI mode
 ```
 
+> **Heads up — signup rate limit.** `signup.spec.ts` hits `/api/auth/signup`, capped at 3/IP/hour by [src/lib/rateLimit.ts](../src/lib/rateLimit.ts). CI gets a fresh in-process limiter cache per run, but local re-runs inside the same hour will start returning 429. If you're iterating, `npx playwright test e2e/auth.spec.ts` only, or restart the dev server to clear the LRU.
+
 ## Run against a deployed URL
 
 Set `PLAYWRIGHT_BASE_URL`; the `webServer` block is skipped:

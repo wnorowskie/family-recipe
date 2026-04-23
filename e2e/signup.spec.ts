@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { expect, test } from '@playwright/test';
 
 const MASTER_KEY = process.env.FAMILY_MASTER_KEY;
@@ -22,7 +23,7 @@ test(
       'FAMILY_MASTER_KEY must be set for the signup flow (see ci.yml for the CI value)'
     );
 
-    const stamp = Date.now();
+    const stamp = `${Date.now()}_${randomBytes(3).toString('hex')}`;
     const username = `e2e_signup_${stamp}`;
     const email = `e2e-signup-${stamp}@example.local`;
     const password = 'e2e-signup-password';
@@ -45,6 +46,7 @@ test(
 
     const cookies = await context.cookies();
     const session = cookies.find((c) => c.name === 'session');
-    expect(session?.value).toBeTruthy();
+    // JWTs signed with jose always start with the base64-encoded header `eyJ`.
+    expect(session?.value).toMatch(/^eyJ/);
   }
 );
