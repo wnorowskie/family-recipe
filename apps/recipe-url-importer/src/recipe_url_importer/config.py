@@ -7,13 +7,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from . import __version__
 
+SERVICE_NAME = "recipe-url-importer"
+
 
 class Settings(BaseSettings):
     """Application configuration loaded from environment variables."""
 
     model_config = SettingsConfigDict(env_prefix="IMPORTER_", case_sensitive=False)
 
-    service_name: str = Field(default="recipe-url-importer")
     service_version: str = Field(default=__version__)
     git_sha: str = Field(default="dev")
 
