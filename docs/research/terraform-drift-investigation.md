@@ -36,14 +36,13 @@ service_name: str = Field(default="recipe-url-importer")
 
 Impact of absence is cosmetic only: the `/health` endpoint and structured error payloads report `"service": "recipe-url-importer"` instead of the env-specific name (e.g. `recipe-importer-dev`).
 
-### Recommendation
+### Resolution ([#110](https://github.com/wnorowskie/family-recipe/issues/110))
 
-Absorb the addition into the #71 apply — it's harmless. For the long term, decide who owns env vars on the Cloud Run service:
+TF is the single source of truth. Kept all nine `env` blocks in [infra/modules/cloud_run_importer/main.tf](../../infra/modules/cloud_run_importer/main.tf) (including `IMPORTER_SERVICE_NAME`), removed `--set-env-vars` from both [deploy-recipe-url-importer.yml](../../.github/workflows/deploy-recipe-url-importer.yml) and [deploy-recipe-url-importer-prod.yml](../../.github/workflows/deploy-recipe-url-importer-prod.yml), and dropped the duplicated `IMPORTER_*` values from the workflow `env:` blocks. `gcloud run deploy` without an env flag inherits the previous revision's env, so deploys carry forward whatever TF last applied.
 
-- **Option A (preferred):** Delete the five `env` blocks from [infra/modules/cloud_run_importer/main.tf:39-82](../../infra/modules/cloud_run_importer/main.tf#L39-L82) and let the deploy workflow be the single source of truth. Add `IMPORTER_SERVICE_NAME=${CLOUD_RUN_SERVICE}` to the `--set-env-vars` list in both `deploy-recipe-url-importer.yml` and `deploy-recipe-url-importer-prod.yml`. Matches the current reality of how this service is actually configured.
-- **Option B:** Keep the env blocks in TF and add `template[0].containers[0].env` to `lifecycle.ignore_changes` so the two managers don't fight. Use `--update-env-vars` in the deploy workflow (preserves what TF set) instead of `--set-env-vars`.
+Deliberately did not add `template[0].containers[0].env` to `lifecycle.ignore_changes` — that would make TF stop managing the field, contradicting "TF as source of truth." Future env-var changes require a `terraform apply` to propagate.
 
-Either works; Option A is less moving parts. Do **not** leave the current arrangement — TF and gcloud are silently fighting over this list.
+**One-time catchup:** `infra-apply.yml` has never run, so the running dev service still has the pre-resolution env list (8 of 9 vars; `IMPORTER_SERVICE_NAME` missing). Owner needs to run `terraform apply` on dev once to converge. Prod has the same need whenever its first apply lands.
 
 ---
 
@@ -121,5 +120,5 @@ Alternatives considered:
 
 - [x] Add `client` and `client_version` to `ignore_changes` on both Cloud Run service modules (Q2). _Bundled into this PR — zero-risk, eliminates the biggest recurring drift source on every plan._
 - [x] Un-gitignore `**/.terraform.lock.hcl`, commit both lock files, and pin the `google` provider to `~> 7.12` in both envs (Q3). _Bundled into this PR. Apply once per env to materialize the new state._
-- [ ] Pick Option A or B for `IMPORTER_SERVICE_NAME` (Q1) and implement. Tracked as [#110](https://github.com/wnorowskie/family-recipe/issues/110) — either removing the env blocks from TF and owning env vars entirely from the deploy workflow (Option A, preferred), or adding `ignore_changes` on `env` and switching to `--update-env-vars` (Option B).
+- [x] Resolve `IMPORTER_SERVICE_NAME` ownership (Q1). [#110](https://github.com/wnorowskie/family-recipe/issues/110) made TF the single source of truth for importer env vars and removed `--set-env-vars` from both importer deploy workflows. Requires a one-time `terraform apply` on dev/prod to materialize the declared state on the running services.
 - [ ] After #71 and the follow-up above land, run `terraform plan` on dev and prod with no code changes; confirm either zero diffs or explainable diffs only. If anything else appears, file a follow-up.
