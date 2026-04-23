@@ -146,19 +146,20 @@ curl -sS -H "Authorization: Bearer $NEXT_TOKEN" -w 'HTTP %{http_code}\n' \
   "$DEV_NEXT_URL/api/timeline"   # expect 401 without session cookie
 ```
 
-### 6. UI verification — limitations and options
+### 6. UI verification via the auth-injecting proxy
 
-Dev Cloud Run runs `--no-allow-unauthenticated`, so a browser cannot load the UI directly: every request (including CSS/JS chunks) needs a Bearer ID token, and browsers don't attach auth headers to subresource loads. Options, in order of preference:
+Dev Cloud Run runs `--no-allow-unauthenticated`, so a browser can't load the UI directly: every request (including CSS/JS subresources) needs a Bearer ID token, and browsers don't attach auth headers to subresource loads. The fix is the local auth-injecting proxy ([scripts/dev-auth-proxy.ts](../../../scripts/dev-auth-proxy.ts)) — it mints an impersonated ID token on every forwarded request and strips `Secure` from Set-Cookie so the session cookie survives the localhost hop.
 
-1. **Trust local Playwright** — if local `npm run test:e2e` (or Playwright MCP against `localhost:3000` with the sandbox stack) passed against the release branch, that's the strongest UI signal available today.
-2. **HTML-grep via curl** — fetch a key page as raw HTML and grep for expected strings. This misses hydration bugs but catches "server-rendered output changed unexpectedly":
-   ```bash
-   curl -sS -H "Authorization: Bearer $NEXT_TOKEN" -b /tmp/fr-dev-cookies.txt \
-     "$DEV_NEXT_URL/timeline" | grep -c "<title>"   # expect ≥1
-   ```
-3. **Skip honestly.** If the release includes hydration-sensitive UI changes and neither option 1 nor 2 is sufficient, the report's "Could not verify" section names it.
+Run the Playwright suite against the live dev deployment through the proxy:
 
-Improving dev UI coverage (auth-injecting proxy, IAP, or a signed-URL wrapper) is tracked separately — don't try to build it inside the skill.
+```bash
+npm run test:e2e:dev
+# → starts proxy on :3100, runs `playwright test`, tears down the proxy on exit
+```
+
+If the release bundles hydration-sensitive UI changes, also load a key page manually via `npm run proxy:dev` + your browser at `http://localhost:3100/login` and exercise one interactive flow (e.g., post a comment). Include the outcome in the report.
+
+If the proxy itself fails to mint a token (check `lsof -nP -iTCP:3100` + proxy logs), the same root cause — missing `roles/iam.serviceAccountTokenCreator` — would have already blocked the smoke in step 5; don't invent a fallback. If Playwright isn't installed in this session (`npx playwright install chromium` hasn't run), say so in "Could not verify" rather than guessing the UI's state.
 
 ### 7. Clean up
 

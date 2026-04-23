@@ -35,6 +35,17 @@ E2E_USER=<user> E2E_PASSWORD=<pass> \
 npm run test:e2e
 ```
 
+### Against the `--no-allow-unauthenticated` dev deployment
+
+Browsers can't attach Bearer tokens to subresource loads, so Playwright must tunnel through the auth-injecting proxy ([scripts/dev-auth-proxy.ts](../scripts/dev-auth-proxy.ts)). The wrapper handles boot + teardown:
+
+```bash
+# Requires .env.dev.local populated — see docs/verification/dev-deployments.md
+npm run test:e2e:dev
+npm run test:e2e:dev -- --ui           # headed
+npm run test:e2e:dev -- e2e/auth.spec.ts
+```
+
 ## Credentials
 
 Defaults to the seeded `claude-test` user (see [prisma/seed.ts](../prisma/seed.ts)). Override via `E2E_USER` / `E2E_PASSWORD` env vars.
