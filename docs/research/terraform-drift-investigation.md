@@ -6,7 +6,7 @@ Explains the three pre-existing drift items that surfaced on `terraform plan` wh
 
 All three drifts are benign but worth fixing so future plans are silent:
 
-1. **`IMPORTER_SERVICE_NAME`** — the env var is declared in TF but has never been applied to the running importer service. Absence is safe (the app has a sane Pydantic default). Absorb via #71, and either remove it from TF or add it to `deploy-recipe-url-importer.yml` so the deploy workflow sets it on every push.
+1. **`IMPORTER_SERVICE_NAME`** — declared in TF but has never actually reached the running importer service. Resolved in [#110](https://github.com/wnorowskie/family-recipe/issues/110) by deleting the env block from TF — the variable turned out to be functionally unused (Pydantic default is fine). Follow-up [#125](https://github.com/wnorowskie/family-recipe/issues/125) tracks removing the matching dead env-var coupling on the Python side.
 2. **`client` / `client_version`** — written by `gcloud run deploy` on every deploy; TF doesn't model these attributes so it keeps trying to clear them. Add both to `lifecycle.ignore_changes` on every `google_cloud_run_v2_service` resource. This is expected, not a sign of out-of-band manual edits.
 3. **Monitoring-dashboard diff** — caused by provider-version drift (dev has `google` 7.14.1, prod has 7.12.0; neither is pinned and `.terraform.lock.hcl` is gitignored). Pin the provider, commit the lock files, apply once to normalize state. No TF code change to the dashboard JSON is required.
 
@@ -36,14 +36,11 @@ service_name: str = Field(default="recipe-url-importer")
 
 Impact of absence is cosmetic only: the `/health` endpoint and structured error payloads report `"service": "recipe-url-importer"` instead of the env-specific name (e.g. `recipe-importer-dev`).
 
-### Recommendation
+### Resolution ([#110](https://github.com/wnorowskie/family-recipe/issues/110))
 
-Absorb the addition into the #71 apply — it's harmless. For the long term, decide who owns env vars on the Cloud Run service:
+Delete the `IMPORTER_SERVICE_NAME` env block from [infra/modules/cloud_run_importer/main.tf](../../infra/modules/cloud_run_importer/main.tf). The variable turned out to be unused in any functional sense — it only appears as an observability label in two structured log fields and in the `/version` response body. Cloud Run already tags every log with the service name via its own metadata, and `/version` has no downstream consumers (no Next.js code, no scripts, no tests assert on it). The Pydantic default `"recipe-url-importer"` has been what the running service has emitted for its entire life, and nothing noticed.
 
-- **Option A (preferred):** Delete the five `env` blocks from [infra/modules/cloud_run_importer/main.tf:39-82](../../infra/modules/cloud_run_importer/main.tf#L39-L82) and let the deploy workflow be the single source of truth. Add `IMPORTER_SERVICE_NAME=${CLOUD_RUN_SERVICE}` to the `--set-env-vars` list in both `deploy-recipe-url-importer.yml` and `deploy-recipe-url-importer-prod.yml`. Matches the current reality of how this service is actually configured.
-- **Option B:** Keep the env blocks in TF and add `template[0].containers[0].env` to `lifecycle.ignore_changes` so the two managers don't fight. Use `--update-env-vars` in the deploy workflow (preserves what TF set) instead of `--set-env-vars`.
-
-Either works; Option A is less moving parts. Do **not** leave the current arrangement — TF and gcloud are silently fighting over this list.
+Kept the default in [apps/recipe-url-importer/src/recipe_url_importer/config.py](../../apps/recipe-url-importer/src/recipe_url_importer/config.py) so [SPEC.md's `/version` contract](../../apps/recipe-url-importer/SPEC.md) stays accurate without further change. [#125](https://github.com/wnorowskie/family-recipe/issues/125) tracks removing the now-dead env-var coupling (Pydantic still auto-maps `IMPORTER_SERVICE_NAME` → `settings.service_name` via the class prefix, even though nothing sets it). Kept the `--set-env-vars` call in both importer deploy workflows — the remaining 8 TF env blocks now exactly match the 8 keys in the workflow, so `terraform plan` will be silent on env (no active divergence). Reconciling the broader TF-vs-gcloud split-brain across all Cloud Run env vars is left as a separate follow-up; per-env-var drift with matching lists is the same benign status quo as [deploy-dev.yml](../../.github/workflows/deploy-dev.yml) + [cloud_run_infra/main.tf](../../infra/modules/cloud_run_infra/main.tf).
 
 ---
 
@@ -121,5 +118,5 @@ Alternatives considered:
 
 - [x] Add `client` and `client_version` to `ignore_changes` on both Cloud Run service modules (Q2). _Bundled into this PR — zero-risk, eliminates the biggest recurring drift source on every plan._
 - [x] Un-gitignore `**/.terraform.lock.hcl`, commit both lock files, and pin the `google` provider to `~> 7.12` in both envs (Q3). _Bundled into this PR. Apply once per env to materialize the new state._
-- [ ] Pick Option A or B for `IMPORTER_SERVICE_NAME` (Q1) and implement. Tracked as [#110](https://github.com/wnorowskie/family-recipe/issues/110) — either removing the env blocks from TF and owning env vars entirely from the deploy workflow (Option A, preferred), or adding `ignore_changes` on `env` and switching to `--update-env-vars` (Option B).
+- [x] Resolve `IMPORTER_SERVICE_NAME` drift (Q1). [#110](https://github.com/wnorowskie/family-recipe/issues/110) deleted the unused env block from the importer TF module rather than reconcile ownership of the full env list; the other 8 TF env blocks match the workflow's `--set-env-vars` so `terraform plan` is silent on importer env. Reconciling TF-vs-gcloud env ownership across all Cloud Run services remains a potential follow-up.
 - [ ] After #71 and the follow-up above land, run `terraform plan` on dev and prod with no code changes; confirm either zero diffs or explainable diffs only. If anything else appears, file a follow-up.

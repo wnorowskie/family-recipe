@@ -52,11 +52,6 @@ resource "google_cloud_run_v2_service" "importer" {
       }
 
       env {
-        name  = "IMPORTER_SERVICE_NAME"
-        value = var.service_name
-      }
-
-      env {
         name  = "IMPORTER_CACHE_TTL_SECONDS"
         value = tostring(var.cache_ttl_seconds)
       }
