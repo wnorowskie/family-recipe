@@ -24,6 +24,7 @@ test.db-journal
 /blob-report/
 /playwright/.cache/
 /e2e/.auth/
+/.playwright-mcp/
 
 # Next.js
 /.next/

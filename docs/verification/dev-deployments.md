@@ -156,6 +156,27 @@ curl -sS -H "Authorization: Bearer $IMP_TOKEN" "$DEV_IMPORTER_URL/version"
 
 Each Cloud Run service is a distinct audience — mint a new token per host.
 
+## Browser UI smoke via the auth-injecting proxy
+
+`--no-allow-unauthenticated` dev Cloud Run blocks browsers from loading the UI directly: the initial HTML fetch works with an explicit `Authorization` header, but browsers don't attach auth headers to subresource requests (CSS, JS, images), so the page never hydrates. To reach `$DEV_NEXT_URL` from a real browser, point it at the local auth-injecting proxy ([scripts/dev-auth-proxy.ts](../../scripts/dev-auth-proxy.ts)):
+
+```bash
+npm run proxy:dev                     # foreground; Ctrl-C to stop
+# → http://localhost:3100 proxies to $DEV_NEXT_URL
+```
+
+The proxy mints an ID token by impersonating the deployer SA (same path as `smoke:dev`), attaches `Authorization: Bearer …` to every forwarded request, refreshes the token before it expires, and strips the `Secure` flag from Set-Cookie so the `session` cookie survives the plain-HTTP localhost hop. Now a browser at `http://localhost:3100/login` loads CSS/JS and hydrates normally.
+
+For an end-to-end Playwright run against the live dev deployment:
+
+```bash
+npm run test:e2e:dev                  # boots proxy → runs playwright → tears down
+npm run test:e2e:dev -- --ui          # headed Playwright UI, same proxy
+npm run test:e2e:dev -- e2e/auth.spec.ts
+```
+
+Prerequisites: the one-time setup above (`roles/iam.serviceAccountTokenCreator`, `.env.dev.local` populated). The wrapper forwards `CLAUDE_TEST_PASSWORD` to Playwright as `E2E_PASSWORD` automatically.
+
 ## Gotchas
 
 - **`curl -F` interprets `;` in values** as a content-type delimiter and silently truncates the payload. Use `curl --form-string` for `multipart/form-data` JSON payloads (the smoke script does; so must your manual probes).
