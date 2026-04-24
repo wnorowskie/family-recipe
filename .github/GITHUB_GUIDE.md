@@ -122,7 +122,7 @@ Example: `feat: cooked-event reactions (#12)`
 
 ### CI gates on every PR
 
-`.github/workflows/ci.yml` runs typecheck, lint, tests, docker build, trivy scan, prisma validate, `npm audit`, dependency-review, semgrep, IaC scan, and gitleaks. Separate workflows run for [apps/api/](../apps/api/) and [apps/recipe-url-importer/](../apps/recipe-url-importer/). All must pass before merging.
+`.github/workflows/ci.yml` runs typecheck, lint, tests, docker build, trivy scan, prisma validate, `npm audit`, dependency-review, semgrep, IaC scan, and gitleaks. Jobs are per-surface path-filtered: each always runs so required-check contexts report, but the expensive steps short-circuit when the relevant surface (`next` / `prisma` / `infra`) didn't change — see [Branch protection](#branch-protection) below. Separate workflows run for [apps/api/](../apps/api/) and [apps/recipe-url-importer/](../apps/recipe-url-importer/). All must pass before merging.
 
 ---
 
@@ -139,7 +139,11 @@ Shared settings on both branches:
 - **Required approving reviews: 0** — as a solo maintainer, self-merge is allowed
 - **Admins not enforced** — the repo owner can bypass in genuine emergencies (use sparingly)
 
-Required status checks (from [ci.yml](workflows/ci.yml), the only workflow that runs on every PR): `typecheck`, `lint`, `test`, `e2e`, `build`, `container-scan`, `prisma-validate`, `prisma-drift-check`, `dependency-scan`, `sast-semgrep`, `iac-scan`, `secrets-scan`. Job names in [api-ci.yml](workflows/api-ci.yml) and [recipe-url-importer-ci.yml](workflows/recipe-url-importer-ci.yml) are path-filtered, so they are **not** listed as required (a path-filtered required check that never runs would permanently block merges). They share names (`lint`, `typecheck`, etc.) with ci.yml jobs, so when they do run and fail, the shared-name required check fails too — effectively required when the relevant paths change.
+Required status checks (all live in [ci.yml](workflows/ci.yml), which runs on every PR): `typecheck`, `lint`, `test`, `e2e`, `build`, `container-scan`, `prisma-validate`, `prisma-drift-check`, `dependency-scan`, `sast-semgrep`, `iac-scan`, `secrets-scan`.
+
+[ci.yml](workflows/ci.yml) uses a per-surface path filter: a top `changes` job computes `next` / `prisma` / `infra` booleans via `dorny/paths-filter`, and each downstream job wraps its expensive steps in an `if:` tied to the relevant flag. The job itself always runs (so the required-check context always reports), but when its surface is unchanged the steps short-circuit to a no-op `echo` and the job completes green. This is the "keep the required-check names attached to a job that always runs" pattern — a required check that never runs would permanently block merges, so we never let one go un-reported.
+
+[api-ci.yml](workflows/api-ci.yml) and [recipe-url-importer-ci.yml](workflows/recipe-url-importer-ci.yml) are workflow-level path-filtered (`on.pull_request.paths`), so they only fire when their owning surface changes. Their job names (`lint`, `typecheck`, `test`, etc.) overlap with ci.yml's by design: when they do run, the shared-name required checks must pass under both workflows for the PR to merge.
 
 Difference between branches:
 

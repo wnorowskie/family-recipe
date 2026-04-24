@@ -5,43 +5,109 @@ on:
     branches: [main, develop]
 
 jobs:
-  typecheck:
+  # Every job below is always queued so each required status check reports on
+  # every PR. `changes` computes per-surface flags; each job short-circuits to
+  # success when its surface is unchanged (see GITHUB_GUIDE.md#branch-protection).
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      next: ${{ steps.filter.outputs.next }}
+      prisma: ${{ steps.filter.outputs.prisma }}
+      infra: ${{ steps.filter.outputs.infra }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            next:
+              - 'src/**'
+              - '__tests__/**'
+              - 'e2e/**'
+              - 'prisma/**'
+              - 'public/**'
+              - 'scripts/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig*.json'
+              - 'next.config.*'
+              - 'tailwind.config.*'
+              - 'postcss.config.*'
+              - 'jest.config.js'
+              - 'jest.setup.js'
+              - 'playwright.config.*'
+              - 'eslint.config.mjs'
+              - 'middleware.*'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - '.github/workflows/ci.yml'
+            prisma:
+              - 'prisma/**'
+              - 'scripts/check-prisma-drift.sh'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/ci.yml'
+            infra:
+              - 'infra/**'
+              - '.github/workflows/ci.yml'
+
+  typecheck:
+    runs-on: ubuntu-latest
+    needs: [changes]
+    steps:
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/checkout@v4
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
-      - run: npm run type-check
+      - if: needs.changes.outputs.next == 'true'
+        run: npm ci
+      - if: needs.changes.outputs.next == 'true'
+        run: npm run type-check
+      - if: needs.changes.outputs.next != 'true'
+        run: echo "::notice::Next.js surface unchanged; typecheck trivially passes."
 
   lint:
     runs-on: ubuntu-latest
+    needs: [changes]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/checkout@v4
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
-      - run: npm run lint
+      - if: needs.changes.outputs.next == 'true'
+        run: npm ci
+      - if: needs.changes.outputs.next == 'true'
+        run: npm run lint
+      - if: needs.changes.outputs.next != 'true'
+        run: echo "::notice::Next.js surface unchanged; lint trivially passes."
 
   test:
     runs-on: ubuntu-latest
-    needs: [typecheck, lint]
+    needs: [changes, typecheck, lint]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/checkout@v4
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
-      - run: npm run test
+      - if: needs.changes.outputs.next == 'true'
+        run: npm ci
+      - if: needs.changes.outputs.next == 'true'
+        run: npm run test
+      - if: needs.changes.outputs.next != 'true'
+        run: echo "::notice::Next.js surface unchanged; test trivially passes."
 
   e2e:
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [changes, test]
     services:
       postgres:
         image: postgres:16
@@ -63,99 +129,127 @@ jobs:
       CLAUDE_TEST_USER: claude-test
       CLAUDE_TEST_PASSWORD: claude-test-password
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/checkout@v4
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
-      - name: Prisma generate + push
+      - if: needs.changes.outputs.next == 'true'
+        run: npm ci
+      - if: needs.changes.outputs.next == 'true'
+        name: Prisma generate + push
         run: |
           npm run db:generate
           npm run db:push
-      - name: Seed with E2E fixtures
+      - if: needs.changes.outputs.next == 'true'
+        name: Seed with E2E fixtures
         run: SEED_E2E=1 npm run db:seed
-      - name: Cache Playwright browsers
+      - if: needs.changes.outputs.next == 'true'
+        name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - if: needs.changes.outputs.next == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
+        name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
-      - name: Install Playwright system deps (cache hit)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
+      - if: needs.changes.outputs.next == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
+        name: Install Playwright system deps (cache hit)
         run: npx playwright install-deps chromium
-      - name: Run Playwright smoke suite
+      - if: needs.changes.outputs.next == 'true'
+        name: Run Playwright smoke suite
         run: npm run test:e2e
-      - name: Upload Playwright report
-        if: failure()
+      - if: failure() && needs.changes.outputs.next == 'true'
+        name: Upload Playwright report
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+      - if: needs.changes.outputs.next != 'true'
+        run: echo "::notice::Next.js surface unchanged; e2e trivially passes."
 
   build:
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [changes, test]
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Docker Buildx
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/checkout@v4
+      - if: needs.changes.outputs.next == 'true'
+        name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Docker build (production image)
+      - if: needs.changes.outputs.next == 'true'
+        name: Docker build (production image)
         run: |
           docker build \
            --pull \
            --no-cache \
            --file Dockerfile \
            --tag family-recipe:ci .
-      - name: Save image artifact
+      - if: needs.changes.outputs.next == 'true'
+        name: Save image artifact
         run: docker save family-recipe:ci -o family-recipe.tar
-      - name: Upload image artifact
+      - if: needs.changes.outputs.next == 'true'
+        name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
           name: family-recipe-image
           path: family-recipe.tar
+      - if: needs.changes.outputs.next != 'true'
+        run: echo "::notice::Next.js surface unchanged; build trivially passes."
 
   container-scan:
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [changes, build]
     steps:
-      - uses: actions/checkout@v4
-      - name: Download image artifact
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/checkout@v4
+      - if: needs.changes.outputs.next == 'true'
+        name: Download image artifact
         uses: actions/download-artifact@v4
         with:
           name: family-recipe-image
           path: .
-      - name: Load image
+      - if: needs.changes.outputs.next == 'true'
+        name: Load image
         run: docker load -i family-recipe.tar
-      - name: Container scan (Trivy)
+      - if: needs.changes.outputs.next == 'true'
+        name: Container scan (Trivy)
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: family-recipe:ci
           format: table
           exit-code: 1
           severity: HIGH,CRITICAL
+      - if: needs.changes.outputs.next != 'true'
+        run: echo "::notice::Next.js surface unchanged; container-scan trivially passes."
 
   prisma-validate:
     runs-on: ubuntu-latest
-    needs: [typecheck]
+    needs: [changes, typecheck]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - if: needs.changes.outputs.prisma == 'true'
+        uses: actions/checkout@v4
+      - if: needs.changes.outputs.prisma == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
-      - run: npx prisma validate --schema prisma/schema.postgres.prisma
+      - if: needs.changes.outputs.prisma == 'true'
+        run: npm ci
+      - if: needs.changes.outputs.prisma == 'true'
+        run: npx prisma validate --schema prisma/schema.postgres.prisma
         env:
           DATABASE_URL: postgresql://user:pass@localhost:5432/db
+      - if: needs.changes.outputs.prisma != 'true'
+        run: echo "::notice::Prisma schema unchanged; prisma-validate trivially passes."
 
   prisma-drift-check:
     runs-on: ubuntu-latest
-    needs: [typecheck]
+    needs: [changes, typecheck]
     services:
       postgres:
         image: postgres:16
@@ -173,26 +267,38 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/drift_check
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - if: needs.changes.outputs.prisma == 'true'
+        uses: actions/checkout@v4
+      - if: needs.changes.outputs.prisma == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
-      - name: Replay prisma/migrations and diff against both schemas
+      - if: needs.changes.outputs.prisma == 'true'
+        run: npm ci
+      - if: needs.changes.outputs.prisma == 'true'
+        name: Replay prisma/migrations and diff against both schemas
         run: scripts/check-prisma-drift.sh
+      - if: needs.changes.outputs.prisma != 'true'
+        run: echo "::notice::Prisma schema unchanged; prisma-drift-check trivially passes."
 
   dependency-scan:
     runs-on: ubuntu-latest
-    needs: [typecheck]
+    needs: [changes, typecheck]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/checkout@v4
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
-      - run: npm audit --production --audit-level=high
+      - if: needs.changes.outputs.next == 'true'
+        run: npm ci
+      - if: needs.changes.outputs.next == 'true'
+        run: npm audit --production --audit-level=high
+      - if: needs.changes.outputs.next != 'true'
+        run: echo "::notice::Next.js surface unchanged; dependency-scan trivially passes."
 
   dependency-review:
     runs-on: ubuntu-latest
@@ -202,27 +308,33 @@ jobs:
 
   sast-semgrep:
     runs-on: ubuntu-latest
-    needs: [lint, typecheck]
+    needs: [changes, lint, typecheck]
     steps:
-      - uses: actions/checkout@v4
+      - if: needs.changes.outputs.next == 'true'
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Run Semgrep (SAST)
+      - if: needs.changes.outputs.next == 'true'
+        name: Run Semgrep (SAST)
         uses: returntocorp/semgrep-action@v1
         with:
           config: p/ci
         env:
           SEMGREP_RULES: p/ci
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: needs.changes.outputs.next != 'true'
+        run: echo "::notice::Next.js surface unchanged; sast-semgrep trivially passes."
 
   iac-scan:
     runs-on: ubuntu-latest
-    needs: [typecheck]
+    needs: [changes, typecheck]
     steps:
-      - uses: actions/checkout@v4
+      - if: needs.changes.outputs.infra == 'true'
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: IaC scan (Trivy)
+      - if: needs.changes.outputs.infra == 'true'
+        name: IaC scan (Trivy)
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           scan-type: 'config'
@@ -230,10 +342,11 @@ jobs:
           format: 'table'
           exit-code: '1'
           severity: 'HIGH,CRITICAL'
+      - if: needs.changes.outputs.infra != 'true'
+        run: echo "::notice::Infra unchanged; iac-scan trivially passes."
 
   secrets-scan:
     runs-on: ubuntu-latest
-    needs: [typecheck]
     steps:
       - uses: actions/checkout@v4
         with:
