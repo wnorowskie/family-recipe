@@ -10,6 +10,8 @@ Decision rationale and tool alternatives: [docs/research/claude-local-verificati
 
 **What CI covers for you.** The `e2e` job in [ci.yml](../../.github/workflows/ci.yml) runs the Playwright smoke suite in [e2e/](../../e2e/) against an ephemeral Postgres + `next start` on every PR (fails uploads the `playwright-report/` artifact). That catches login + protected-route regressions automatically; the local playbooks below still cover everything the smoke suite doesn't yet.
 
+ci.yml jobs are per-surface path-filtered (`next` / `prisma` / `infra`). Each job still queues on every PR so required-status-check contexts always report, but expensive steps short-circuit to a no-op when the owning surface is unchanged — so a docs-only or FastAPI-only PR won't rebuild the Next.js Docker image or run Playwright. See [.github/GITHUB_GUIDE.md#branch-protection](../../.github/GITHUB_GUIDE.md#branch-protection) for the mechanism.
+
 ## Local vs dev deployment
 
 | Stage                           | Target                                          | Playbook                                 |
