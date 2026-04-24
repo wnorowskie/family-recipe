@@ -21,9 +21,10 @@ import { expect, test } from '@playwright/test';
 test.use({ storageState: 'e2e/.auth/claude-test.json' });
 
 const POST_ID = 'ce2epost001';
-// Fresh emoji — the seed already has ❤️ from claude-test, so clicking ❤️
-// would toggle it off. 🔥 starts at 0 and goes to 1.
+// Fresh emoji — the seed has ❤️ from claude-test, so clicking ❤️ would
+// toggle it off. 🔥 is un-seeded.
 const REACTION_EMOJI = '🔥';
+// Must match the second user seeded by `SEED_E2E=1` in prisma/seed.ts.
 const E2E_AUTHOR_USER = 'e2e-author';
 const E2E_AUTHOR_PASSWORD = 'e2e-author-password';
 
@@ -49,25 +50,29 @@ test(
     const reactionsSection = page
       .getByRole('heading', { name: 'Reactions', exact: true })
       .locator('xpath=ancestor::section[1]');
-    await reactionsSection
-      .getByRole('button', { name: REACTION_EMOJI })
-      .click();
+    const reactionPill = reactionsSection.getByText(`${REACTION_EMOJI}1`, {
+      exact: false,
+    });
 
-    // Badges render as `<emoji> <count>` inside a pill span. Assert the 🔥
-    // pill appears in the Reactions section with a count of 1.
-    await expect(
-      reactionsSection.getByText(`${REACTION_EMOJI}1`, { exact: false })
-    ).toBeVisible();
+    // POST /api/reactions is a toggle, not additive. A CI retry (retries: 1
+    // in playwright.config) reuses the seeded DB — if a prior attempt left
+    // 🔥 on, clicking again would toggle it OFF and the assertion below
+    // would fail deterministically. Click only when the pill is absent so
+    // the end state is always "🔥 reacted".
+    if ((await reactionPill.count()) === 0) {
+      await reactionsSection
+        .getByRole('button', { name: REACTION_EMOJI })
+        .click();
+    }
+    await expect(reactionPill).toBeVisible();
 
     await page.reload();
     await expect(page.getByText(commentText, { exact: true })).toBeVisible();
-    const reactionsSectionAfterReload = page
-      .getByRole('heading', { name: 'Reactions', exact: true })
-      .locator('xpath=ancestor::section[1]');
     await expect(
-      reactionsSectionAfterReload.getByText(`${REACTION_EMOJI}1`, {
-        exact: false,
-      })
+      page
+        .getByRole('heading', { name: 'Reactions', exact: true })
+        .locator('xpath=ancestor::section[1]')
+        .getByText(`${REACTION_EMOJI}1`, { exact: false })
     ).toBeVisible();
 
     // Log in as the post author in a fresh context so we can inspect their
