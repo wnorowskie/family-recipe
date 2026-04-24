@@ -132,14 +132,25 @@ async function seedTestUser(familySpaceId: string): Promise<string | null> {
   return user.id;
 }
 
-// Deterministic fixture IDs — Playwright specs assert by content/ID.
-const E2E_POST_ID = 'e2e-post-001';
-const E2E_COMMENT_ID = 'e2e-comment-001';
-const E2E_REACTION_ID = 'e2e-reaction-001';
-const E2E_RECIPE_POST_ID = 'e2e-recipe-001';
-const E2E_RECIPE_DETAILS_ID = 'e2e-recipe-details-001';
-const E2E_COOKED_EVENT_ID = 'e2e-cooked-001';
-const E2E_NOTIFICATION_ID = 'e2e-notification-001';
+// Deterministic fixture IDs — Playwright specs assert by ID. Shaped to pass
+// Zod's `.cuid()` check (starts with 'c', 9+ alphanumeric chars) so they're
+// accepted by route handlers that validate postId/commentId as CUIDs — see
+// [src/lib/validation.ts] postIdParamSchema, commentIdParamSchema.
+const E2E_POST_ID = 'ce2epost001';
+const E2E_COMMENT_ID = 'ce2ecomment001';
+const E2E_REACTION_ID = 'ce2ereaction001';
+const E2E_RECIPE_POST_ID = 'ce2erecipe001';
+const E2E_RECIPE_DETAILS_ID = 'ce2erd001';
+const E2E_COOKED_EVENT_ID = 'ce2ecooked001';
+const E2E_NOTIFICATION_ID = 'ce2enotif001';
+
+// Second E2E user so `claude-test` can act on a post they didn't author — the
+// `Notification` flow (#104) filters self-actions in [src/lib/notifications.ts],
+// so without two users the comment/reaction smoke can't verify delivery.
+const E2E_AUTHOR_USERNAME = 'e2e-author';
+const E2E_AUTHOR_EMAIL = 'e2e-author@example.local';
+const E2E_AUTHOR_NAME = 'E2E Author';
+const E2E_AUTHOR_PASSWORD = 'e2e-author-password';
 
 async function seedE2EFixtures(familySpaceId: string, userId: string) {
   if (process.env.SEED_E2E !== '1') return;
@@ -148,9 +159,33 @@ async function seedE2EFixtures(familySpaceId: string, userId: string) {
     return;
   }
 
+  const authorPasswordHash = await bcrypt.hash(E2E_AUTHOR_PASSWORD, 10);
+  const author = await prisma.user.upsert({
+    where: { email: E2E_AUTHOR_EMAIL },
+    update: { passwordHash: authorPasswordHash, name: E2E_AUTHOR_NAME },
+    create: {
+      email: E2E_AUTHOR_EMAIL,
+      username: E2E_AUTHOR_USERNAME,
+      name: E2E_AUTHOR_NAME,
+      passwordHash: authorPasswordHash,
+    },
+  });
+
+  await prisma.familyMembership.upsert({
+    where: {
+      familySpaceId_userId: { familySpaceId, userId: author.id },
+    },
+    update: {},
+    create: {
+      familySpaceId,
+      userId: author.id,
+      role: 'member',
+    },
+  });
+
   const postData = {
     familySpaceId,
-    authorId: userId,
+    authorId: author.id,
     title: 'E2E Seed Post',
     caption: 'Deterministic post for Playwright smoke suite',
     hasRecipeDetails: false,
@@ -224,12 +259,9 @@ async function seedE2EFixtures(familySpaceId: string, userId: string) {
     create: { id: E2E_COOKED_EVENT_ID, ...cookedEventData },
   });
 
-  // V1 only seeds one user, so actor == recipient here. The DB allows it;
-  // UI business logic that filters self-notifications is validated in tests,
-  // not at seed time.
   const notificationData = {
     familySpaceId,
-    recipientId: userId,
+    recipientId: author.id,
     actorId: userId,
     type: 'comment',
     postId: E2E_POST_ID,
