@@ -19,7 +19,7 @@ import { expect, test } from '@playwright/test';
 
 test.use({ storageState: 'e2e/.auth/claude-test.json' });
 
-const RECIPE_POST_ID = 'e2e-recipe-001';
+const RECIPE_POST_ID = 'ce2erecipe001';
 const COOKED_RATING = 5;
 
 test(
