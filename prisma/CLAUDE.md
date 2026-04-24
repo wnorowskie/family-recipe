@@ -36,12 +36,15 @@ To rotate the master key, do it manually via the DB — there is no API for it.
 
 Setting `SEED_E2E=1` (alongside the default non-prod `NODE_ENV`) adds a deterministic fixture set on top of the baseline seed, for the Playwright smoke suite (#58 / #102):
 
-- one post (`id='e2e-post-001'`, title `E2E Seed Post`) authored by `claude-test`
-- one comment on that post (`id='e2e-comment-001'`)
-- one reaction on that post (`id='e2e-reaction-001'`, emoji `❤️`)
-- one recipe post (`id='e2e-recipe-001'`, title `E2E Seed Recipe`, `hasRecipeDetails=true`) with `RecipeDetails`
-- one cooked event against the recipe (`id='e2e-cooked-001'`, rating 5)
-- one notification for `claude-test` (`id='e2e-notification-001'`, type `comment`)
+- a second user `e2e-author` (email `e2e-author@example.local`, password `e2e-author-password`) in the same family space, so `claude-test` can act on a post they didn't author — [src/lib/notifications.ts](../src/lib/notifications.ts) filters self-notifications, which would otherwise suppress comment/reaction delivery in the smoke suite
+- one post (`id='ce2epost001'`, title `E2E Seed Post`) authored by `e2e-author`
+- one comment on that post (`id='ce2ecomment001'`) by `claude-test`
+- one reaction on that post (`id='ce2ereaction001'`, emoji `❤️`) by `claude-test`
+- one recipe post (`id='ce2erecipe001'`, title `E2E Seed Recipe`, `hasRecipeDetails=true`) authored by `claude-test`, with `RecipeDetails`
+- one cooked event against the recipe (`id='ce2ecooked001'`, rating 5) by `claude-test`
+- one notification for `e2e-author` (`id='ce2enotif001'`, type `comment`, actor `claude-test`)
+
+Fixture IDs are shaped to pass Zod's `.cuid()` check — route handlers that validate postId/commentId as CUIDs reject hyphenated IDs like `e2e-post-001`.
 
 All upserts keyed on the deterministic IDs, so re-running `SEED_E2E=1 npm run db:seed` does not duplicate rows. Specs assert by ID or content (`E2E Seed Post`, etc.). Ignored when `NODE_ENV=production` or `SEED_E2E` is unset.
 

@@ -7,6 +7,8 @@ This directory currently contains:
 - [auth.spec.ts](auth.spec.ts) — login + protected-route gating (PoC flow from #58).
 - [signup.spec.ts](signup.spec.ts) — signup via family master key (#106). Tagged `@smoke @destructive`; CI-only (see [Tags](#tags)).
 - [post-with-photo.spec.ts](post-with-photo.spec.ts) — create a post with a photo upload (#103). Tagged `@smoke`; uses shared storageState (see [Authentication](#authentication)).
+- [cooked-event.spec.ts](cooked-event.spec.ts) — log a cooked event against the seeded recipe (#105). Tagged `@smoke`; uses shared storageState.
+- [comment-reaction.spec.ts](comment-reaction.spec.ts) — comment + react on the seeded post and verify the author's notification (#104). Tagged `@smoke`; uses shared storageState, plus a fresh context signed in as the seeded `e2e-author` for the notification assertion.
 
 Further smoke flows land in follow-up tickets (see the research doc for the list).
 
