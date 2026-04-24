@@ -109,7 +109,7 @@ Always finish with `npm test` (the pre-commit hook doesn't run it). If the sessi
 
 ## CI gates
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) runs typecheck → lint → test → docker build → trivy scan, plus prisma validate (postgres schema), `npm audit`, dependency-review, semgrep, IaC scan, and gitleaks. Separate workflows cover [api-ci.yml](.github/workflows/api-ci.yml) and [recipe-url-importer-ci.yml](.github/workflows/recipe-url-importer-ci.yml). Deploy workflows target GCP Cloud Run.
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs typecheck → lint → test → docker build → trivy scan, plus prisma validate (postgres schema), `npm audit`, dependency-review, semgrep, IaC scan, and gitleaks. Jobs are gated per-surface by a top `changes` job (dorny/paths-filter) — each job always runs so required-check contexts report, but expensive steps short-circuit when their surface (`next` / `prisma` / `infra`) didn't change. Separate workflows cover [api-ci.yml](.github/workflows/api-ci.yml) and [recipe-url-importer-ci.yml](.github/workflows/recipe-url-importer-ci.yml). Deploy workflows target GCP Cloud Run.
 
 ## What's out of scope (don't add unless asked)
 
