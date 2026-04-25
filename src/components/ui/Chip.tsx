@@ -12,10 +12,10 @@ interface ChipProps extends HTMLAttributes<HTMLSpanElement> {
 
 const variantClasses: Record<ChipVariant, string> = {
   active: 'bg-[var(--bg-primary)] text-[var(--fg-on-primary)] border-0',
-  soft: 'bg-[var(--color-gray-200)] text-[var(--fg-body)] border-0',
+  soft: 'bg-[var(--bg-chip)] text-[var(--fg-body)] border-0',
   outline:
     'bg-transparent text-[var(--fg-body)] border border-[var(--border-input)]',
-  muted: 'bg-[var(--color-gray-100)] text-[var(--fg-meta)] border-0',
+  muted: 'bg-[var(--bg-chip-soft)] text-[var(--fg-meta)] border-0',
 };
 
 const sizeClasses: Record<ChipSize, string> = {
