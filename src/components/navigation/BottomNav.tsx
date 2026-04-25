@@ -35,7 +35,7 @@ export default function BottomNav() {
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 aria-label={label}
-                className="flex items-center justify-center rounded-full bg-[var(--bg-primary)] p-2 text-[var(--fg-on-primary)] transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
+                className="flex items-center justify-center rounded-full bg-[var(--bg-primary)] p-3 text-[var(--fg-on-primary)] transition-colors hover:bg-[var(--color-gray-900)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
               >
                 <Icon size={24} aria-hidden="true" />
               </Link>
