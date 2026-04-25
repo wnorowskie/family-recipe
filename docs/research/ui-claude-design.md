@@ -99,14 +99,19 @@ Before-screenshots for the three POC surfaces are in [`screenshots/ui-claude-des
 
 ## POC results
 
-The Claude Design canvas → Handoff to Claude Code round completed end-to-end. The handoff bundle was retrieved from `https://api.anthropic.com/v1/design/h/IcDALLIxEMAV65Uus9ikFw` (gzipped tarball, 880KB extracted). The `README.md`, `colors_and_type.css`, and `SKILL.md` are committed under [`handoff-ui-claude-design/`](handoff-ui-claude-design/) as a stable local reference for the implementation tickets — the URL may not stay live indefinitely.
+The Claude Design canvas → Handoff to Claude Code round completed end-to-end across two iterations:
+
+- **v1**: `https://api.anthropic.com/v1/design/h/IcDALLIxEMAV65Uus9ikFw` — full design system (tokens, fonts, voice, primitives, JSX kits for Timeline / PostDetail / RecipesBrowse / Profile / AuthLogin / BottomTabBar / Header).
+- **v2**: `https://api.anthropic.com/v1/design/h/HkOvVKpccJnUMNuQ-Nr87g` — adds `AddPost.jsx` (Frame 06) closing the only screen gap from v1.
+
+The `README.md`, `colors_and_type.css`, `SKILL.md`, and the full `ui_kit/` JSX prototypes are committed under [`handoff-ui-claude-design/`](handoff-ui-claude-design/) as a stable local reference for the implementation tickets — the hosted URLs may not stay live indefinitely.
 
 ### What Claude Design produced
 
 - **Tokens** ([`handoff-ui-claude-design/colors_and_type.css`](handoff-ui-claude-design/colors_and_type.css)) — full grayscale palette (gray-50 through gray-900 in `oklch`), red destructive accent, semantic surface/text/border tokens, type scale (xs–2xl), spacing scale, radii scale, motion tokens. Tailwind-version-agnostic CSS custom properties.
 - **Fonts** — Fraunces variable TTFs (regular + italic) with SOFT/WONK/opsz/wght axes. Not committed in this research dir — they'll move to `public/fonts/` in the foundation ticket.
 - **Design system documentation** ([`handoff-ui-claude-design/DESIGN_SYSTEM_README.md`](handoff-ui-claude-design/DESIGN_SYSTEM_README.md)) — voice/tone, casing, microcopy patterns, palette, type, spacing, borders, shadows (almost none — the system uses borders for separation), corner radii (the signature shape is the **14px-radius white card with 1px gray-200 border, no shadow**), iconography (Lucide React), emoji policy (UGC reactions only, never chrome).
-- **JSX prototypes** — Primitives (Button, Chip, Avatar) + per-screen kits (Header, BottomTabBar, Timeline, PostDetail, RecipesBrowse, Profile, AuthLogin). These are _prototypes_, not production code — the handoff README explicitly directs implementers to "match the visual output, don't copy the prototype's internal structure."
+- **JSX prototypes** ([`handoff-ui-claude-design/ui-kit/`](handoff-ui-claude-design/ui-kit/)) — Primitives (Button, Chip, Avatar) + per-screen kits (Header, BottomTabBar, Timeline, PostDetail, RecipesBrowse, Profile, AuthLogin, **AddPost** added in v2). These are _prototypes_, not production code — the handoff README explicitly directs implementers to "match the visual output, don't copy the prototype's internal structure."
 - **Skill manifest** ([`handoff-ui-claude-design/SKILL.md`](handoff-ui-claude-design/SKILL.md)) — installable as a Claude Code skill so future design work in this codebase can re-use the system without re-fetching.
 
 ### Closed open questions
@@ -123,7 +128,7 @@ Claude Design surfaced five open questions; user decisions made on each:
 
 ### Gaps in the handoff (carried into implementation tickets)
 
-- **No AddPost screen** in the kit — the kit shipped Timeline / PostDetail / RecipesBrowse / Profile / AuthLogin but the AddPost form layout was not drawn. A follow-up Claude Design round was prompted; the result will land in the AddPost implementation ticket, not in this research doc.
+- ~~No AddPost screen in the kit~~ — closed in v2 of the bundle: `AddPost.jsx` (Frame 06) covers the new-post composer with photo dropzone, title + caption, and the collapsible "Add Recipe Details (Optional)" section. Two implementation caveats noted in [#139](https://github.com/wnorowskie/family-recipe/issues/139): (a) the kit simplifies ingredients/steps to single textareas while production has per-row drag-reorderable rows — keep the production structure, restyle each row with the new primitives; (b) the kit labels footer buttons "Cancel/Post" while production says "Reset/Share with family" — the warmer production microcopy wins per the design system's voice rules.
 - **Tailwind v3, not v4.** The handoff README assumed Tailwind v4 + `@theme` syntax. This repo is on Tailwind v3 — tokens will be ported via `theme.extend` and CSS custom properties in `globals.css` instead.
 
 ### Implementation tickets unblocked
