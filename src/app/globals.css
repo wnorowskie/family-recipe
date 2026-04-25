@@ -5,6 +5,50 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* --- Family Recipe design system tokens (per docs/research/handoff-ui-claude-design/colors_and_type.css) ---
+     Additive only: not yet applied to global elements. Available for `src/components/ui/` primitives
+     and per-screen redesign tickets (#137 navbar, #138 timeline, #139 add form). */
+
+  /* Color: gray scale (the whole system) */
+  --color-gray-50: oklch(0.985 0.002 247.839);
+  --color-gray-100: oklch(0.967 0.003 264.542);
+  --color-gray-200: oklch(0.928 0.006 264.531);
+  --color-gray-300: oklch(0.872 0.01 258.338);
+  --color-gray-400: oklch(0.707 0.022 261.325);
+  --color-gray-500: oklch(0.551 0.027 264.364);
+  --color-gray-600: oklch(0.446 0.03 256.802);
+  --color-gray-700: oklch(0.373 0.034 259.733);
+  --color-gray-800: oklch(0.278 0.033 256.848);
+  --color-gray-900: oklch(0.21 0.034 264.665);
+
+  /* Color: destructive accent */
+  --color-red-400: oklch(0.704 0.191 22.216);
+  --color-red-500: oklch(0.637 0.237 25.331);
+  --color-red-600: oklch(0.577 0.245 27.325);
+
+  /* Semantic surface tokens */
+  --bg-page: var(--color-gray-50);
+  --bg-surface: #ffffff;
+  --bg-muted: var(--color-gray-100);
+  --bg-chip: var(--color-gray-200);
+  --bg-chip-soft: var(--color-gray-100);
+  --bg-primary: var(--color-gray-800);
+
+  /* Semantic text tokens */
+  --fg-strong: var(--color-gray-900);
+  --fg-body: var(--color-gray-700);
+  --fg-meta: var(--color-gray-600);
+  --fg-caption: var(--color-gray-500);
+  --fg-placeholder: var(--color-gray-400);
+  --fg-on-primary: #ffffff;
+  --fg-destructive: var(--color-red-600);
+
+  /* Semantic border tokens */
+  --border-card: var(--color-gray-200);
+  --border-input: var(--color-gray-300);
+  --border-active: var(--color-gray-900);
+  --border-error: var(--color-red-400);
 }
 
 @media (prefers-color-scheme: dark) {
