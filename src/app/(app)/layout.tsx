@@ -37,7 +37,7 @@ export default async function AppLayout({
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 gap-4">
+        <div className="mx-auto flex max-w-3xl lg:max-w-2xl items-center justify-between px-4 py-4 gap-4">
           <div>
             <h1 className="text-xl font-bold text-gray-900">
               Wnorowski Family Recipe
@@ -52,7 +52,9 @@ export default async function AppLayout({
           </div>
         </div>
       </header>
-      <main className="mx-auto mt-4 max-w-3xl px-4 pb-10">{children}</main>
+      <main className="mx-auto mt-4 max-w-3xl lg:max-w-2xl px-4 pb-10">
+        {children}
+      </main>
       <BottomNav />
     </div>
   );
