@@ -39,11 +39,11 @@ export default function PillButton({
 
   return (
     <button
+      {...rest}
       type={type}
       aria-pressed={pressed}
       disabled={disabled}
       className={composed}
-      {...rest}
     >
       {children}
     </button>
