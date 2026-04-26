@@ -1,6 +1,6 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 
-export type ChipVariant = 'active' | 'soft' | 'outline' | 'muted';
+export type ChipVariant = 'active' | 'soft' | 'outline' | 'muted' | 'surface';
 export type ChipSize = 'sm' | 'md';
 
 interface ChipProps extends HTMLAttributes<HTMLSpanElement> {
@@ -16,10 +16,11 @@ const variantClasses: Record<ChipVariant, string> = {
   outline:
     'bg-transparent text-[var(--fg-body)] border border-[var(--border-input)]',
   muted: 'bg-[var(--bg-chip-soft)] text-[var(--fg-meta)] border-0',
+  surface: 'bg-[var(--bg-surface)] text-[var(--fg-strong)] border-0',
 };
 
 const sizeClasses: Record<ChipSize, string> = {
-  sm: 'px-2 py-0.5 text-[11px]',
+  sm: 'px-2 py-0.5 text-xs',
   md: 'px-3 py-1 text-xs',
 };
 

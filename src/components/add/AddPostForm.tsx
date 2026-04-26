@@ -29,7 +29,14 @@ import {
   X,
 } from 'lucide-react';
 
-import { Button, Card, Input, PillButton, Textarea } from '@/components/ui';
+import {
+  Button,
+  Card,
+  Chip,
+  Input,
+  PillButton,
+  Textarea,
+} from '@/components/ui';
 import { ingredientUnitOptions } from '@/lib/ingredients';
 import { MAX_PHOTO_COUNT } from '@/lib/postPayload';
 import { type RecipeIngredientUnit } from '@/lib/validation';
@@ -1223,9 +1230,9 @@ export default function AddPostForm({
                     </div>
                     <div className="absolute top-2 left-2">
                       {index === 0 && (
-                        <span className="bg-[var(--bg-surface)] text-xs font-medium px-2 py-0.5 rounded-full text-[var(--fg-strong)]">
+                        <Chip variant="surface" size="sm">
                           Cover
-                        </span>
+                        </Chip>
                       )}
                     </div>
                     <div className="absolute top-2 right-2 flex gap-1">
