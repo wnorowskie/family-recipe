@@ -39,7 +39,11 @@ import {
 } from '@/components/ui';
 import { ingredientUnitOptions } from '@/lib/ingredients';
 import { MAX_PHOTO_COUNT } from '@/lib/postPayload';
-import { type RecipeIngredientUnit } from '@/lib/validation';
+import {
+  MAX_RECIPE_INGREDIENT_NAME_LENGTH,
+  MAX_RECIPE_ORIGIN_LENGTH,
+  type RecipeIngredientUnit,
+} from '@/lib/validation';
 import { mapImporterResponseToPrefill } from './importerMapping';
 
 const courseOptions = [
@@ -168,6 +172,7 @@ function SortableIngredientRow({
             <Input
               type="text"
               placeholder="Ingredient name"
+              maxLength={MAX_RECIPE_INGREDIENT_NAME_LENGTH}
               value={ingredient.name}
               data-ingredient-focus={ingredient.id}
               onChange={(event) =>
@@ -934,6 +939,13 @@ export default function AddPostForm({
         continue;
       }
 
+      if (name.length > MAX_RECIPE_INGREDIENT_NAME_LENGTH) {
+        setFormError(
+          `Ingredient ${index + 1} name must be ${MAX_RECIPE_INGREDIENT_NAME_LENGTH} characters or fewer`
+        );
+        return;
+      }
+
       let parsedQuantity: number | undefined;
       if (quantityValue) {
         parsedQuantity = Number(quantityValue);
@@ -955,6 +967,14 @@ export default function AddPostForm({
     const sanitizedSteps = steps
       .map((step) => step.text.trim())
       .filter((text) => text.length > 0);
+
+    const trimmedOrigin = recipe.origin.trim();
+    if (trimmedOrigin.length > MAX_RECIPE_ORIGIN_LENGTH) {
+      setFormError(
+        `Origin must be ${MAX_RECIPE_ORIGIN_LENGTH} characters or fewer`
+      );
+      return;
+    }
 
     if (
       recipeHasCoreDetails &&
@@ -1042,7 +1062,7 @@ export default function AddPostForm({
 
       if (recipeHasAnyData) {
         payload.recipe = {
-          origin: recipe.origin.trim() || undefined,
+          origin: trimmedOrigin || undefined,
           ingredients: sanitizedIngredients.map((ingredient) => ({
             name: ingredient.name,
             unit: ingredient.unit,
@@ -1335,6 +1355,7 @@ export default function AddPostForm({
                   id="origin"
                   type="text"
                   placeholder="e.g. Grandma's recipe, NYT Cooking…"
+                  maxLength={MAX_RECIPE_ORIGIN_LENGTH}
                   value={recipe.origin}
                   onChange={(event) =>
                     handleRecipeChange('origin', event.target.value)
