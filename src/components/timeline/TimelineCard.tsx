@@ -80,18 +80,20 @@ function EventMarker({
 function EventBody({ item }: { item: TimelineItem }) {
   switch (item.type) {
     case 'post_created':
-      return item.post.mainPhotoUrl ? (
+      return (
         <div className="relative mt-2 h-32 w-full overflow-hidden rounded-input bg-[var(--color-gray-200)]">
-          <Image
-            src={item.post.mainPhotoUrl}
-            alt={item.post.title}
-            fill
-            sizes="(min-width: 768px) 600px, 100vw"
-            className="object-cover"
-            unoptimized
-          />
+          {item.post.mainPhotoUrl ? (
+            <Image
+              src={item.post.mainPhotoUrl}
+              alt={item.post.title}
+              fill
+              sizes="(min-width: 768px) 600px, 100vw"
+              className="object-cover"
+              unoptimized
+            />
+          ) : null}
         </div>
-      ) : null;
+      );
 
     case 'comment_added':
       return (
