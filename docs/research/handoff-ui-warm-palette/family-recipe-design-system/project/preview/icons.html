@@ -1,0 +1,35 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body{margin:0;padding:24px;font-family:var(--font-sans);background:var(--bg-page);color:var(--fg-strong);}
+  .grid{display:grid;grid-template-columns:repeat(9,1fr);gap:14px;}
+  .ic{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--fg-meta);}
+  .ic svg{width:22px;height:22px;stroke-width:2;color:var(--fg-strong);}
+  .lbl{font-size:10px;}
+  .note{margin-top:14px;font-size:11px;color:var(--fg-meta);background:var(--bg-muted);padding:8px 12px;border-radius:8px;display:inline-block;}
+</style></head>
+<body>
+  <div class="grid">
+    <div class="ic"><i data-lucide="home"></i><span class="lbl">home</span></div>
+    <div class="ic"><i data-lucide="book"></i><span class="lbl">book</span></div>
+    <div class="ic"><i data-lucide="plus"></i><span class="lbl">plus</span></div>
+    <div class="ic"><i data-lucide="user"></i><span class="lbl">user</span></div>
+    <div class="ic"><i data-lucide="file-text"></i><span class="lbl">file-text</span></div>
+    <div class="ic"><i data-lucide="message-circle"></i><span class="lbl">message-circle</span></div>
+    <div class="ic"><i data-lucide="chef-hat"></i><span class="lbl">chef-hat</span></div>
+    <div class="ic"><i data-lucide="search"></i><span class="lbl">search</span></div>
+    <div class="ic"><i data-lucide="chevron-down"></i><span class="lbl">chevron-down</span></div>
+    <div class="ic"><i data-lucide="arrow-left"></i><span class="lbl">arrow-left</span></div>
+    <div class="ic"><i data-lucide="more-vertical"></i><span class="lbl">more-vertical</span></div>
+    <div class="ic"><i data-lucide="camera"></i><span class="lbl">camera</span></div>
+    <div class="ic"><i data-lucide="bookmark"></i><span class="lbl">bookmark</span></div>
+    <div class="ic"><i data-lucide="trash-2"></i><span class="lbl">trash-2</span></div>
+    <div class="ic"><i data-lucide="x"></i><span class="lbl">x</span></div>
+    <div class="ic"><i data-lucide="users"></i><span class="lbl">users</span></div>
+    <div class="ic"><i data-lucide="log-out"></i><span class="lbl">log-out</span></div>
+    <div class="ic"><i data-lucide="alert-circle"></i><span class="lbl">alert-circle</span></div>
+  </div>
+  <div class="note">Lucide line icons · 2px stroke · 24px chrome / 20px inline / 14px dense. Color inherited from context.</div>
+  <script>lucide.createIcons();</script>
+</body></html>

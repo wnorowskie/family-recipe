@@ -1,0 +1,32 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body{margin:0;padding:24px;font-family:var(--font-sans);background:var(--bg-page);color:var(--fg-strong);}
+  .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:14px 12px;}
+  .ic{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;color:var(--fg-meta);}
+  .ic svg{stroke:var(--fg-strong);}
+  .group{font-size:11px;color:var(--fg-meta);text-transform:uppercase;letter-spacing:.05em;margin:0 0 10px 0;font-weight:500;}
+</style></head>
+<body>
+  <div class="group">Lucide React · 2px stroke · 24/20/18/14 sizes · color inherits</div>
+  <div class="grid">
+    <div class="ic"><i data-lucide="home"></i>Home</div>
+    <div class="ic"><i data-lucide="book"></i>Book</div>
+    <div class="ic"><i data-lucide="plus"></i>Plus</div>
+    <div class="ic"><i data-lucide="user"></i>User</div>
+    <div class="ic"><i data-lucide="file-text"></i>FileText</div>
+    <div class="ic"><i data-lucide="message-circle"></i>MessageCircle</div>
+    <div class="ic"><i data-lucide="chef-hat"></i>ChefHat</div>
+    <div class="ic"><i data-lucide="search"></i>Search</div>
+    <div class="ic"><i data-lucide="chevron-down"></i>ChevronDown</div>
+    <div class="ic"><i data-lucide="arrow-left"></i>ArrowLeft</div>
+    <div class="ic"><i data-lucide="more-vertical"></i>MoreVertical</div>
+    <div class="ic"><i data-lucide="camera"></i>Camera</div>
+    <div class="ic"><i data-lucide="bookmark"></i>Bookmark</div>
+    <div class="ic"><i data-lucide="trash-2"></i>Trash2</div>
+    <div class="ic"><i data-lucide="users"></i>Users</div>
+    <div class="ic"><i data-lucide="log-out"></i>LogOut</div>
+  </div>
+  <script>lucide.createIcons();</script>
+</body></html>

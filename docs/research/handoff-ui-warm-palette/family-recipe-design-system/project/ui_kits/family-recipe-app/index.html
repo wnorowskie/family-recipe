@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Family Recipe — UI Kit</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg-page);
+    font-family: var(--font-body);
+    color: var(--fg-body);
+    min-height: 100vh;
+  }
+  .stage {
+    display: flex; gap: 32px; padding: 32px;
+    align-items: flex-start; justify-content: center;
+    flex-wrap: wrap;
+  }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .frame-label { font-size: 12px; color: var(--fg-caption); letter-spacing: 0.04em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" src="Primitives.jsx"></script>
+  <script type="text/babel" src="Cards.jsx"></script>
+  <script type="text/babel" src="Header.jsx"></script>
+  <script type="text/babel" src="BottomTabBar.jsx"></script>
+  <script type="text/babel" src="MobileFrame.jsx"></script>
+  <script type="text/babel" src="AuthLogin.jsx"></script>
+  <script type="text/babel" src="Timeline.jsx"></script>
+  <script type="text/babel" src="PostDetail.jsx"></script>
+  <script type="text/babel" src="RecipesBrowse.jsx"></script>
+  <script type="text/babel" src="Profile.jsx"></script>
+  <script type="text/babel" src="AddPost.jsx"></script>
+  <script type="text/babel">
+    function Phone({ label, screen, tab, onTab, header }) {
+      return (
+        <div className="frame-wrap">
+          <span className="frame-label">{label}</span>
+          <MobileFrame>
+            {header}
+            {screen}
+            {tab && <BottomTabBar active={tab} onChange={onTab}/>}
+          </MobileFrame>
+        </div>
+      );
+    }
+
+    function App() {
+      const [tab, setTab] = React.useState('timeline');
+      const [open, setOpen] = React.useState(null); // 'post' | null
+
+      React.useEffect(() => { lucide.createIcons(); });
+
+      // Frame 1: Login
+      const f1 = (
+        <Phone
+          label="01 — Log in"
+          screen={<AuthLogin onLogin={() => {}} onSignup={() => {}}/>}
+        />
+      );
+
+      // Frame 2: Timeline
+      const f2 = (
+        <Phone
+          label="02 — Family timeline"
+          tab="timeline" onTab={() => {}}
+          header={<Header title="Family Timeline" rightIcon="bell"/>}
+          screen={<Timeline onOpenPost={() => {}}/>}
+        />
+      );
+
+      // Frame 3: Recipe Detail
+      const f3 = (
+        <Phone
+          label="03 — Recipe detail"
+          tab="recipes" onTab={() => {}}
+          header={<Header title="Lemon Chicken" leftIcon="arrow-left" rightIcon="more-horizontal"/>}
+          screen={<PostDetail/>}
+        />
+      );
+
+      // Frame 4: Recipes Browse
+      const f4 = (
+        <Phone
+          label="04 — Browse recipes"
+          tab="recipes" onTab={() => {}}
+          screen={<RecipesBrowse/>}
+        />
+      );
+
+      // Frame 5: Profile
+      const f5 = (
+        <Phone
+          label="05 — Profile"
+          tab="profile" onTab={() => {}}
+          header={<Header title="Profile" rightIcon="settings"/>}
+          screen={<Profile/>}
+        />
+      );
+
+      // Frame 6: New Post
+      const f6 = (
+        <Phone
+          label="06 — New post"
+          tab="add" onTab={() => {}}
+          header={<Header title="New Post" leftIcon="x" rightIcon="more-horizontal"/>}
+          screen={<AddPost/>}
+        />
+      );
+
+      return (
+        <div className="stage">
+          {f1}{f2}{f3}{f4}{f5}{f6}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:24px;font-family:var(--font-sans);background:var(--bg-page);color:var(--fg-strong);}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+  .demo{background:var(--bg-page);padding:16px;border-radius:10px;}
+  .ex{background:#fff;border-radius:14px;padding:14px;font-size:13px;}
+  .lbl{font-size:11px;color:var(--fg-meta);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;font-weight:500;}
+  .v{font-family:var(--font-mono);font-size:10px;color:var(--fg-caption);margin-top:8px;}
+</style></head>
+<body>
+  <div class="grid">
+    <div>
+      <div class="lbl">Card (default)</div>
+      <div class="demo"><div class="ex" style="border:1px solid var(--border-card)">Lemon Chicken<div class="v">border-card · no shadow</div></div></div>
+    </div>
+    <div>
+      <div class="lbl">No-border surface</div>
+      <div class="demo"><div class="ex">Lemon Chicken<div class="v">flush within section</div></div></div>
+    </div>
+    <div>
+      <div class="lbl">Device frame mockup</div>
+      <div class="demo"><div class="ex" style="box-shadow:var(--shadow-frame)">Mobile preview<div class="v">shadow-frame (the only shadow)</div></div></div>
+    </div>
+  </div>
+</body></html>

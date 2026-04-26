@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Family Recipe — UI Kit (Print)</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg-page);
+    font-family: var(--font-body);
+    color: var(--fg-body);
+  }
+  .stage {
+    display: flex; gap: 32px; padding: 32px;
+    align-items: flex-start; justify-content: center;
+    flex-wrap: wrap;
+  }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; break-inside: avoid; }
+  .frame-label { font-size: 12px; color: var(--fg-caption); letter-spacing: 0.04em; text-transform: uppercase; }
+
+  /* Each phone frame becomes its own page so it never splits */
+  .page {
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 24px;
+    page-break-after: always;
+    break-after: page;
+  }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+
+  /* Cap content height so long screens (recipe detail) fit on one page */
+  .frame-wrap .frame {
+    max-height: 812px;
+  }
+
+  @media print {
+    @page { size: 420mm 260mm; margin: 8mm; }
+    html, body {
+      background: #fff !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body { background: #fff !important; }
+    .page { padding: 0; }
+    /* kill scroll regions inside phone frames so all content prints */
+    [data-printscroll] { overflow: visible !important; max-height: none !important; }
+    /* prevent React's transitions/hover from disturbing print */
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" src="Primitives.jsx"></script>
+  <script type="text/babel" src="Cards.jsx"></script>
+  <script type="text/babel" src="Header.jsx"></script>
+  <script type="text/babel" src="BottomTabBar.jsx"></script>
+  <script type="text/babel" src="MobileFrame.jsx"></script>
+  <script type="text/babel" src="AuthLogin.jsx"></script>
+  <script type="text/babel" src="Timeline.jsx"></script>
+  <script type="text/babel" src="PostDetail.jsx"></script>
+  <script type="text/babel" src="RecipesBrowse.jsx"></script>
+  <script type="text/babel" src="Profile.jsx"></script>
+  <script type="text/babel">
+    function Phone({ label, screen, tab, onTab, header }) {
+      return (
+        <div className="frame-wrap">
+          <span className="frame-label">{label}</span>
+          <div className="frame">
+            <MobileFrame>
+              {header}
+              {screen}
+              {tab && <BottomTabBar active={tab} onChange={onTab}/>}
+            </MobileFrame>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      React.useEffect(() => {
+        lucide.createIcons();
+        // mark scroll regions so print CSS can release them
+        document.querySelectorAll('div').forEach(el => {
+          const cs = getComputedStyle(el);
+          if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
+            el.setAttribute('data-printscroll', '');
+          }
+        });
+        // signal ready
+        window.__appReady = true;
+      });
+
+      const frames = [
+        { label: '01 — Log in', screen: <AuthLogin/> },
+        { label: '02 — Family timeline', tab: 'timeline', header: <Header title="Family Timeline" rightIcon="bell"/>, screen: <Timeline/> },
+        { label: '03 — Recipe detail', tab: 'recipes', header: <Header title="Lemon Chicken" leftIcon="arrow-left" rightIcon="more-horizontal"/>, screen: <PostDetail/> },
+        { label: '04 — Browse recipes', tab: 'recipes', screen: <RecipesBrowse/> },
+        { label: '05 — Profile', tab: 'profile', header: <Header title="Profile" rightIcon="settings"/>, screen: <Profile/> },
+      ];
+
+      return (
+        <>
+          {frames.map((f, i) => (
+            <div className="page" key={i}>
+              <Phone {...f} onTab={() => {}}/>
+            </div>
+          ))}
+        </>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+
+    // Auto-print once everything is ready
+    (async function autoPrint() {
+      // wait for fonts
+      if (document.fonts && document.fonts.ready) {
+        try { await document.fonts.ready; } catch (e) {}
+      }
+      // wait for app to finish first render + lucide icons
+      const start = Date.now();
+      while (!window.__appReady && Date.now() - start < 5000) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+      // small safety delay so layout settles
+      await new Promise(r => setTimeout(r, 600));
+      window.print();
+    })();
+  </script>
+</body>
+</html>

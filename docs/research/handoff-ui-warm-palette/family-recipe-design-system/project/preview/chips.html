@@ -1,0 +1,18 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:24px;font-family:var(--font-sans);background:var(--bg-page);color:var(--fg-strong);}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+  .lbl{width:120px;font-size:11px;color:var(--fg-meta);text-transform:uppercase;letter-spacing:.05em;}
+  .pill{padding:4px 12px;border-radius:9999px;font-size:12px;}
+  .pill.tag-active{background:var(--color-gray-800);color:#fff;}
+  .pill.tag-soft{background:var(--color-gray-200);color:var(--fg-body);}
+  .pill.outline{background:transparent;color:var(--fg-body);border:1px solid var(--border-input);}
+  .chip-soft{background:var(--color-gray-100);color:var(--fg-meta);font-size:12px;padding:2px 8px;border-radius:4px;}
+</style></head>
+<body>
+  <div class="row"><div class="lbl">Tag · active</div><span class="pill tag-active">quick</span><span class="pill tag-active">family classic</span></div>
+  <div class="row"><div class="lbl">Tag · soft</div><span class="pill tag-soft">holiday</span><span class="pill tag-soft">kid-friendly</span><span class="pill tag-soft">vegetarian</span></div>
+  <div class="row"><div class="lbl">Course · outline</div><span class="pill outline">Breakfast</span><span class="pill outline">Lunch</span><span class="pill tag-active">Dinner</span><span class="pill outline">Dessert</span></div>
+  <div class="row"><div class="lbl">Recipe-row chip</div><span class="chip-soft">Dinner</span><span class="chip-soft">quick</span><span class="chip-soft">comfort food</span></div>
+</body></html>
