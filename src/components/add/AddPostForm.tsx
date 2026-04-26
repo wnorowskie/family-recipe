@@ -29,7 +29,7 @@ import {
   X,
 } from 'lucide-react';
 
-import { Button, Card, Input, Textarea } from '@/components/ui';
+import { Button, Card, Input, PillButton, Textarea } from '@/components/ui';
 import { ingredientUnitOptions } from '@/lib/ingredients';
 import { MAX_PHOTO_COUNT } from '@/lib/postPayload';
 import { type RecipeIngredientUnit } from '@/lib/validation';
@@ -64,18 +64,6 @@ const sectionHeadingClass = 'text-lg font-medium text-[var(--fg-strong)]';
 const sectionSubtitleClass = 'text-sm text-[var(--fg-meta)]';
 const selectClass =
   'w-full rounded-input border border-[var(--border-input)] bg-[var(--bg-surface)] px-4 py-3 text-base text-[var(--fg-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)] focus-visible:ring-offset-1';
-
-function pillClass(active: boolean, disabled = false): string {
-  return [
-    'rounded-full px-3 py-1 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]',
-    active
-      ? 'bg-[var(--bg-primary)] text-[var(--fg-on-primary)] border border-transparent'
-      : 'bg-[var(--bg-surface)] text-[var(--fg-body)] border border-[var(--border-input)] hover:border-[var(--border-active)]',
-    disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer',
-  ]
-    .filter(Boolean)
-    .join(' ');
-}
 
 interface ExistingPhotoAttachment {
   id: string;
@@ -1412,15 +1400,14 @@ export default function AddPostForm({
                     const disabled =
                       !selected && selectedCourses.length >= MAX_COURSES;
                     return (
-                      <button
+                      <PillButton
                         key={option.value}
-                        type="button"
-                        onClick={() => toggleCourseSelection(option.value)}
+                        pressed={selected}
                         disabled={disabled}
-                        className={pillClass(selected, disabled)}
+                        onClick={() => toggleCourseSelection(option.value)}
                       >
                         {option.label}
-                      </button>
+                      </PillButton>
                     );
                   })}
                 </div>
@@ -1431,19 +1418,18 @@ export default function AddPostForm({
                   {difficultyOptions.map((option) => {
                     const selected = recipe.difficulty === option.value;
                     return (
-                      <button
+                      <PillButton
                         key={option.value}
-                        type="button"
+                        pressed={selected}
                         onClick={() =>
                           handleRecipeChange(
                             'difficulty',
                             selected ? '' : option.value
                           )
                         }
-                        className={pillClass(selected)}
                       >
                         {option.label}
-                      </button>
+                      </PillButton>
                     );
                   })}
                 </div>
@@ -1551,15 +1537,14 @@ export default function AddPostForm({
                             const disabled =
                               !selected && tags.length >= MAX_TAGS;
                             return (
-                              <button
+                              <PillButton
                                 key={tag.id}
-                                type="button"
-                                onClick={() => toggleTagSelection(tag.name)}
+                                pressed={selected}
                                 disabled={disabled}
-                                className={pillClass(selected, disabled)}
+                                onClick={() => toggleTagSelection(tag.name)}
                               >
                                 #{tag.name}
-                              </button>
+                              </PillButton>
                             );
                           })}
                         </div>
