@@ -1,0 +1,211 @@
+/*
+ * Family Recipe — Warm vs Grayscale theme exploration
+ *
+ * Strategy: pure CSS-variable swap. The grayscale tokens are the
+ * shipped values from the design system. The warm tokens override
+ * surface/foreground/border roles only when [data-theme="warm"]
+ * is set on an ancestor. Type, spacing, radii, shadows, motion are
+ * unchanged — they live on :root for both themes.
+ */
+
+@font-face {
+  font-family: 'Fraunces';
+  src: url('fonts/Fraunces-VariableFont_SOFT_WONK_opsz_wght.ttf')
+    format('truetype-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fraunces';
+  src: url('fonts/Fraunces-Italic-VariableFont_SOFT_WONK_opsz_wght.ttf')
+    format('truetype-variations');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  /* Type — IDENTICAL across themes */
+  --font-display: 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-body: var(--font-sans);
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  /* Radii — IDENTICAL */
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-pill: 9999px;
+  --radius-frame: 40px;
+
+  /* Spacing — IDENTICAL */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+
+  /* Shadow + motion — IDENTICAL */
+  --shadow-frame:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --duration-base: 150ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   GRAYSCALE — shipped values (default)
+   ────────────────────────────────────────────────────────────── */
+[data-theme='gray'],
+:root {
+  --color-white: #ffffff;
+  --color-gray-50: oklch(0.985 0.002 247.839);
+  --color-gray-100: oklch(0.967 0.003 264.542);
+  --color-gray-200: oklch(0.928 0.006 264.531);
+  --color-gray-300: oklch(0.872 0.01 258.338);
+  --color-gray-400: oklch(0.707 0.022 261.325);
+  --color-gray-500: oklch(0.551 0.027 264.364);
+  --color-gray-600: oklch(0.446 0.03 256.802);
+  --color-gray-700: oklch(0.373 0.034 259.733);
+  --color-gray-800: oklch(0.278 0.033 256.848);
+  --color-gray-900: oklch(0.21 0.034 264.665);
+  --color-red-600: oklch(0.577 0.245 27.325);
+
+  --bg-page: var(--color-gray-50);
+  --bg-surface: var(--color-white);
+  --bg-muted: var(--color-gray-100);
+  --bg-chip: var(--color-gray-200);
+  --bg-chip-soft: var(--color-gray-100);
+  --bg-primary: var(--color-gray-800);
+  --fg-on-primary: var(--color-white);
+
+  --fg-strong: var(--color-gray-900);
+  --fg-body: var(--color-gray-700);
+  --fg-meta: var(--color-gray-600);
+  --fg-caption: var(--color-gray-500);
+  --fg-placeholder: var(--color-gray-400);
+  --fg-destructive: var(--color-red-600);
+
+  --border-card: var(--color-gray-200);
+  --border-input: var(--color-gray-300);
+  --border-active: var(--color-gray-900);
+
+  --photo-placeholder: var(--color-gray-200);
+  --focus-ring: oklch(0.708 0 0);
+  --device-frame: var(--color-gray-800);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   WARM — proposed variant
+   Surfaces: unbleached paper / faint cream (no yellow cast)
+   Foreground: deep warm brown
+   Primary: muted sage / herb green
+   Borders: warm taupe / clay
+   ────────────────────────────────────────────────────────────── */
+[data-theme='warm'] {
+  /* Cream surface scale — chroma stays low (~0.012) so it reads "warm
+     paper" not "yellow". Hue locked around 75–85° (warm neutral). */
+  --color-white: oklch(0.992 0.005 85); /* paper-white card */
+  --color-gray-50: oklch(0.97 0.012 80); /* page = unbleached cream */
+  --color-gray-100: oklch(0.94 0.014 78); /* muted chip / version bar */
+  --color-gray-200: oklch(0.89 0.018 75); /* card border, photo bg */
+  --color-gray-300: oklch(0.82 0.022 72); /* input border, dashed */
+  --color-gray-400: oklch(0.66 0.028 60); /* placeholder taupe */
+  --color-gray-500: oklch(0.53 0.032 50); /* clay caption */
+  --color-gray-600: oklch(0.43 0.035 45); /* warm meta */
+  --color-gray-700: oklch(0.35 0.038 40); /* body — warm brown */
+  --color-gray-800: oklch(0.26 0.038 38); /* deep brown (text, frame) */
+  --color-gray-900: oklch(0.2 0.035 35); /* heading espresso */
+
+  /* Sage primary — muted herb green. Chosen so it contrasts against the
+     cream surfaces (~5.2:1 against gray-50, ~6.8:1 against white) and
+     against the deep-brown text it sits next to. */
+  --primary-500: oklch(0.52 0.085 145); /* sage 500 */
+  --primary-600: oklch(0.45 0.09 145); /* sage 600 — pressed */
+  --primary-100: oklch(0.92 0.035 140); /* sage tint for chips */
+
+  --color-red-600: oklch(0.56 0.18 30); /* warmer terracotta-red destructive */
+
+  --bg-page: var(--color-gray-50);
+  --bg-surface: var(--color-white);
+  --bg-muted: var(--color-gray-100);
+  --bg-chip: var(--color-gray-200);
+  --bg-chip-soft: var(--color-gray-100);
+  --bg-primary: var(--primary-500); /* sage instead of near-black */
+  --fg-on-primary: oklch(0.992 0.005 85); /* paper-white */
+
+  --fg-strong: var(--color-gray-900);
+  --fg-body: var(--color-gray-700);
+  --fg-meta: var(--color-gray-600);
+  --fg-caption: var(--color-gray-500);
+  --fg-placeholder: var(--color-gray-400);
+  --fg-destructive: var(--color-red-600);
+
+  --border-card: var(--color-gray-200);
+  --border-input: var(--color-gray-300);
+  --border-active: var(--color-gray-900);
+
+  --photo-placeholder: var(--color-gray-200);
+  /* Focus ring: shifted to the sage primary so it reads as brand,
+     not as a stray neutral. Contrast vs surface = ~3.8:1 (passes
+     non-text WCAG AA 3:1 for UI components). */
+  --focus-ring: var(--primary-500);
+  --device-frame: var(--color-gray-800);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Element defaults
+   ────────────────────────────────────────────────────────────── */
+html {
+  font-size: 16px;
+}
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--fg-body);
+  background: #efeae3;
+  -webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  color: var(--fg-strong);
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 0;
+  font-variation-settings:
+    'SOFT' 50,
+    'WONK' 0,
+    'opsz' 24;
+}
+h1 {
+  font-size: var(--text-2xl);
+  letter-spacing: -0.01em;
+  font-variation-settings:
+    'SOFT' 50,
+    'WONK' 0,
+    'opsz' 32;
+}
+h2 {
+  font-size: var(--text-xl);
+  letter-spacing: -0.005em;
+}
+h3 {
+  font-size: var(--text-lg);
+}
+p {
+  margin: 0;
+  line-height: 1.5;
+}

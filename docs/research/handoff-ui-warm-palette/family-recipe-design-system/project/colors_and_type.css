@@ -1,0 +1,264 @@
+/*
+ * Family Recipe — design tokens
+ * Sourced from figma/src/index.css (the Figma Make export) +
+ * src/app/globals.css (Tailwind v4 defaults).
+ * Mobile-first; one cohesive grayscale palette + red destructive accent.
+ */
+
+/* Brand display face — Fraunces (variable, with SOFT/WONK axes) */
+@font-face {
+  font-family: 'Fraunces';
+  src: url('fonts/Fraunces-VariableFont_SOFT_WONK_opsz_wght.ttf')
+    format('truetype-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fraunces';
+  src: url('fonts/Fraunces-Italic-VariableFont_SOFT_WONK_opsz_wght.ttf')
+    format('truetype-variations');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  /* --- Color: Gray scale (the whole system) --- */
+  --color-white: #ffffff;
+  --color-gray-50: oklch(0.985 0.002 247.839); /* page background */
+  --color-gray-100: oklch(
+    0.967 0.003 264.542
+  ); /* muted chip background, version-info bar */
+  --color-gray-200: oklch(
+    0.928 0.006 264.531
+  ); /* card border, photo placeholder, secondary chip */
+  --color-gray-300: oklch(
+    0.872 0.01 258.338
+  ); /* input border, dashed upload border, avatar placeholder */
+  --color-gray-400: oklch(
+    0.707 0.022 261.325
+  ); /* placeholder text, inactive tab icons */
+  --color-gray-500: oklch(
+    0.551 0.027 264.364
+  ); /* timestamps, captions, icon stroke */
+  --color-gray-600: oklch(0.446 0.03 256.802); /* meta copy, "by Mom" */
+  --color-gray-700: oklch(0.373 0.034 259.733); /* body copy, comment text */
+  --color-gray-800: oklch(
+    0.278 0.033 256.848
+  ); /* PRIMARY: buttons, active chip, FAB */
+  --color-gray-900: oklch(0.21 0.034 264.665); /* headings, active tab text */
+
+  /* --- Color: destructive accent --- */
+  --color-red-400: oklch(0.704 0.191 22.216); /* invalid input border */
+  --color-red-500: oklch(0.637 0.237 25.331); /* required-field asterisk */
+  --color-red-600: oklch(
+    0.577 0.245 27.325
+  ); /* destructive text (Log Out, delete) */
+
+  /* --- Semantic surface tokens --- */
+  --bg-page: var(--color-gray-50);
+  --bg-surface: var(--color-white);
+  --bg-muted: var(--color-gray-100);
+  --bg-chip: var(--color-gray-200);
+  --bg-chip-soft: var(--color-gray-100);
+  --bg-primary: var(--color-gray-800);
+  --bg-overlay-50: rgba(255, 255, 255, 0.5);
+
+  /* --- Semantic text tokens --- */
+  --fg-strong: var(--color-gray-900);
+  --fg-body: var(--color-gray-700);
+  --fg-meta: var(--color-gray-600);
+  --fg-caption: var(--color-gray-500);
+  --fg-placeholder: var(--color-gray-400);
+  --fg-on-primary: var(--color-white);
+  --fg-destructive: var(--color-red-600);
+
+  /* --- Semantic border tokens --- */
+  --border-card: var(--color-gray-200);
+  --border-input: var(--color-gray-300);
+  --border-active: var(--color-gray-900);
+  --border-error: var(--color-red-400);
+
+  /* --- Type families ---
+     Fraunces is the brand display face — used for headings and recipe titles.
+     Body copy stays on the system sans stack (matches the production app).
+  */
+  --font-display: 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-body: var(--font-sans);
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+
+  /* --- Type scale (Tailwind v4 defaults the codebase inherits) --- */
+  --text-xs: 0.75rem; /* 12px — timestamps, tag chips, helper text */
+  --text-sm: 0.875rem; /* 14px — secondary copy, tab labels */
+  --text-base: 1rem; /* 16px — body, button, input, label */
+  --text-lg: 1.125rem; /* 18px — h3 (Ingredients, Steps) */
+  --text-xl: 1.25rem; /* 20px — h2 (section titles) */
+  --text-2xl: 1.5rem; /* 24px — h1 (page / recipe title) */
+
+  /* --- Weights (only two used in the system) --- */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+
+  /* --- Line height: a single global rhythm --- */
+  --leading-tight: 1.2;
+  --leading-normal: 1.5; /* used everywhere in the export */
+
+  /* --- Spacing scale (4px base, Tailwind --spacing) --- */
+  --space-1: 0.25rem; /*  4 */
+  --space-2: 0.5rem; /*  8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem; /* 16 */
+  --space-6: 1.5rem; /* 24 */
+  --space-8: 2rem; /* 32 */
+  --space-12: 3rem; /* 48 */
+
+  /* --- Radii --- */
+  --radius-xs: 4px; /* tiny chip */
+  --radius-sm: 8px; /* (not commonly used) */
+  --radius-md: 10px; /* inputs, buttons, photo placeholder (--radius) */
+  --radius-lg: 14px; /* CARDS — the signature shape */
+  --radius-xl: 16px; /* logo square */
+  --radius-pill: 9999px; /* tag chips, course pills, FAB, avatars */
+  --radius-frame: 40px; /* mobile device-frame mockup */
+
+  /* --- Shadow (the app uses borders, not shadows; one shadow exists) --- */
+  --shadow-none: none;
+  --shadow-frame:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+  /* --- Motion --- */
+  --duration-fast: 100ms;
+  --duration-base: 150ms; /* Tailwind default; the only duration used */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ----------------------------------------------------------------- */
+/*  Semantic element styles — opt in by including this file globally */
+/* ----------------------------------------------------------------- */
+
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-normal);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--fg-body);
+  background-color: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+  color: var(--fg-strong);
+  font-variation-settings:
+    'SOFT' 50,
+    'WONK' 0,
+    'opsz' 32;
+}
+h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 500;
+  line-height: var(--leading-tight);
+  letter-spacing: -0.005em;
+  color: var(--fg-strong);
+  font-variation-settings:
+    'SOFT' 50,
+    'WONK' 0,
+    'opsz' 24;
+}
+h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  line-height: var(--leading-tight);
+  color: var(--fg-strong);
+  font-variation-settings:
+    'SOFT' 50,
+    'WONK' 0,
+    'opsz' 18;
+}
+h4 {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: var(--leading-normal);
+  color: var(--fg-strong);
+  font-variation-settings:
+    'SOFT' 50,
+    'WONK' 0,
+    'opsz' 14;
+}
+p {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--leading-normal);
+}
+label,
+button {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-normal);
+}
+input,
+textarea {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--leading-normal);
+}
+.text-meta {
+  font-size: var(--text-sm);
+  color: var(--fg-meta);
+}
+.text-caption {
+  font-size: var(--text-xs);
+  color: var(--fg-caption);
+}
+
+/* The signature card */
+.fr-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+/* Primary CTA */
+.fr-btn-primary {
+  background: var(--bg-primary);
+  color: var(--fg-on-primary);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-weight: var(--font-weight-medium);
+  border: 0;
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+.fr-btn-primary:hover {
+  opacity: 0.92;
+}
+.fr-btn-primary:active {
+  opacity: 0.85;
+}
+
+/* Secondary / outline button */
+.fr-btn-secondary {
+  background: var(--bg-surface);
+  color: var(--fg-strong);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-weight: var(--font-weight-medium);
+}

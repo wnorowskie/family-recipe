@@ -1,0 +1,41 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:24px;font-family:var(--font-sans);background:var(--bg-page);color:var(--fg-strong);}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .card{background:#fff;border:1px solid var(--border-card);border-radius:14px;padding:16px;}
+  .row{display:flex;gap:12px;align-items:flex-start;}
+  .icon{flex-shrink:0;width:20px;height:20px;border-radius:4px;background:var(--color-gray-300);margin-top:2px;}
+  .photo{margin-top:8px;width:100%;height:80px;background:var(--color-gray-200);border-radius:10px;}
+  .thumb{flex-shrink:0;width:72px;height:72px;background:var(--color-gray-200);border-radius:10px;}
+  p{margin:0;font-size:14px;}
+  .strong{color:var(--fg-strong);}
+  .meta{color:var(--fg-meta);}
+  .caption{font-size:12px;color:var(--fg-caption);margin-top:6px;}
+  .chiprow{display:flex;gap:4px;margin-top:6px;}
+  .chiprow span{background:var(--color-gray-100);color:var(--fg-meta);font-size:11px;padding:2px 8px;border-radius:4px;}
+  h4{margin:0 0 4px 0;font-size:14px;font-weight:500;}
+</style></head>
+<body>
+  <div class="grid">
+    <div class="card">
+      <div class="row">
+        <div class="icon"></div>
+        <div style="flex:1;">
+          <p><span class="strong">Mom</span><span class="meta"> posted </span><span class="strong">'Lemon Chicken'</span></p>
+          <div class="photo"></div>
+          <div class="caption">2 hours ago</div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="display:flex;gap:12px;padding:12px;">
+      <div class="thumb"></div>
+      <div style="flex:1;min-width:0;">
+        <h4>Lemon Chicken</h4>
+        <div style="font-size:12px;color:var(--fg-meta);">by Mom</div>
+        <div class="chiprow"><span>Dinner</span><span>quick</span></div>
+        <div class="caption">Cooked 3 times · 4.3⭐</div>
+      </div>
+    </div>
+  </div>
+</body></html>
