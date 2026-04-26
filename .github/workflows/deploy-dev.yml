@@ -165,6 +165,7 @@ jobs:
           DEPLOYER_SA_EMAIL: ${{ secrets.DEV_GCP_DEPLOYER_SA }}
         run: |
           URI="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          echo "DEV_NEXT_URL=$URI" >> "$GITHUB_ENV"
           # Dev service requires auth (--no-allow-unauthenticated). Under WIF the active
           # gcloud credential is an access token, which `print-identity-token --audiences`
           # rejects; --impersonate-service-account routes the mint through the
@@ -185,8 +186,93 @@ jobs:
           echo "Healthcheck did not return 200 within timeout."
           exit 1
 
+      - name: Cache Playwright browsers
+        if: steps.smoke_check.conclusion == 'success'
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        if: steps.smoke_check.conclusion == 'success' && steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system deps (cache hit)
+        if: steps.smoke_check.conclusion == 'success' && steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Post-deploy Playwright @smoke against dev
+        id: post_deploy_smoke
+        if: steps.smoke_check.conclusion == 'success'
+        env:
+          DEV_DEPLOYER_SA: ${{ secrets.DEV_GCP_DEPLOYER_SA }}
+          # Optional override secrets — fall back to the seeded `claude-test`
+          # creds from prisma/seed.ts when unset, matching e2e/global-setup.ts.
+          E2E_USER: ${{ secrets.DEV_E2E_USER || 'claude-test' }}
+          E2E_PASSWORD: ${{ secrets.DEV_E2E_PASSWORD || 'claude-test-password' }}
+          PROXY_PORT: '3100'
+          PROXY_PID_FILE: ${{ runner.temp }}/dev-auth-proxy.pid
+        run: |
+          # Boot the auth-injecting proxy from scripts/dev-auth-proxy.ts in the
+          # background; it mints an ID token by impersonating the deployer SA and
+          # forwards every request — the same pattern the existing smoke_check
+          # step uses, plus cookie/Set-Cookie rewriting so a browser session works.
+          # See docs/research/automated-testing.md and #112.
+          PROXY_LOG="$RUNNER_TEMP/dev-auth-proxy.log"
+          npx tsx scripts/dev-auth-proxy.ts >"$PROXY_LOG" 2>&1 &
+          PROXY_PID=$!
+          echo "$PROXY_PID" > "$PROXY_PID_FILE"
+
+          # Wait for the proxy to mint its first token and start listening.
+          for _ in $(seq 1 30); do
+            if ! kill -0 "$PROXY_PID" 2>/dev/null; then
+              echo "auth proxy exited before becoming ready:" >&2
+              cat "$PROXY_LOG" >&2
+              exit 1
+            fi
+            if curl -sf -o /dev/null "http://localhost:${PROXY_PORT}/api/health"; then
+              break
+            fi
+            sleep 1
+          done
+          if ! curl -sf -o /dev/null "http://localhost:${PROXY_PORT}/api/health"; then
+            echo "auth proxy never reached http://localhost:${PROXY_PORT}/api/health" >&2
+            cat "$PROXY_LOG" >&2
+            exit 1
+          fi
+
+          export PLAYWRIGHT_BASE_URL="http://localhost:${PROXY_PORT}"
+
+          # @smoke covers the three non-destructive flows (#103/#104/#105);
+          # signup is also tagged @destructive (creates a real user row) and is
+          # excluded here — that flow stays gated behind ci.yml's seeded DB.
+          npx playwright test --grep @smoke --grep-invert @destructive
+
+      - name: Stop auth proxy
+        if: always()
+        env:
+          PROXY_PID_FILE: ${{ runner.temp }}/dev-auth-proxy.pid
+        run: |
+          if [ ! -f "$PROXY_PID_FILE" ]; then
+            exit 0
+          fi
+          PROXY_PID="$(cat "$PROXY_PID_FILE" 2>/dev/null || true)"
+          if [ -n "$PROXY_PID" ] && kill -0 "$PROXY_PID" 2>/dev/null; then
+            kill "$PROXY_PID" 2>/dev/null || true
+          fi
+          rm -f "$PROXY_PID_FILE"
+
+      - name: Upload Playwright report
+        if: failure() && steps.post_deploy_smoke.conclusion == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-dev-deploy
+          path: playwright-report/
+          retention-days: 7
+
       - name: Rollback traffic on smoke-check failure
-        if: failure() && steps.smoke_check.conclusion == 'failure'
+        if: failure() && (steps.smoke_check.conclusion == 'failure' || steps.post_deploy_smoke.conclusion == 'failure')
         run: |
           if [ -z "${PREV_REVISION:-}" ]; then
             echo "No previous revision was captured (first deploy?); cannot roll back."
