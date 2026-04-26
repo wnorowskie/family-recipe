@@ -205,6 +205,10 @@ jobs:
       - name: Post-deploy Playwright @smoke against dev
         id: post_deploy_smoke
         if: steps.smoke_check.conclusion == 'success'
+        # Bound the <2 min wall-clock target from #107 against hung-browser
+        # scenarios where Playwright's per-test timeouts wouldn't fire (e.g.
+        # the tsx-wrapped proxy stuck before Playwright launches).
+        timeout-minutes: 5
         env:
           DEV_DEPLOYER_SA: ${{ secrets.DEV_GCP_DEPLOYER_SA }}
           # Optional override secrets — fall back to the seeded `claude-test`
