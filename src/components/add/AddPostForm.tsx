@@ -59,6 +59,7 @@ const MAX_COURSES = 3;
 
 const fieldLabelClass =
   'block text-sm text-[var(--fg-body)] mb-1.5 font-normal';
+const fieldLabelInlineClass = 'block text-sm text-[var(--fg-body)] font-normal';
 const sectionHeadingClass = 'text-lg font-medium text-[var(--fg-strong)]';
 const sectionSubtitleClass = 'text-sm text-[var(--fg-meta)]';
 const selectClass =
@@ -1181,9 +1182,7 @@ export default function AddPostForm({
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className={fieldLabelClass.replace('mb-1.5', 'mb-0')}>
-              Photos
-            </span>
+            <span className={fieldLabelInlineClass}>Photos</span>
             {coverPhotoId && (
               <span className="text-xs text-[var(--fg-caption)]">
                 First photo is used as cover
@@ -1402,9 +1401,7 @@ export default function AddPostForm({
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className={fieldLabelClass.replace('mb-1.5', 'mb-0')}>
-                    Courses
-                  </span>
+                  <span className={fieldLabelInlineClass}>Courses</span>
                   <span className="text-xs text-[var(--fg-caption)]">
                     {selectedCourses.length}/{MAX_COURSES}
                   </span>
@@ -1429,9 +1426,7 @@ export default function AddPostForm({
                 </div>
               </div>
               <div className="space-y-2">
-                <span className={fieldLabelClass.replace('mb-1.5', 'mb-0')}>
-                  Difficulty
-                </span>
+                <span className={fieldLabelInlineClass}>Difficulty</span>
                 <div className="flex flex-wrap gap-2">
                   {difficultyOptions.map((option) => {
                     const selected = recipe.difficulty === option.value;
@@ -1456,9 +1451,7 @@ export default function AddPostForm({
             </div>
 
             <div className="space-y-3">
-              <span className={fieldLabelClass.replace('mb-1.5', 'mb-0')}>
-                Ingredients
-              </span>
+              <span className={fieldLabelInlineClass}>Ingredients</span>
               <DndContext
                 collisionDetection={closestCenter}
                 onDragEnd={handleIngredientDragEnd}
@@ -1495,9 +1488,7 @@ export default function AddPostForm({
             </div>
 
             <div className="space-y-3">
-              <span className={fieldLabelClass.replace('mb-1.5', 'mb-0')}>
-                Steps
-              </span>
+              <span className={fieldLabelInlineClass}>Steps</span>
               <DndContext
                 collisionDetection={closestCenter}
                 onDragEnd={handleStepDragEnd}
@@ -1535,9 +1526,7 @@ export default function AddPostForm({
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className={fieldLabelClass.replace('mb-1.5', 'mb-0')}>
-                  Tags
-                </span>
+                <span className={fieldLabelInlineClass}>Tags</span>
                 <span className="text-xs text-[var(--fg-caption)]">
                   {tags.length}/{MAX_TAGS} selected
                 </span>
