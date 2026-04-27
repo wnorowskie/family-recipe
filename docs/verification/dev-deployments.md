@@ -177,6 +177,33 @@ npm run test:e2e:dev -- e2e/auth.spec.ts
 
 Prerequisites: the one-time setup above (`roles/iam.serviceAccountTokenCreator`, `.env.dev.local` populated). The wrapper forwards `CLAUDE_TEST_PASSWORD` to Playwright as `E2E_PASSWORD` automatically.
 
+## Confirming the deploy actually flipped traffic
+
+A successful `deploy-dev.yml` run does not, on its own, mean the dev URL is serving the new revision. Always confirm with:
+
+```bash
+gcloud run services describe family-recipe-dev \
+  --project family-recipe-dev --region us-east1 \
+  --format='value(status.traffic[0].revisionName,status.latestReadyRevisionName,status.traffic[0].latestRevision)'
+# Want: same revision name in cols 1+2 AND `True` in col 3.
+# - Cols 1≠2 → traffic is pinned to a stale revision; the new one is at 0%.
+# - Col 3 != True → traffic is pinned by name, so even if cols 1+2 match
+#   today, the *next* deploy will silently sit at 0%.
+# Either failure mode is the #158 bug. /release-testing treats both as HOLD.
+```
+
+The deploy workflow uses a canary pattern (`gcloud run deploy --no-traffic --tag=candidate`, smoke against the candidate URL, then `gcloud run services update-traffic --to-latest --remove-tags=candidate` on success). The `--to-latest` step is what unpins the service after a previous rollback — without it, a single `--to-revisions=X=100` rollback would freeze the service on a stale revision forever, and every subsequent green deploy would build a new revision at 0% traffic while still reporting `success` (#158). If the columns above don't match, check `gh run list --workflow=deploy-dev.yml -L 1` for the most recent deploy and inspect the "Promote candidate to LATEST" step.
+
+To unpin manually (if the pin survives somehow):
+
+```bash
+gcloud run services update-traffic family-recipe-dev \
+  --project family-recipe-dev --region us-east1 \
+  --to-latest --remove-tags=candidate --quiet
+```
+
+The same canary pattern lives in `deploy-prod.yml` — confirm prod the same way before assuming a prod release shipped.
+
 ## Gotchas
 
 - **`curl -F` interprets `;` in values** as a content-type delimiter and silently truncates the payload. Use `curl --form-string` for `multipart/form-data` JSON payloads (the smoke script does; so must your manual probes).
