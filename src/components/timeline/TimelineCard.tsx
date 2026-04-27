@@ -20,8 +20,12 @@ export default function TimelineCard({ item }: TimelineCardProps) {
   const Icon = EVENT_ICON[item.type];
 
   return (
-    <article className="rounded-card border border-[var(--border-card)] bg-[var(--bg-surface)] p-4">
-      <div className="flex items-start gap-3">
+    <Link
+      href={`/posts/${item.post.id}`}
+      aria-label={`${item.actor.name} ${verb} ${item.post.title}`}
+      className="block rounded-card border border-[var(--border-card)] bg-[var(--bg-surface)] p-4 hover:border-[var(--border-active)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
+    >
+      <article className="flex items-start gap-3">
         <EventMarker icon={Icon} item={item} />
         <div className="min-w-0 flex-1">
           <p className="text-sm leading-normal">
@@ -29,12 +33,9 @@ export default function TimelineCard({ item }: TimelineCardProps) {
               {item.actor.name}
             </span>{' '}
             <span className="text-[var(--fg-meta)]">{verb}</span>{' '}
-            <Link
-              href={`/posts/${item.post.id}`}
-              className="font-medium text-[var(--fg-strong)] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
-            >
+            <span className="font-medium text-[var(--fg-strong)]">
               ‘{item.post.title}’
-            </Link>
+            </span>
           </p>
 
           <EventBody item={item} />
@@ -43,8 +44,8 @@ export default function TimelineCard({ item }: TimelineCardProps) {
             {formatRelativeTime(item.timestamp)}
           </p>
         </div>
-      </div>
-    </article>
+      </article>
+    </Link>
   );
 }
 
