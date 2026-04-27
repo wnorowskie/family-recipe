@@ -81,19 +81,35 @@ Map the file list to areas:
 
 ### 3. Confirm the dev deployment is actually for the release SHA
 
+This is the most important guard in the skill — running smoke against a stale revision was the exact bug behind #158, and produced false-confidence green reports for ~30 deploys before discovery. Treat any mismatch here as an automatic **HOLD**, not a "probably fine" warning.
+
 ```bash
-# The latest revision should have been built from the head of `develop`.
+# Both columns: the revision currently serving traffic, and the latest-ready
+# revision (i.e. the one the most recent deploy built).
+gcloud run services describe family-recipe-dev \
+  --project family-recipe-dev --region us-east1 \
+  --format='value(status.traffic[0].revisionName,status.latestReadyRevisionName,status.traffic[0].latestRevision)'
+# Want: same revision in cols 1 and 2, AND col 3 == True (LATEST routing).
+```
+
+Two failure modes are HOLDs:
+
+1. **`status.traffic[0].revisionName != status.latestReadyRevisionName`** — the service is pinned to an older revision while a newer one sits at 0% traffic. This is the #158 traffic-pin bug. Surface the mismatch in the report, recommend running `gcloud run services update-traffic family-recipe-dev --to-latest --remove-tags=candidate` (or re-running deploy-dev), and stop. Do **not** run the smoke against the stale revision and call it green.
+2. **`status.traffic[0].latestRevision != True`** — even if the revision names happen to match right now, traffic is pinned by name rather than tracking LATEST, so the next deploy will silently sit at 0%. Surface the same recommendation.
+
+If both columns match and `latestRevision=True`, confirm the deployed image SHA matches `git rev-parse origin/develop`:
+
+```bash
 REV=$(gcloud run services describe family-recipe-dev \
   --project family-recipe-dev --region us-east1 \
   --format='value(status.traffic[0].revisionName)')
-# Cloud Run revisions are named like family-recipe-dev-00051-cv6 — the SHA
-# is visible in the Cloud Console or via:
 gcloud run revisions describe "$REV" \
   --project family-recipe-dev --region us-east1 \
   --format='value(spec.containers[0].image)'
+# The image tag is the commit SHA; compare to `git rev-parse origin/develop`.
 ```
 
-The image tag is the commit SHA. Compare to `git rev-parse origin/develop`. If they don't match, the deploy workflow is still running or failed — check `gh run list --workflow=deploy-dev.yml` before continuing; running the smoke against a stale revision tests the wrong artifact.
+If the SHAs don't match, the deploy workflow is still running or failed — check `gh run list --workflow=deploy-dev.yml -L 5` before continuing.
 
 ### 4. Confirm infrastructure state
 

@@ -143,8 +143,15 @@ jobs:
       - name: Push image
         run: docker push "$IMAGE"
 
-      - name: Deploy to Cloud Run (prod)
+      - name: Deploy to Cloud Run (prod) at 0% traffic with candidate tag
         run: |
+          # --no-traffic + --tag=candidate match the dev workflow's canary
+          # pattern (#158): smoke against the new revision via the tag URL,
+          # then explicitly --to-latest to promote. The same step also unpins
+          # any previous traffic pin on every successful deploy, which fixes
+          # the latent bug where a one-off rollback (--to-revisions=X=100)
+          # would freeze the service on a stale revision and silently route
+          # every subsequent green deploy to 0%.
           gcloud run deploy "$CLOUD_RUN_SERVICE" \
             --project "$PROJECT_ID" \
             --region "$REGION" \
@@ -153,22 +160,34 @@ jobs:
             --platform managed \
             --port 3000 \
             --quiet \
+            --no-traffic \
+            --tag candidate \
             --add-cloudsql-instances "$INSTANCE_CONNECTION_NAME" \
             --set-secrets DATABASE_URL=${DATABASE_URL_SECRET}:latest,JWT_SECRET=${JWT_SECRET_NAME}:latest,FAMILY_MASTER_KEY=${FAMILY_MASTER_KEY_SECRET_NAME}:latest \
             --set-env-vars PRISMA_SCHEMA=${PRISMA_SCHEMA},UPLOADS_BUCKET=${UPLOADS_BUCKET},UPLOADS_BASE_URL=${UPLOADS_BASE_URL},RECIPE_IMPORTER_URL=${RECIPE_IMPORTER_URL},RECIPE_IMPORTER_AUDIENCE=${RECIPE_IMPORTER_AUDIENCE},RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL=${RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL} \
             --ingress all \
             --allow-unauthenticated
 
-      - name: Print service URL
+      - name: Resolve candidate + service URLs
         run: |
-          URI="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
-          echo "Cloud Run URL: $URI"
-          echo "Healthcheck:  $URI/api/health"
+          SERVICE_URL="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          CANDIDATE_URL="$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --format='value(status.traffic.filter("tag:candidate").extract(url).flatten())')"
+          if [ -z "$CANDIDATE_URL" ]; then
+            echo "Could not resolve candidate tag URL — failing fast." >&2
+            exit 1
+          fi
+          echo "Service URL:    $SERVICE_URL"
+          echo "Candidate URL:  $CANDIDATE_URL"
+          echo "Healthcheck:    $CANDIDATE_URL/api/health"
+          echo "SERVICE_URL=$SERVICE_URL" >> "$GITHUB_ENV"
+          echo "CANDIDATE_URL=$CANDIDATE_URL" >> "$GITHUB_ENV"
 
-      - name: Smoke check /api/health
+      - name: Smoke check /api/health (against candidate revision)
         id: smoke_check
         run: |
-          URI="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          URI="$CANDIDATE_URL"
           for i in {1..20}; do
             STATUS="$(curl -sS -o /dev/null -w '%{http_code}' "$URI/api/health" || true)"
             if [ "$STATUS" = "200" ]; then
@@ -181,18 +200,37 @@ jobs:
           echo "Healthcheck did not return 200 within timeout."
           exit 1
 
-      - name: Rollback traffic on smoke-check failure
-        if: failure() && steps.smoke_check.conclusion == 'failure'
+      - name: Promote candidate to LATEST
+        if: steps.smoke_check.conclusion == 'success'
         run: |
-          if [ -z "${PREV_REVISION:-}" ]; then
-            echo "No previous revision was captured (first deploy?); cannot roll back."
-            exit 1
-          fi
-          echo "Smoke check failed. Rolling traffic back to previous revision: $PREV_REVISION"
           gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
             --project "$PROJECT_ID" \
             --region "$REGION" \
-            --to-revisions="$PREV_REVISION=100" \
+            --to-latest \
+            --remove-tags=candidate \
             --quiet
+
+      - name: Rollback traffic on smoke-check failure
+        if: failure() && steps.smoke_check.conclusion == 'failure'
+        run: |
+          # Deploy used --no-traffic, so the failed revision never served
+          # users; PREV_REVISION is still receiving 100%. Re-pin defensively
+          # and remove the candidate tag so the next deploy can re-create it.
+          if [ -n "${PREV_REVISION:-}" ]; then
+            echo "Smoke check failed. Pinning traffic to previous revision: $PREV_REVISION"
+            gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+              --project "$PROJECT_ID" \
+              --region "$REGION" \
+              --to-revisions="$PREV_REVISION=100" \
+              --remove-tags=candidate \
+              --quiet
+          else
+            echo "No previous revision captured (first deploy?); removing candidate tag only."
+            gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+              --project "$PROJECT_ID" \
+              --region "$REGION" \
+              --remove-tags=candidate \
+              --quiet || true
+          fi
           echo "Rollback complete. Job will fail so the broken deploy is surfaced."
           exit 1
