@@ -8,6 +8,8 @@
  */
 
 import {
+  MAX_RECIPE_INGREDIENT_NAME_LENGTH,
+  MAX_RECIPE_ORIGIN_LENGTH,
   paginationSchema,
   recipeFiltersSchema,
   postIdParamSchema,
@@ -522,6 +524,37 @@ describe('Validation Schemas', () => {
     });
 
     describe('recipeDetailsSchema', () => {
+      it('should accept ingredient names up to the max length', () => {
+        const result = recipeDetailsSchema.safeParse({
+          ingredients: [
+            {
+              name: 'a'.repeat(MAX_RECIPE_INGREDIENT_NAME_LENGTH),
+              unit: 'cup',
+            },
+          ],
+          steps: [{ text: 'Mix' }],
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it('should reject ingredient names longer than the max length', () => {
+        const result = recipeDetailsSchema.safeParse({
+          ingredients: [
+            {
+              name: 'a'.repeat(MAX_RECIPE_INGREDIENT_NAME_LENGTH + 1),
+              unit: 'cup',
+            },
+          ],
+          steps: [{ text: 'Mix' }],
+        });
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues[0].message).toBe(
+            `Ingredient name must be ${MAX_RECIPE_INGREDIENT_NAME_LENGTH} characters or fewer`
+          );
+        }
+      });
+
       it('should validate course enum', () => {
         const result = recipeDetailsSchema.safeParse({
           ingredients: [{ name: 'flour', unit: 'cup' }],
@@ -637,6 +670,29 @@ describe('Validation Schemas', () => {
           servings: 4,
         });
         expect(result.success).toBe(true);
+      });
+
+      it('should accept origin up to the max length', () => {
+        const result = recipeDetailsSchema.safeParse({
+          ingredients: [{ name: 'flour', unit: 'cup' }],
+          steps: [{ text: 'Mix' }],
+          origin: 'a'.repeat(MAX_RECIPE_ORIGIN_LENGTH),
+        });
+        expect(result.success).toBe(true);
+      });
+
+      it('should reject origin longer than the max length', () => {
+        const result = recipeDetailsSchema.safeParse({
+          ingredients: [{ name: 'flour', unit: 'cup' }],
+          steps: [{ text: 'Mix' }],
+          origin: 'a'.repeat(MAX_RECIPE_ORIGIN_LENGTH + 1),
+        });
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues[0].message).toBe(
+            `Origin must be ${MAX_RECIPE_ORIGIN_LENGTH} characters or fewer`
+          );
+        }
       });
 
       it('should validate positive totalTime', () => {
