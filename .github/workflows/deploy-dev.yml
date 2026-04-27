@@ -186,11 +186,15 @@ jobs:
         env:
           DEPLOYER_SA_EMAIL: ${{ secrets.DEV_GCP_DEPLOYER_SA }}
         run: |
-          URI="$CANDIDATE_URL"
-          # DEV_NEXT_URL is published for downstream steps; the auth-injecting
-          # proxy and Playwright run target the candidate URL so we exercise
-          # the just-built revision, not whatever the service URL routes to.
-          echo "DEV_NEXT_URL=$URI" >> "$GITHUB_ENV"
+          # Publish env for downstream steps. The auth-injecting proxy and
+          # Playwright will route requests through the candidate URL so the
+          # just-built revision is exercised; DEV_AUDIENCE stays on the
+          # service URL because Cloud Run's IAM bearer-token check validates
+          # the `aud` claim against the service URL, not per-tag hostnames.
+          # (Run 25002226021 hit 60s of 401s because the smoke step minted a
+          # token with --audiences=$CANDIDATE_URL.)
+          echo "DEV_NEXT_URL=$CANDIDATE_URL" >> "$GITHUB_ENV"
+          echo "DEV_AUDIENCE=$SERVICE_URL" >> "$GITHUB_ENV"
           # Dev service requires auth (--no-allow-unauthenticated). Under WIF the active
           # gcloud credential is an access token, which `print-identity-token --audiences`
           # rejects; --impersonate-service-account routes the mint through the
@@ -198,9 +202,9 @@ jobs:
           # self-binding of roles/iam.serviceAccountTokenCreator).
           TOKEN="$(gcloud auth print-identity-token \
             --impersonate-service-account="$DEPLOYER_SA_EMAIL" \
-            --audiences="$URI")"
+            --audiences="$SERVICE_URL")"
           for i in {1..20}; do
-            STATUS="$(curl -sS -H "Authorization: Bearer $TOKEN" -o /dev/null -w '%{http_code}' "$URI/api/health" || true)"
+            STATUS="$(curl -sS -H "Authorization: Bearer $TOKEN" -o /dev/null -w '%{http_code}' "$CANDIDATE_URL/api/health" || true)"
             if [ "$STATUS" = "200" ]; then
               echo "Healthcheck OK (200)"
               exit 0

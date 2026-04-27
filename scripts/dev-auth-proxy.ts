@@ -18,6 +18,14 @@
  * Required env (from .env.dev.local or the shell):
  *   DEV_NEXT_URL                  upstream Cloud Run URL
  *   DEV_DEPLOYER_SA               SA to impersonate for ID tokens
+ *
+ * Optional env:
+ *   DEV_AUDIENCE                  audience for the minted ID token. Defaults
+ *                                 to DEV_NEXT_URL. Set this when the upstream
+ *                                 host differs from the IAM-validated audience
+ *                                 — e.g. when forwarding to a Cloud Run tag URL
+ *                                 (`https://candidate---svc-...run.app`) but
+ *                                 IAM expects the service URL.
  */
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -44,6 +52,7 @@ loadEnvFile(ENV_FILE);
 
 const UPSTREAM_URL = requiredEnv('DEV_NEXT_URL');
 const DEPLOYER_SA = requiredEnv('DEV_DEPLOYER_SA');
+const TOKEN_AUDIENCE = process.env.DEV_AUDIENCE ?? UPSTREAM_URL;
 const PORT = Number(process.env.PROXY_PORT ?? 3100);
 
 const upstream = new URL(UPSTREAM_URL);
@@ -77,7 +86,7 @@ function mintToken(): Promise<TokenState> {
         'auth',
         'print-identity-token',
         `--impersonate-service-account=${DEPLOYER_SA}`,
-        `--audiences=${UPSTREAM_URL}`,
+        `--audiences=${TOKEN_AUDIENCE}`,
       ],
       { stdio: ['ignore', 'pipe', 'pipe'] }
     );
