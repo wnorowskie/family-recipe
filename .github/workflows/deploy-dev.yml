@@ -215,6 +215,23 @@ jobs:
           echo "Healthcheck did not return 200 within timeout."
           exit 1
 
+      - name: Fetch claude-test password from GSM
+        # GSM is the single source of truth for the dev `claude-test`
+        # password (the seed in prisma/seed.ts pulls from CLAUDE_TEST_PASSWORD
+        # which is sourced from this same secret per docs/verification/
+        # dev-deployments.md). Surfacing it here as $GITHUB_ENV avoids a
+        # GHA-secret duplicate that drifts on rotation (closes #164 — the
+        # workflow previously fell back to the literal default
+        # `claude-test-password`, which mismatched the rotated DB password
+        # and produced 401s in Playwright's global-setup login).
+        if: steps.smoke_check.conclusion == 'success'
+        run: |
+          E2E_PASSWORD="$(gcloud secrets versions access latest \
+            --secret family-recipe-dev-claude-test-password \
+            --project "$PROJECT_ID")"
+          echo "::add-mask::${E2E_PASSWORD}"
+          echo "E2E_PASSWORD=${E2E_PASSWORD}" >> "$GITHUB_ENV"
+
       - name: Cache Playwright browsers
         if: steps.smoke_check.conclusion == 'success'
         id: playwright-cache
@@ -240,10 +257,12 @@ jobs:
         timeout-minutes: 5
         env:
           DEV_DEPLOYER_SA: ${{ secrets.DEV_GCP_DEPLOYER_SA }}
-          # Optional override secrets — fall back to the seeded `claude-test`
-          # creds from prisma/seed.ts when unset, matching e2e/global-setup.ts.
+          # E2E_USER stays a literal because the seeded username has never
+          # been rotated and is set on user-create only (see prisma/seed.ts
+          # comment about CLAUDE_TEST_USER). E2E_PASSWORD is set in the
+          # "Fetch claude-test password from GSM" step above, sourcing from
+          # the same secret prisma/seed.ts uses.
           E2E_USER: ${{ secrets.DEV_E2E_USER || 'claude-test' }}
-          E2E_PASSWORD: ${{ secrets.DEV_E2E_PASSWORD || 'claude-test-password' }}
           PROXY_PORT: '3100'
           PROXY_PID_FILE: ${{ runner.temp }}/dev-auth-proxy.pid
         run: |
