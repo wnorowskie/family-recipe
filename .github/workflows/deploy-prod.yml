@@ -144,6 +144,7 @@ jobs:
         run: docker push "$IMAGE"
 
       - name: Deploy to Cloud Run (prod) at 0% traffic with candidate tag
+        id: deploy
         run: |
           # --no-traffic + --tag=candidate match the dev workflow's canary
           # pattern (#158): smoke against the new revision via the tag URL,
@@ -214,23 +215,30 @@ jobs:
         if: failure() && steps.smoke_check.conclusion == 'failure'
         run: |
           # Deploy used --no-traffic, so the failed revision never served
-          # users; PREV_REVISION is still receiving 100%. Re-pin defensively
-          # and remove the candidate tag so the next deploy can re-create it.
+          # users; PREV_REVISION is still receiving 100%. Re-pin defensively;
+          # tag cleanup is handled by the always()-gated step below.
           if [ -n "${PREV_REVISION:-}" ]; then
             echo "Smoke check failed. Pinning traffic to previous revision: $PREV_REVISION"
             gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
               --project "$PROJECT_ID" \
               --region "$REGION" \
               --to-revisions="$PREV_REVISION=100" \
-              --remove-tags=candidate \
               --quiet
           else
-            echo "No previous revision captured (first deploy?); removing candidate tag only."
-            gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
-              --project "$PROJECT_ID" \
-              --region "$REGION" \
-              --remove-tags=candidate \
-              --quiet || true
+            echo "No previous revision captured (first deploy?); skipping traffic pin."
           fi
           echo "Rollback complete. Job will fail so the broken deploy is surfaced."
           exit 1
+
+      - name: Always remove candidate tag
+        # Runs on every conclusion so a step failure between deploy and the
+        # rollback gate doesn't leak the tag into the next deploy. Idempotent
+        # — `--remove-tags=candidate` with no `--to-*` preserves traffic and
+        # is a no-op when the tag is already gone (the success path).
+        if: always() && steps.deploy.conclusion == 'success'
+        run: |
+          gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --remove-tags=candidate \
+            --quiet || true

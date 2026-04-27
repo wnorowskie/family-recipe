@@ -138,6 +138,7 @@ jobs:
         run: docker push "$IMAGE"
 
       - name: Deploy to Cloud Run (dev) at 0% traffic with candidate tag
+        id: deploy
         run: |
           # --no-traffic builds the new revision without flipping traffic to it,
           # and --tag=candidate gives us a tagged URL we can probe directly.
@@ -318,24 +319,38 @@ jobs:
         run: |
           # Because the deploy uses --no-traffic, the failed revision never
           # served users — the previous revision is still receiving 100%.
-          # We still pin to PREV_REVISION explicitly to defend against any
-          # mid-flight traffic state and remove the candidate tag so the next
-          # deploy can re-create it cleanly.
+          # Pin to PREV_REVISION explicitly to defend against any mid-flight
+          # traffic state. Tag cleanup is handled by the always()-gated step
+          # below, so this step's only job is to make traffic safe.
           if [ -n "${PREV_REVISION:-}" ]; then
             echo "Smoke check failed. Pinning traffic to previous revision: $PREV_REVISION"
             gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
               --project "$PROJECT_ID" \
               --region "$REGION" \
               --to-revisions="$PREV_REVISION=100" \
-              --remove-tags=candidate \
               --quiet
           else
-            echo "No previous revision captured (first deploy?); removing candidate tag only."
-            gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
-              --project "$PROJECT_ID" \
-              --region "$REGION" \
-              --remove-tags=candidate \
-              --quiet || true
+            echo "No previous revision captured (first deploy?); skipping traffic pin."
           fi
           echo "Rollback complete. Job will fail so the broken deploy is surfaced."
           exit 1
+
+      - name: Always remove candidate tag
+        # Runs on every conclusion — including step failures between deploy
+        # and the rollback gate (Playwright install/cache failures, runner
+        # OOMs, the 5-minute Playwright timeout). Without this, a mid-pipeline
+        # failure would leave the `candidate` tag attached to the failed
+        # revision and the next deploy's "Resolve candidate + service URLs"
+        # step would either resolve a stale URL or fail the existence check.
+        # `--remove-tags=candidate` with no `--to-*` flag preserves whatever
+        # traffic spec is currently in place (the Promote/Rollback steps
+        # already settled traffic). The command is idempotent — it's a no-op
+        # when the tag is already gone, which is the common path after a
+        # successful Promote.
+        if: always() && steps.deploy.conclusion == 'success'
+        run: |
+          gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --remove-tags=candidate \
+            --quiet || true
