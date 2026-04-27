@@ -1,6 +1,13 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
@@ -11,7 +18,25 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import {
+  Camera,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  GripVertical,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react';
 
+import {
+  Button,
+  Card,
+  Chip,
+  Input,
+  PillButton,
+  Textarea,
+} from '@/components/ui';
 import { ingredientUnitOptions } from '@/lib/ingredients';
 import { MAX_PHOTO_COUNT } from '@/lib/postPayload';
 import {
@@ -31,7 +56,6 @@ const courseOptions = [
 ];
 
 const difficultyOptions = [
-  { value: '', label: 'Select difficulty' },
   { value: 'easy', label: 'Easy' },
   { value: 'medium', label: 'Medium' },
   { value: 'hard', label: 'Hard' },
@@ -43,6 +67,14 @@ const HOUR_OPTIONS = Array.from({ length: 13 }, (_, index) => index);
 const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, index) => index * 5);
 const SERVING_OPTIONS = Array.from({ length: 16 }, (_, index) => index + 1);
 const MAX_COURSES = 3;
+
+const fieldLabelClass =
+  'block text-sm text-[var(--fg-body)] mb-1.5 font-normal';
+const fieldLabelInlineClass = 'block text-sm text-[var(--fg-body)] font-normal';
+const sectionHeadingClass = 'text-lg font-medium text-[var(--fg-strong)]';
+const sectionSubtitleClass = 'text-sm text-[var(--fg-meta)]';
+const selectClass =
+  'w-full rounded-input border border-[var(--border-input)] bg-[var(--bg-surface)] px-4 py-3 text-base text-[var(--fg-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)] focus-visible:ring-offset-1';
 
 interface ExistingPhotoAttachment {
   id: string;
@@ -107,39 +139,38 @@ function SortableIngredientRow({
   };
 
   return (
-    <div ref={setNodeRef} className="space-y-3" style={style}>
-      <div className="group rounded-xl border border-gray-200 p-3 space-y-3">
-        <div className="flex items-center justify-between text-xs text-gray-500">
+    <div ref={setNodeRef} style={style}>
+      <div className="rounded-card border border-[var(--border-card)] bg-[var(--bg-surface)] p-3 space-y-3">
+        <div className="flex items-center justify-between text-xs text-[var(--fg-caption)]">
           <span>Ingredient {index + 1}</span>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="rounded-full border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-700"
+              className="inline-flex items-center justify-center rounded-full border border-[var(--border-input)] p-1.5 text-[var(--fg-meta)] hover:text-[var(--fg-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
               aria-label="Reorder ingredient"
               title="Drag to reorder"
               {...attributes}
               {...listeners}
             >
-              ↕
+              <GripVertical size={14} aria-hidden="true" />
             </button>
             {canRemove && (
               <button
                 type="button"
                 onClick={() => onRemove(ingredient.id)}
-                className="rounded-full border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-600 hover:border-red-300"
+                className="inline-flex items-center justify-center rounded-full border border-[var(--border-input)] p-1.5 text-[var(--fg-destructive)] hover:border-[var(--border-error)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
                 aria-label="Remove ingredient"
                 title="Remove ingredient"
               >
-                -
+                <Trash2 size={14} aria-hidden="true" />
               </button>
             )}
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div className="sm:col-span-2">
-            <input
+            <Input
               type="text"
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
               placeholder="Ingredient name"
               maxLength={MAX_RECIPE_INGREDIENT_NAME_LENGTH}
               value={ingredient.name}
@@ -150,10 +181,9 @@ function SortableIngredientRow({
             />
           </div>
           <div>
-            <input
+            <Input
               type="text"
               inputMode="decimal"
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
               placeholder="Qty"
               value={ingredient.quantity}
               onChange={(event) =>
@@ -163,7 +193,7 @@ function SortableIngredientRow({
           </div>
           <div>
             <select
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className={selectClass}
               value={ingredient.unit}
               onChange={(event) =>
                 onChange(ingredient.id, 'unit', event.target.value)
@@ -206,36 +236,35 @@ function SortableStepRow({
   };
 
   return (
-    <div ref={setNodeRef} className="space-y-3" style={style}>
-      <div className="group rounded-xl border border-gray-200 p-3 space-y-2">
-        <div className="flex items-center justify-between text-xs text-gray-500">
+    <div ref={setNodeRef} style={style}>
+      <div className="rounded-card border border-[var(--border-card)] bg-[var(--bg-surface)] p-3 space-y-2">
+        <div className="flex items-center justify-between text-xs text-[var(--fg-caption)]">
           <span>Step {index + 1}</span>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="rounded-full border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-700"
+              className="inline-flex items-center justify-center rounded-full border border-[var(--border-input)] p-1.5 text-[var(--fg-meta)] hover:text-[var(--fg-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
               aria-label="Reorder step"
               title="Drag to reorder"
               {...attributes}
               {...listeners}
             >
-              ↕
+              <GripVertical size={14} aria-hidden="true" />
             </button>
             {canRemove && (
               <button
                 type="button"
                 onClick={() => onRemove(step.id)}
-                className="rounded-full border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-600 hover:border-red-300"
+                className="inline-flex items-center justify-center rounded-full border border-[var(--border-input)] p-1.5 text-[var(--fg-destructive)] hover:border-[var(--border-error)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
                 aria-label="Remove step"
                 title="Remove step"
               >
-                -
+                <Trash2 size={14} aria-hidden="true" />
               </button>
             )}
           </div>
         </div>
-        <textarea
-          className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+        <Textarea
           placeholder="Describe this step"
           rows={3}
           value={step.text}
@@ -453,12 +482,10 @@ export default function AddPostForm({
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importWarning, setImportWarning] = useState<string | null>(null);
-  const [pendingIngredientFocusId, setPendingIngredientFocusId] = useState<
-    string | null
-  >(null);
-  const [pendingStepFocusId, setPendingStepFocusId] = useState<string | null>(
-    null
-  );
+  // Refs (not state) so writing them after DOM focus doesn't trigger a re-render
+  // — the effects below fire on ingredients/steps changes and read the ref synchronously.
+  const pendingIngredientFocusIdRef = useRef<string | null>(null);
+  const pendingStepFocusIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -504,36 +531,38 @@ export default function AddPostForm({
   }, []);
 
   useEffect(() => {
-    if (!pendingIngredientFocusId) {
+    const id = pendingIngredientFocusIdRef.current;
+    if (!id) {
       return;
     }
 
     const input = document.querySelector<HTMLInputElement>(
-      `[data-ingredient-focus="${pendingIngredientFocusId}"]`
+      `[data-ingredient-focus="${id}"]`
     );
 
     if (input) {
       input.focus();
     }
 
-    setPendingIngredientFocusId(null);
-  }, [ingredients, pendingIngredientFocusId]);
+    pendingIngredientFocusIdRef.current = null;
+  }, [ingredients]);
 
   useEffect(() => {
-    if (!pendingStepFocusId) {
+    const id = pendingStepFocusIdRef.current;
+    if (!id) {
       return;
     }
 
     const textarea = document.querySelector<HTMLTextAreaElement>(
-      `[data-step-focus="${pendingStepFocusId}"]`
+      `[data-step-focus="${id}"]`
     );
 
     if (textarea) {
       textarea.focus();
     }
 
-    setPendingStepFocusId(null);
-  }, [steps, pendingStepFocusId]);
+    pendingStepFocusIdRef.current = null;
+  }, [steps]);
 
   const recipeHasAnyData = useMemo(() => {
     const hasIngredientContent = ingredients.some(
@@ -706,8 +735,10 @@ export default function AddPostForm({
 
   function addIngredientRow() {
     const newRow = createIngredientRow();
+    // Set the ref *before* setState so the focus effect (deps: [ingredients])
+    // reads a populated ref on the next commit. Don't reorder.
+    pendingIngredientFocusIdRef.current = newRow.id;
     setIngredients((prev) => [...prev, newRow]);
-    setPendingIngredientFocusId(newRow.id);
   }
 
   function handleIngredientDragEnd(event: DragEndEvent) {
@@ -745,8 +776,10 @@ export default function AddPostForm({
 
   function addStepRow() {
     const newRow = createStepRow();
+    // Set the ref *before* setState so the focus effect (deps: [steps])
+    // reads a populated ref on the next commit. Don't reorder.
+    pendingStepFocusIdRef.current = newRow.id;
     setSteps((prev) => [...prev, newRow]);
-    setPendingStepFocusId(newRow.id);
   }
 
   function handleStepDragEnd(event: DragEndEvent) {
@@ -1126,23 +1159,22 @@ export default function AddPostForm({
   }
 
   return (
-    <form className="space-y-8" onSubmit={handleSubmit}>
-      <section className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+    <form className="space-y-6" onSubmit={handleSubmit}>
+      <Card className="space-y-4 p-6">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Basic Post</h2>
-          <p className="text-sm text-gray-500">
+          <h2 className={sectionHeadingClass}>Basic Post</h2>
+          <p className={sectionSubtitleClass}>
             Share a quick update or turn it into a full recipe below.
           </p>
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="title" className="text-sm font-medium text-gray-700">
-            Title
+          <label htmlFor="title" className={fieldLabelClass}>
+            Title <span className="text-[var(--color-red-500)]">*</span>
           </label>
-          <input
+          <Input
             id="title"
             type="text"
-            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
             placeholder="What are you cooking?"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -1151,16 +1183,12 @@ export default function AddPostForm({
         </div>
 
         <div className="space-y-1">
-          <label
-            htmlFor="caption"
-            className="text-sm font-medium text-gray-700"
-          >
+          <label htmlFor="caption" className={fieldLabelClass}>
             Caption (optional)
           </label>
-          <textarea
+          <Textarea
             id="caption"
-            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
-            placeholder="Add a quick note or context"
+            placeholder="Share the story behind this dish…"
             rows={4}
             value={caption}
             onChange={(event) => setCaption(event.target.value)}
@@ -1169,14 +1197,14 @@ export default function AddPostForm({
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700">Photos</label>
+            <span className={fieldLabelInlineClass}>Photos</span>
             {coverPhotoId && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-[var(--fg-caption)]">
                 First photo is used as cover
               </span>
             )}
           </div>
-          <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-300 rounded-xl px-6 py-10 text-center cursor-pointer hover:border-gray-400">
+          <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-[var(--border-input)] rounded-input px-6 py-8 text-center cursor-pointer bg-[var(--bg-page)] hover:border-[var(--border-active)] transition-colors gap-2">
             <input
               type="file"
               accept="image/*"
@@ -1184,11 +1212,16 @@ export default function AddPostForm({
               className="hidden"
               onChange={handlePhotoChange}
             />
-            <span className="text-sm font-medium text-gray-700">
+            <Camera
+              size={28}
+              aria-hidden="true"
+              className="text-[var(--fg-caption)]"
+            />
+            <span className="text-sm text-[var(--fg-meta)]">
               Tap to add photos
             </span>
-            <span className="text-xs text-gray-500 mt-1">
-              JPEG, PNG, GIF, or WEBP
+            <span className="text-xs text-[var(--fg-caption)]">
+              Up to {MAX_PHOTOS} — JPEG, PNG, GIF, or WEBP
             </span>
           </label>
           {photos.length > 0 && (
@@ -1203,7 +1236,7 @@ export default function AddPostForm({
                 return (
                   <div
                     key={photo.id}
-                    className="relative rounded-xl overflow-hidden border border-gray-200"
+                    className="relative rounded-input overflow-hidden border border-[var(--border-card)]"
                   >
                     <div className="relative h-28 w-full">
                       <Image
@@ -1217,37 +1250,37 @@ export default function AddPostForm({
                     </div>
                     <div className="absolute top-2 left-2">
                       {index === 0 && (
-                        <span className="bg-white text-xs font-semibold px-2 py-0.5 rounded-full text-gray-800">
+                        <Chip variant="surface" size="sm">
                           Cover
-                        </span>
+                        </Chip>
                       )}
                     </div>
                     <div className="absolute top-2 right-2 flex gap-1">
                       <button
                         type="button"
                         onClick={() => movePhoto(photo.id, 'left')}
-                        className="bg-white/90 rounded-full p-1 text-xs text-gray-700 disabled:opacity-30"
+                        className="inline-flex items-center justify-center bg-[var(--bg-surface)]/90 rounded-full p-1 text-[var(--fg-meta)] hover:text-[var(--fg-strong)] disabled:opacity-30 disabled:cursor-not-allowed"
                         disabled={index === 0}
                         aria-label="Move photo left"
                       >
-                        ◀
+                        <ChevronLeft size={14} aria-hidden="true" />
                       </button>
                       <button
                         type="button"
                         onClick={() => movePhoto(photo.id, 'right')}
-                        className="bg-white/90 rounded-full p-1 text-xs text-gray-700 disabled:opacity-30"
+                        className="inline-flex items-center justify-center bg-[var(--bg-surface)]/90 rounded-full p-1 text-[var(--fg-meta)] hover:text-[var(--fg-strong)] disabled:opacity-30 disabled:cursor-not-allowed"
                         disabled={index === photos.length - 1}
                         aria-label="Move photo right"
                       >
-                        ▶
+                        <ChevronRight size={14} aria-hidden="true" />
                       </button>
                       <button
                         type="button"
                         onClick={() => removePhoto(photo.id)}
-                        className="bg-white/90 rounded-full p-1 text-xs text-red-600"
+                        className="inline-flex items-center justify-center bg-[var(--bg-surface)]/90 rounded-full p-1 text-[var(--fg-destructive)]"
                         aria-label="Remove photo"
                       >
-                        ✕
+                        <X size={14} aria-hidden="true" />
                       </button>
                     </div>
                   </div>
@@ -1256,66 +1289,72 @@ export default function AddPostForm({
             </div>
           )}
         </div>
-      </section>
+      </Card>
 
-      <section className="bg-white rounded-2xl shadow-sm">
+      <section className="overflow-hidden rounded-card border border-[var(--border-card)] bg-[var(--bg-surface)]">
         <button
           type="button"
-          className="w-full flex items-center justify-between px-6 py-4"
+          className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-[var(--bg-page)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
           onClick={() => setRecipeOpen((prev) => !prev)}
+          aria-expanded={recipeOpen}
         >
-          <div className="text-left">
-            <p className="text-lg font-semibold text-gray-900">
-              Recipe Details
+          <div>
+            <p className="text-base font-medium text-[var(--fg-strong)]">
+              Add Recipe Details (Optional)
             </p>
-            <p className="text-sm text-gray-500">
+            <p className={sectionSubtitleClass}>
               Ingredients, steps, tags, and more
             </p>
           </div>
-          <span className="text-sm text-gray-500">
-            {recipeOpen ? 'Hide' : 'Add'}
-          </span>
+          <ChevronDown
+            size={18}
+            aria-hidden="true"
+            className="text-[var(--fg-meta)] transition-transform duration-150"
+            style={{ transform: recipeOpen ? 'rotate(180deg)' : 'rotate(0)' }}
+          />
         </button>
         {recipeOpen && (
-          <div className="border-t border-gray-100 px-6 py-6 space-y-4">
-            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <div className="border-t border-[var(--border-card)] px-6 py-6 space-y-4">
+            <div className="space-y-2 rounded-card border border-[var(--border-card)] bg-[var(--bg-page)] p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <input
+                <Input
                   type="url"
-                  className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="flex-1"
                   placeholder="Paste a recipe URL to import"
                   value={importUrl}
                   onChange={(event) => setImportUrl(event.target.value)}
                 />
-                <button
+                <Button
                   type="button"
+                  variant="primary"
                   onClick={handleImportRecipe}
                   disabled={isImporting}
-                  className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {isImporting ? 'Importing…' : 'Import from URL'}
-                </button>
+                </Button>
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[var(--fg-caption)]">
                 Import will overwrite existing recipe details.
               </p>
               {importError && (
-                <p className="text-sm text-red-600">{importError}</p>
+                <p className="text-sm text-[var(--fg-destructive)]">
+                  {importError}
+                </p>
               )}
               {importWarning && (
-                <p className="text-sm text-amber-700">{importWarning}</p>
+                <p className="text-sm text-[var(--fg-meta)]">{importWarning}</p>
               )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
+                <label htmlFor="origin" className={fieldLabelClass}>
                   Origin
                 </label>
-                <input
+                <Input
+                  id="origin"
                   type="text"
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                  placeholder="Story / Source / Origin"
+                  placeholder="e.g. Grandma's recipe, NYT Cooking…"
                   maxLength={MAX_RECIPE_ORIGIN_LENGTH}
                   value={recipe.origin}
                   onChange={(event) =>
@@ -1324,12 +1363,11 @@ export default function AddPostForm({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Prep + cook time
-                </label>
+                <span className={fieldLabelClass}>Prep + cook time</span>
                 <div className="grid grid-cols-2 gap-3">
                   <select
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    aria-label="Hours"
+                    className={selectClass}
                     value={recipe.totalTimeHours}
                     onChange={(event) =>
                       handleRecipeChange('totalTimeHours', event.target.value)
@@ -1342,7 +1380,8 @@ export default function AddPostForm({
                     ))}
                   </select>
                   <select
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    aria-label="Minutes"
+                    className={selectClass}
                     value={recipe.totalTimeMinutes}
                     onChange={(event) =>
                       handleRecipeChange('totalTimeMinutes', event.target.value)
@@ -1357,11 +1396,12 @@ export default function AddPostForm({
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
+                <label htmlFor="servings" className={fieldLabelClass}>
                   Servings
                 </label>
                 <select
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  id="servings"
+                  className={selectClass}
                   value={recipe.servings}
                   onChange={(event) =>
                     handleRecipeChange('servings', event.target.value)
@@ -1377,10 +1417,8 @@ export default function AddPostForm({
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700">
-                    Courses
-                  </label>
-                  <span className="text-xs text-gray-500">
+                  <span className={fieldLabelInlineClass}>Courses</span>
+                  <span className="text-xs text-[var(--fg-caption)]">
                     {selectedCourses.length}/{MAX_COURSES}
                   </span>
                 </div>
@@ -1390,49 +1428,44 @@ export default function AddPostForm({
                     const disabled =
                       !selected && selectedCourses.length >= MAX_COURSES;
                     return (
-                      <button
+                      <PillButton
                         key={option.value}
-                        type="button"
-                        onClick={() => toggleCourseSelection(option.value)}
+                        pressed={selected}
                         disabled={disabled}
-                        className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
-                          selected
-                            ? 'bg-gray-900 text-white border-gray-900'
-                            : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                        } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        onClick={() => toggleCourseSelection(option.value)}
                       >
                         {option.label}
-                      </button>
+                      </PillButton>
                     );
                   })}
                 </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Difficulty
-                </label>
-                <select
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                  value={recipe.difficulty}
-                  onChange={(event) =>
-                    handleRecipeChange('difficulty', event.target.value)
-                  }
-                >
-                  {difficultyOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-2">
+                <span className={fieldLabelInlineClass}>Difficulty</span>
+                <div className="flex flex-wrap gap-2">
+                  {difficultyOptions.map((option) => {
+                    const selected = recipe.difficulty === option.value;
+                    return (
+                      <PillButton
+                        key={option.value}
+                        pressed={selected}
+                        onClick={() =>
+                          handleRecipeChange(
+                            'difficulty',
+                            selected ? '' : option.value
+                          )
+                        }
+                      >
+                        {option.label}
+                      </PillButton>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700">
-                  Ingredients
-                </label>
-              </div>
+              <span className={fieldLabelInlineClass}>Ingredients</span>
               <DndContext
                 collisionDetection={closestCenter}
                 onDragEnd={handleIngredientDragEnd}
@@ -1459,21 +1492,17 @@ export default function AddPostForm({
                 <button
                   type="button"
                   onClick={addIngredientRow}
-                  className="h-8 w-8 rounded-full border border-gray-200 text-sm font-semibold text-gray-700"
+                  className="inline-flex items-center justify-center h-9 w-9 rounded-full border border-[var(--border-input)] text-[var(--fg-meta)] hover:text-[var(--fg-strong)] hover:border-[var(--border-active)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
                   aria-label="Add ingredient"
                   title="Add ingredient"
                 >
-                  +
+                  <Plus size={16} aria-hidden="true" />
                 </button>
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700">
-                  Steps
-                </label>
-              </div>
+              <span className={fieldLabelInlineClass}>Steps</span>
               <DndContext
                 collisionDetection={closestCenter}
                 onDragEnd={handleStepDragEnd}
@@ -1500,34 +1529,34 @@ export default function AddPostForm({
                 <button
                   type="button"
                   onClick={addStepRow}
-                  className="h-8 w-8 rounded-full border border-gray-200 text-sm font-semibold text-gray-700"
+                  className="inline-flex items-center justify-center h-9 w-9 rounded-full border border-[var(--border-input)] text-[var(--fg-meta)] hover:text-[var(--fg-strong)] hover:border-[var(--border-active)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
                   aria-label="Add step"
                   title="Add step"
                 >
-                  +
+                  <Plus size={16} aria-hidden="true" />
                 </button>
               </div>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700">
-                  Tags
-                </label>
-                <span className="text-xs text-gray-500">
+                <span className={fieldLabelInlineClass}>Tags</span>
+                <span className="text-xs text-[var(--fg-caption)]">
                   {tags.length}/{MAX_TAGS} selected
                 </span>
               </div>
               {tagsLoading ? (
-                <p className="text-sm text-gray-500">Loading tags…</p>
+                <p className="text-sm text-[var(--fg-meta)]">Loading tags…</p>
               ) : tagsError ? (
-                <p className="text-sm text-red-600">{tagsError}</p>
+                <p className="text-sm text-[var(--fg-destructive)]">
+                  {tagsError}
+                </p>
               ) : (
                 <div className="space-y-4">
                   {Object.entries(availableTags).map(
                     ([groupName, groupTags]) => (
                       <div key={groupName} className="space-y-2">
-                        <p className="text-xs font-semibold uppercase text-gray-500">
+                        <p className="text-xs font-medium uppercase text-[var(--fg-caption)] tracking-wide">
                           {groupName.replace(/-/g, ' ')}
                         </p>
                         <div className="flex flex-wrap gap-2">
@@ -1536,19 +1565,14 @@ export default function AddPostForm({
                             const disabled =
                               !selected && tags.length >= MAX_TAGS;
                             return (
-                              <button
+                              <PillButton
                                 key={tag.id}
-                                type="button"
-                                onClick={() => toggleTagSelection(tag.name)}
+                                pressed={selected}
                                 disabled={disabled}
-                                className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
-                                  selected
-                                    ? 'bg-gray-900 text-white border-gray-900'
-                                    : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                                } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                onClick={() => toggleTagSelection(tag.name)}
                               >
                                 #{tag.name}
-                              </button>
+                              </PillButton>
                             );
                           })}
                         </div>
@@ -1563,41 +1587,39 @@ export default function AddPostForm({
       </section>
 
       {isEditMode && (
-        <section className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
+        <Card className="space-y-3 p-6">
           <div className="space-y-1">
-            <label
-              htmlFor="change-note"
-              className="text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="change-note" className={fieldLabelClass}>
               Change note (optional)
             </label>
-            <textarea
+            <Textarea
               id="change-note"
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
               placeholder="Let the family know what changed"
               rows={3}
               maxLength={280}
               value={changeNote}
               onChange={(event) => setChangeNote(event.target.value)}
             />
-            <p className="text-xs text-gray-500 text-right">
+            <p className="text-xs text-[var(--fg-caption)] text-right">
               {changeNote.length}/280
             </p>
           </div>
-        </section>
+        </Card>
       )}
 
       {formError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-input border border-[var(--border-error)] bg-red-50 px-4 py-3 text-sm text-[var(--fg-destructive)]">
           {formError}
         </div>
       )}
 
       <div className="flex gap-3">
-        <button
+        <Button
           type="submit"
+          variant="primary"
+          full
           disabled={isSubmitting}
-          className="flex-1 rounded-xl bg-gray-900 text-white py-3 font-semibold disabled:opacity-50"
+          className="flex-1"
         >
           {isSubmitting
             ? isEditMode
@@ -1606,14 +1628,10 @@ export default function AddPostForm({
             : isEditMode
               ? 'Save changes'
               : 'Share with family'}
-        </button>
-        <button
-          type="button"
-          className="rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700"
-          onClick={handleReset}
-        >
+        </Button>
+        <Button type="button" variant="secondary" onClick={handleReset}>
           Reset
-        </button>
+        </Button>
       </div>
     </form>
   );

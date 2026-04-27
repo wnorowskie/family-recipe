@@ -135,7 +135,7 @@ From V1 Detailed Summary:
 - [ ] Ensure migrations run in containers:
   - [ ] Command/steps to run `prisma migrate deploy` inside the app container.
 - [ ] Verify local dev can run:
-  - [ ] Directly via `npm run dev` (SQLite or local Postgres).
+  - [ ] Directly via `npm run dev` (local Postgres).
   - [ ] Via `docker-compose up` using Postgres.
 
 From V1 Detailed Summary:

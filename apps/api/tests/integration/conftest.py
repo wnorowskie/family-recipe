@@ -53,12 +53,12 @@ def mock_user() -> SimpleNamespace:
 
 @pytest.fixture
 def mock_admin_user() -> SimpleNamespace:
-    return make_mock_user(id="admin_123", name="Admin", emailOrUsername="admin@example.com")
+    return make_mock_user(id="admin_123", name="Admin", email="admin@example.com", username="admin")
 
 
 @pytest.fixture
 def mock_owner_user() -> SimpleNamespace:
-    return make_mock_user(id="owner_123", name="Owner", emailOrUsername="owner@example.com")
+    return make_mock_user(id="owner_123", name="Owner", email="owner@example.com", username="owner")
 
 
 @pytest.fixture

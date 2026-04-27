@@ -7,6 +7,7 @@ from ..dependencies import get_current_user
 from ..errors import bad_request, internal_error
 from ..schemas.auth import UserResponse
 from ..security import hash_password, verify_password
+from ..uploads import get_signed_upload_url
 from ..utils import iso
 
 logger = logging.getLogger(__name__)
@@ -53,18 +54,34 @@ async def update_profile(
     payload: dict, user: UserResponse = Depends(get_current_user)
 ):  # simple dict validation to mirror existing behavior
     name = payload.get("name")
-    email_or_username = payload.get("emailOrUsername")
+    email = payload.get("email")
+    username = payload.get("username")
     if not isinstance(name, str) or not name.strip():
         return bad_request("Name is required")
-    if not isinstance(email_or_username, str) or not email_or_username.strip():
-        return bad_request("Email or username is required")
+    if not isinstance(email, str) or not email.strip():
+        return bad_request("Email is required")
+    if not isinstance(username, str) or not username.strip():
+        return bad_request("Username is required")
 
     try:
         updated = await prisma.user.update(
             where={"id": user.id},
-            data={"name": name.strip(), "emailOrUsername": email_or_username.strip()},
+            data={
+                "name": name.strip(),
+                "email": email.strip(),
+                "username": username.strip(),
+            },
         )
-        return {"user": {"id": updated.id, "name": updated.name, "emailOrUsername": updated.emailOrUsername, "avatarUrl": updated.avatarUrl}}
+        return {
+            "user": {
+                "id": updated.id,
+                "name": updated.name,
+                "email": updated.email,
+                "username": updated.username,
+                "emailOrUsername": updated.email,
+                "avatarUrl": await get_signed_upload_url(getattr(updated, "avatarStorageKey", None)),
+            }
+        }
     except PrismaError:
         return internal_error("Failed to update profile")
     except Exception:

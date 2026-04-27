@@ -112,48 +112,87 @@ def test_me_favorites_requires_auth(client):
 
 
 def test_update_profile_success(client, mock_prisma, member_auth):
-    updated_user = SimpleNamespace(id="user_test_123", name="New Name", emailOrUsername="new@example.com", avatarUrl="https://cdn.test/avatar.jpg")
+    updated_user = SimpleNamespace(
+        id="user_test_123",
+        name="New Name",
+        email="new@example.com",
+        username="newname",
+    )
     mock_prisma.user.update = AsyncMock(return_value=updated_user)
 
     response = client.put(
         "/me/profile",
         headers=member_auth,
-        json={"name": "  New Name  ", "emailOrUsername": "  new@example.com  "},
+        json={
+            "name": "  New Name  ",
+            "email": "  new@example.com  ",
+            "username": "  newname  ",
+        },
     )
 
     assert response.status_code == 200
     assert response.json()["user"] == {
         "id": updated_user.id,
         "name": updated_user.name,
-        "emailOrUsername": updated_user.emailOrUsername,
-        "avatarUrl": updated_user.avatarUrl,
+        "email": updated_user.email,
+        "username": updated_user.username,
+        "emailOrUsername": updated_user.email,
+        "avatarUrl": None,
     }
     call_kwargs = mock_prisma.user.update.await_args.kwargs
-    assert call_kwargs["data"] == {"name": "New Name", "emailOrUsername": "new@example.com"}
+    assert call_kwargs["data"] == {
+        "name": "New Name",
+        "email": "new@example.com",
+        "username": "newname",
+    }
 
 
 def test_update_profile_missing_name_400(client, member_auth):
-    response = client.put("/me/profile", headers=member_auth, json={"emailOrUsername": "test@example.com"})
+    response = client.put(
+        "/me/profile",
+        headers=member_auth,
+        json={"email": "test@example.com", "username": "testuser"},
+    )
 
     assert response.status_code == 400
     assert response.json()["error"]["message"] == "Name is required"
 
 
 def test_update_profile_missing_email_400(client, member_auth):
-    response = client.put("/me/profile", headers=member_auth, json={"name": "Test"})
+    response = client.put(
+        "/me/profile",
+        headers=member_auth,
+        json={"name": "Test", "username": "testuser"},
+    )
 
     assert response.status_code == 400
-    assert response.json()["error"]["message"] == "Email or username is required"
+    assert response.json()["error"]["message"] == "Email is required"
+
+
+def test_update_profile_missing_username_400(client, member_auth):
+    response = client.put(
+        "/me/profile",
+        headers=member_auth,
+        json={"name": "Test", "email": "test@example.com"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["message"] == "Username is required"
 
 
 def test_update_profile_returns_updated_user_shape(client, mock_prisma, member_auth):
-    updated_user = SimpleNamespace(id="user_test_123", name="Tester", emailOrUsername="tester", avatarUrl=None)
+    updated_user = SimpleNamespace(
+        id="user_test_123",
+        name="Tester",
+        email="tester@example.com",
+        username="tester",
+    )
     mock_prisma.user.update = AsyncMock(return_value=updated_user)
 
     response = client.put(
         "/me/profile",
         headers=member_auth,
-        json={"name": "Tester", "emailOrUsername": "tester"},
+        json={"name": "Tester", "email": "tester@example.com", "username": "tester"},
     )
 
     assert response.status_code == 200
@@ -161,14 +200,19 @@ def test_update_profile_returns_updated_user_shape(client, mock_prisma, member_a
         "user": {
             "id": updated_user.id,
             "name": "Tester",
-            "emailOrUsername": "tester",
+            "email": "tester@example.com",
+            "username": "tester",
+            "emailOrUsername": "tester@example.com",
             "avatarUrl": None,
         }
     }
 
 
 def test_update_profile_requires_auth(client):
-    response = client.put("/me/profile", json={"name": "Test", "emailOrUsername": "test"})
+    response = client.put(
+        "/me/profile",
+        json={"name": "Test", "email": "test@example.com", "username": "test"},
+    )
 
     assert response.status_code == 401
 

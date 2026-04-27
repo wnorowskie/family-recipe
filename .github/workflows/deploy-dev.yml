@@ -104,6 +104,23 @@ jobs:
 
           npx prisma migrate deploy --schema "${PRISMA_SCHEMA}"
 
+      - name: Capture currently-serving revision (for rollback)
+        run: |
+          # status.traffic[0] assumes a single revision serves 100%
+          # (current setup). If traffic is ever split across revisions,
+          # this capture will only grab the first split and rollback
+          # will be partial.
+          PREV_REVISION="$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --format='value(status.traffic[0].revisionName)' 2>/dev/null || true)"
+          if [ -n "$PREV_REVISION" ]; then
+            echo "Previously-serving revision: $PREV_REVISION"
+          else
+            echo "No previously-serving revision found (first deploy or service missing); rollback will be skipped."
+          fi
+          echo "PREV_REVISION=$PREV_REVISION" >> "$GITHUB_ENV"
+
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
 
@@ -120,8 +137,17 @@ jobs:
       - name: Push image
         run: docker push "$IMAGE"
 
-      - name: Deploy to Cloud Run (dev)
+      - name: Deploy to Cloud Run (dev) at 0% traffic with candidate tag
+        id: deploy
         run: |
+          # --no-traffic builds the new revision without flipping traffic to it,
+          # and --tag=candidate gives us a tagged URL we can probe directly.
+          # Traffic is promoted in the "Promote candidate to LATEST" step below
+          # only after smoke + Playwright pass. This canary pattern also fixes
+          # the latent traffic-pin bug from #158: a prior failed deploy could
+          # leave the service pinned to a specific revision, and an unconditional
+          # `--to-latest` promotion below restores LATEST routing on every green
+          # deploy.
           gcloud run deploy "$CLOUD_RUN_SERVICE" \
             --project "$PROJECT_ID" \
             --region "$REGION" \
@@ -130,8 +156,224 @@ jobs:
             --platform managed \
             --port 3000 \
             --quiet \
+            --no-traffic \
+            --tag candidate \
             --add-cloudsql-instances "$INSTANCE_CONNECTION_NAME" \
             --set-secrets DATABASE_URL=${DATABASE_URL_SECRET}:latest,JWT_SECRET=${JWT_SECRET_NAME}:latest,FAMILY_MASTER_KEY=${FAMILY_MASTER_KEY_SECRET_NAME}:latest \
             --set-env-vars PRISMA_SCHEMA=${PRISMA_SCHEMA},UPLOADS_BUCKET=${UPLOADS_BUCKET},UPLOADS_BASE_URL=${UPLOADS_BASE_URL},RECIPE_IMPORTER_URL=${RECIPE_IMPORTER_URL},RECIPE_IMPORTER_AUDIENCE=${RECIPE_IMPORTER_AUDIENCE},RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL=${RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL} \
             --ingress all \
             --no-allow-unauthenticated
+
+      - name: Resolve candidate + service URLs
+        id: urls
+        run: |
+          SERVICE_URL="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          CANDIDATE_URL="$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --format='value(status.traffic.filter("tag:candidate").extract(url).flatten())')"
+          if [ -z "$CANDIDATE_URL" ]; then
+            echo "Could not resolve candidate tag URL — failing fast." >&2
+            exit 1
+          fi
+          echo "Service URL:    $SERVICE_URL"
+          echo "Candidate URL:  $CANDIDATE_URL"
+          echo "Healthcheck:    $CANDIDATE_URL/api/health"
+          echo "SERVICE_URL=$SERVICE_URL" >> "$GITHUB_ENV"
+          echo "CANDIDATE_URL=$CANDIDATE_URL" >> "$GITHUB_ENV"
+
+      - name: Smoke check /api/health (against candidate revision)
+        id: smoke_check
+        env:
+          DEPLOYER_SA_EMAIL: ${{ secrets.DEV_GCP_DEPLOYER_SA }}
+        run: |
+          # Publish env for downstream steps. The auth-injecting proxy and
+          # Playwright will route requests through the candidate URL so the
+          # just-built revision is exercised; DEV_AUDIENCE stays on the
+          # service URL because Cloud Run's IAM bearer-token check validates
+          # the `aud` claim against the service URL, not per-tag hostnames.
+          # (Run 25002226021 hit 60s of 401s because the smoke step minted a
+          # token with --audiences=$CANDIDATE_URL.)
+          echo "DEV_NEXT_URL=$CANDIDATE_URL" >> "$GITHUB_ENV"
+          echo "DEV_AUDIENCE=$SERVICE_URL" >> "$GITHUB_ENV"
+          # Dev service requires auth (--no-allow-unauthenticated). Under WIF the active
+          # gcloud credential is an access token, which `print-identity-token --audiences`
+          # rejects; --impersonate-service-account routes the mint through the
+          # iamcredentials.generateIdToken API instead (authorized by the deployer SA's
+          # self-binding of roles/iam.serviceAccountTokenCreator).
+          TOKEN="$(gcloud auth print-identity-token \
+            --impersonate-service-account="$DEPLOYER_SA_EMAIL" \
+            --audiences="$SERVICE_URL")"
+          for i in {1..20}; do
+            STATUS="$(curl -sS -H "Authorization: Bearer $TOKEN" -o /dev/null -w '%{http_code}' "$CANDIDATE_URL/api/health" || true)"
+            if [ "$STATUS" = "200" ]; then
+              echo "Healthcheck OK (200)"
+              exit 0
+            fi
+            echo "Healthcheck not ready yet (status=$STATUS), retrying..."
+            sleep 3
+          done
+          echo "Healthcheck did not return 200 within timeout."
+          exit 1
+
+      - name: Fetch claude-test password from GSM
+        # GSM is the single source of truth for the dev `claude-test`
+        # password (the seed in prisma/seed.ts pulls from CLAUDE_TEST_PASSWORD
+        # which is sourced from this same secret per docs/verification/
+        # dev-deployments.md). Surfacing it here as $GITHUB_ENV avoids a
+        # GHA-secret duplicate that drifts on rotation (closes #164 — the
+        # workflow previously fell back to the literal default
+        # `claude-test-password`, which mismatched the rotated DB password
+        # and produced 401s in Playwright's global-setup login).
+        if: steps.smoke_check.conclusion == 'success'
+        run: |
+          E2E_PASSWORD="$(gcloud secrets versions access latest \
+            --secret family-recipe-dev-claude-test-password \
+            --project "$PROJECT_ID")"
+          echo "::add-mask::${E2E_PASSWORD}"
+          echo "E2E_PASSWORD=${E2E_PASSWORD}" >> "$GITHUB_ENV"
+
+      - name: Cache Playwright browsers
+        if: steps.smoke_check.conclusion == 'success'
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        if: steps.smoke_check.conclusion == 'success' && steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system deps (cache hit)
+        if: steps.smoke_check.conclusion == 'success' && steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Post-deploy Playwright @smoke against dev
+        id: post_deploy_smoke
+        if: steps.smoke_check.conclusion == 'success'
+        # Bound the <2 min wall-clock target from #107 against hung-browser
+        # scenarios where Playwright's per-test timeouts wouldn't fire (e.g.
+        # the tsx-wrapped proxy stuck before Playwright launches).
+        timeout-minutes: 5
+        env:
+          DEV_DEPLOYER_SA: ${{ secrets.DEV_GCP_DEPLOYER_SA }}
+          # E2E_USER stays a literal because the seeded username has never
+          # been rotated and is set on user-create only (see prisma/seed.ts
+          # comment about CLAUDE_TEST_USER). E2E_PASSWORD is set in the
+          # "Fetch claude-test password from GSM" step above, sourcing from
+          # the same secret prisma/seed.ts uses.
+          E2E_USER: ${{ secrets.DEV_E2E_USER || 'claude-test' }}
+          PROXY_PORT: '3100'
+          PROXY_PID_FILE: ${{ runner.temp }}/dev-auth-proxy.pid
+        run: |
+          # Boot the auth-injecting proxy from scripts/dev-auth-proxy.ts in the
+          # background; it mints an ID token by impersonating the deployer SA and
+          # forwards every request — the same pattern the existing smoke_check
+          # step uses, plus cookie/Set-Cookie rewriting so a browser session works.
+          # See docs/research/automated-testing.md and #112.
+          PROXY_LOG="$RUNNER_TEMP/dev-auth-proxy.log"
+          npx tsx scripts/dev-auth-proxy.ts >"$PROXY_LOG" 2>&1 &
+          PROXY_PID=$!
+          echo "$PROXY_PID" > "$PROXY_PID_FILE"
+
+          # Wait for the proxy to mint its first token and start listening.
+          for _ in $(seq 1 30); do
+            if ! kill -0 "$PROXY_PID" 2>/dev/null; then
+              echo "auth proxy exited before becoming ready:" >&2
+              cat "$PROXY_LOG" >&2
+              exit 1
+            fi
+            if curl -sf -o /dev/null "http://localhost:${PROXY_PORT}/api/health"; then
+              break
+            fi
+            sleep 1
+          done
+          if ! curl -sf -o /dev/null "http://localhost:${PROXY_PORT}/api/health"; then
+            echo "auth proxy never reached http://localhost:${PROXY_PORT}/api/health" >&2
+            cat "$PROXY_LOG" >&2
+            exit 1
+          fi
+
+          export PLAYWRIGHT_BASE_URL="http://localhost:${PROXY_PORT}"
+
+          # @smoke covers the three non-destructive flows (#103/#104/#105);
+          # signup is also tagged @destructive (creates a real user row) and is
+          # excluded here — that flow stays gated behind ci.yml's seeded DB.
+          npx playwright test --grep @smoke --grep-invert @destructive
+
+      - name: Stop auth proxy
+        if: always()
+        env:
+          PROXY_PID_FILE: ${{ runner.temp }}/dev-auth-proxy.pid
+        run: |
+          if [ ! -f "$PROXY_PID_FILE" ]; then
+            exit 0
+          fi
+          PROXY_PID="$(cat "$PROXY_PID_FILE" 2>/dev/null || true)"
+          if [ -n "$PROXY_PID" ] && kill -0 "$PROXY_PID" 2>/dev/null; then
+            kill "$PROXY_PID" 2>/dev/null || true
+          fi
+          rm -f "$PROXY_PID_FILE"
+
+      - name: Upload Playwright report
+        if: failure() && steps.post_deploy_smoke.conclusion == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-dev-deploy
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Promote candidate to LATEST
+        if: steps.smoke_check.conclusion == 'success' && steps.post_deploy_smoke.conclusion == 'success'
+        run: |
+          # Flip 100% of traffic to the just-built revision and remove the
+          # candidate tag so the next deploy starts clean. --to-latest also
+          # clears any prior pin (see #158): once promoted, status.traffic[0]
+          # tracks LATEST again instead of being stuck on a frozen revision.
+          gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --to-latest \
+            --remove-tags=candidate \
+            --quiet
+
+      - name: Rollback traffic on smoke-check failure
+        if: failure() && (steps.smoke_check.conclusion == 'failure' || steps.post_deploy_smoke.conclusion == 'failure')
+        run: |
+          # Because the deploy uses --no-traffic, the failed revision never
+          # served users — the previous revision is still receiving 100%.
+          # Pin to PREV_REVISION explicitly to defend against any mid-flight
+          # traffic state. Tag cleanup is handled by the always()-gated step
+          # below, so this step's only job is to make traffic safe.
+          if [ -n "${PREV_REVISION:-}" ]; then
+            echo "Smoke check failed. Pinning traffic to previous revision: $PREV_REVISION"
+            gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+              --project "$PROJECT_ID" \
+              --region "$REGION" \
+              --to-revisions="$PREV_REVISION=100" \
+              --quiet
+          else
+            echo "No previous revision captured (first deploy?); skipping traffic pin."
+          fi
+          echo "Rollback complete. Job will fail so the broken deploy is surfaced."
+          exit 1
+
+      - name: Always remove candidate tag
+        # Runs on every conclusion — including step failures between deploy
+        # and the rollback gate (Playwright install/cache failures, runner
+        # OOMs, the 5-minute Playwright timeout). Without this, a mid-pipeline
+        # failure would leave the `candidate` tag attached to the failed
+        # revision and the next deploy's "Resolve candidate + service URLs"
+        # step would either resolve a stale URL or fail the existence check.
+        # `--remove-tags=candidate` with no `--to-*` flag preserves whatever
+        # traffic spec is currently in place (the Promote/Rollback steps
+        # already settled traffic). The command is idempotent — it's a no-op
+        # when the tag is already gone, which is the common path after a
+        # successful Promote.
+        if: always() && steps.deploy.conclusion == 'success'
+        run: |
+          gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --remove-tags=candidate \
+            --quiet || true

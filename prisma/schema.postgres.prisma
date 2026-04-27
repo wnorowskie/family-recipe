@@ -15,40 +15,43 @@ datasource db {
 
 // User represents an individual family member
 model User {
-  id                String   @id @default(cuid())
-  name              String
-  email             String   @unique
-  username          String   @unique
-  passwordHash      String   @map("password_hash")
-  avatarStorageKey  String?  @map("avatar_url")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(cuid())
+  name             String
+  email            String   @unique
+  username         String   @unique
+  passwordHash     String   @map("password_hash")
+  avatarStorageKey String?  @map("avatar_url")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   // Relations
-  memberships       FamilyMembership[]
-  posts             Post[]             @relation("PostAuthor")
-  editedPosts       Post[]             @relation("PostEditor")
-  comments          Comment[]
-  reactions         Reaction[]
-  cookedEvents      CookedEvent[]
-  favorites         Favorite[]
-  feedbackSubmissions FeedbackSubmission[]
+  memberships           FamilyMembership[]
+  posts                 Post[]               @relation("PostAuthor")
+  editedPosts           Post[]               @relation("PostEditor")
+  comments              Comment[]
+  reactions             Reaction[]
+  cookedEvents          CookedEvent[]
+  favorites             Favorite[]
+  feedbackSubmissions   FeedbackSubmission[]
+  receivedNotifications Notification[]       @relation("NotificationRecipient")
+  sentNotifications     Notification[]       @relation("NotificationActor")
 
   @@map("users")
 }
 
 // FamilySpace represents a family group
 model FamilySpace {
-  id              String   @id @default(cuid())
-  name            String
-  masterKeyHash   String   @map("master_key_hash")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  name          String
+  masterKeyHash String   @map("master_key_hash")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
-  memberships     FamilyMembership[]
-  posts           Post[]
+  memberships         FamilyMembership[]
+  posts               Post[]
   feedbackSubmissions FeedbackSubmission[]
+  notifications       Notification[]
 
   @@map("family_spaces")
 }
@@ -58,63 +61,64 @@ model FamilyMembership {
   id            String   @id @default(cuid())
   familySpaceId String   @map("family_space_id")
   userId        String   @map("user_id")
-  role          String   // 'owner', 'admin', 'member'
+  role          String // 'owner', 'admin', 'member'
   createdAt     DateTime @default(now()) @map("created_at")
 
   // Relations
-  familySpace   FamilySpace @relation(fields: [familySpaceId], references: [id], onDelete: Cascade)
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familySpace FamilySpace @relation(fields: [familySpaceId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([familySpaceId, userId])
-  @@map("family_memberships")
   @@index([familySpaceId])
+  @@map("family_memberships")
 }
 
 // Post represents both quick posts and full recipe posts
 model Post {
-  id                String    @id @default(cuid())
-  familySpaceId     String    @map("family_space_id")
-  authorId          String    @map("author_id")
-  title             String
-  caption           String?
-  hasRecipeDetails  Boolean   @default(false) @map("has_recipe_details")
+  id                  String    @id @default(cuid())
+  familySpaceId       String    @map("family_space_id")
+  authorId            String    @map("author_id")
+  title               String
+  caption             String?
+  hasRecipeDetails    Boolean   @default(false) @map("has_recipe_details")
   mainPhotoStorageKey String?   @map("main_photo_url")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  lastEditedBy      String?   @map("last_edited_by")
-  lastEditNote      String?   @map("last_edit_note")
-  lastEditAt        DateTime? @map("last_edit_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  lastEditedBy        String?   @map("last_edited_by")
+  lastEditNote        String?   @map("last_edit_note")
+  lastEditAt          DateTime? @map("last_edit_at")
 
   // Relations
-  familySpace       FamilySpace      @relation(fields: [familySpaceId], references: [id], onDelete: Cascade)
-  author            User             @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  editor            User?            @relation("PostEditor", fields: [lastEditedBy], references: [id])
-  photos            PostPhoto[]
-  recipeDetails     RecipeDetails?
-  tags              PostTag[]
-  comments          Comment[]
-  reactions         Reaction[] @relation("PostReactions")
-  cookedEvents      CookedEvent[]
-  favorites         Favorite[]
+  familySpace   FamilySpace    @relation(fields: [familySpaceId], references: [id], onDelete: Cascade)
+  author        User           @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  editor        User?          @relation("PostEditor", fields: [lastEditedBy], references: [id])
+  photos        PostPhoto[]
+  recipeDetails RecipeDetails?
+  tags          PostTag[]
+  comments      Comment[]
+  reactions     Reaction[]     @relation("PostReactions")
+  cookedEvents  CookedEvent[]
+  favorites     Favorite[]
+  notifications Notification[]
 
-  @@map("posts")
   @@index([familySpaceId, createdAt])
   @@index([authorId])
+  @@map("posts")
 }
 
 // PostPhoto stores additional photos attached to a post
 model PostPhoto {
-  id          String   @id @default(cuid())
-  postId      String   @map("post_id")
-  storageKey  String   @map("url")
-  sortOrder   Int      @default(0) @map("sort_order")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id         String   @id @default(cuid())
+  postId     String   @map("post_id")
+  storageKey String   @map("url")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   // Relations
-  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
-  @@map("post_photos")
   @@index([postId])
+  @@map("post_photos")
 }
 
 // RecipeDetails stores optional recipe-specific information
@@ -126,14 +130,14 @@ model RecipeDetails {
   steps       String
   totalTime   Int?     @map("total_time")
   servings    Int?
-  course      String?  // Maintains primary course for legacy filters
+  course      String? // Maintains primary course for legacy filters
   courses     String?
-  difficulty  String?  // 'easy', 'medium', 'hard'
+  difficulty  String? // 'easy', 'medium', 'hard'
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@map("recipe_details")
 }
@@ -142,49 +146,50 @@ model RecipeDetails {
 model Tag {
   id        String   @id @default(cuid())
   name      String   @unique
-  type      String?  // 'general', 'dietary', 'other'
+  type      String? // 'general', 'dietary', 'other'
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  postTags  PostTag[]
+  postTags PostTag[]
 
   @@map("tags")
 }
 
 // PostTag links tags to posts (many-to-many)
 model PostTag {
-  id        String   @id @default(cuid())
-  postId    String   @map("post_id")
-  tagId     String   @map("tag_id")
+  id     String @id @default(cuid())
+  postId String @map("post_id")
+  tagId  String @map("tag_id")
 
   // Relations
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([postId, tagId])
-  @@map("post_tags")
   @@index([postId])
   @@index([tagId])
+  @@map("post_tags")
 }
 
 // Comment represents flat comments on posts
 model Comment {
-  id        String    @id @default(cuid())
-  postId    String    @map("post_id")
-  authorId  String    @map("author_id")
-  text      String
-  photoStorageKey  String?   @map("photo_url")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime? @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  id              String    @id @default(cuid())
+  postId          String    @map("post_id")
+  authorId        String    @map("author_id")
+  text            String
+  photoStorageKey String?   @map("photo_url")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime? @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
 
   // Relations
-  post      Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  reactions Reaction[] @relation("CommentReactions")
+  post          Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author        User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reactions     Reaction[]     @relation("CommentReactions")
+  notifications Notification[]
 
-  @@map("comments")
   @@index([postId, createdAt])
+  @@map("comments")
 }
 
 // Reaction represents emoji-based reactions on posts and comments
@@ -199,15 +204,15 @@ model Reaction {
   createdAt  DateTime @default(now()) @map("created_at")
 
   // Relations
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post    Post?   @relation("PostReactions", fields: [postId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post    Post?    @relation("PostReactions", fields: [postId], references: [id], onDelete: Cascade)
   comment Comment? @relation("CommentReactions", fields: [commentId], references: [id], onDelete: Cascade)
 
   @@unique([targetType, targetId, userId, emoji])
-  @@map("reactions")
   @@index([targetType, targetId])
   @@index([postId])
   @@index([commentId])
+  @@map("reactions")
 }
 
 // CookedEvent represents "Cooked this!" check-ins
@@ -215,17 +220,18 @@ model CookedEvent {
   id        String   @id @default(cuid())
   postId    String   @map("post_id")
   userId    String   @map("user_id")
-  rating    Int?     // 1-5
+  rating    Int? // 1-5
   note      String?
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post          Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications Notification[]
 
-  @@map("cooked_events")
   @@index([postId])
   @@index([userId])
+  @@map("cooked_events")
 }
 
 // Favorite represents user's private bookmarks
@@ -236,13 +242,13 @@ model Favorite {
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([userId, postId])
-  @@map("favorites")
   @@index([userId])
   @@index([postId])
+  @@map("favorites")
 }
 
 model FeedbackSubmission {
@@ -250,7 +256,7 @@ model FeedbackSubmission {
   userId        String?  @map("user_id")
   familySpaceId String?  @map("family_space_id")
   contactEmail  String?  @map("contact_email")
-  category      String   // 'bug' | 'suggestion'
+  category      String // 'bug' | 'suggestion'
   message       String
   pageUrl       String?  @map("page_url")
   userAgent     String?  @map("user_agent")
@@ -259,8 +265,36 @@ model FeedbackSubmission {
   user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   familySpace FamilySpace? @relation(fields: [familySpaceId], references: [id], onDelete: SetNull)
 
-  @@map("feedback_submissions")
   @@index([familySpaceId])
   @@index([userId])
   @@index([createdAt])
+  @@map("feedback_submissions")
+}
+
+model Notification {
+  id            String    @id @default(cuid())
+  familySpaceId String    @map("family_space_id")
+  recipientId   String    @map("recipient_id")
+  actorId       String    @map("actor_id")
+  type          String
+  postId        String    @map("post_id")
+  commentId     String?   @map("comment_id")
+  cookedEventId String?   @map("cooked_event_id")
+  emojiCounts   Json?     @map("emoji_counts")
+  totalCount    Int?      @map("total_count")
+  metadata      Json?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  readAt        DateTime? @map("read_at") @db.Timestamptz(6)
+
+  recipient   User         @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor       User         @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+  post        Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment     Comment?     @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  cookedEvent CookedEvent? @relation(fields: [cookedEventId], references: [id], onDelete: Cascade)
+  familySpace FamilySpace  @relation(fields: [familySpaceId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, readAt, createdAt], map: "notifications_recipient_read_idx")
+  @@index([familySpaceId, postId], map: "notifications_family_post_idx")
+  @@map("notifications")
 }

@@ -64,11 +64,10 @@ function extractChangeNote(value: unknown): {
 }
 
 export const GET = withAuth(
-  async (request, user, context?: { params: { postId: string } }) => {
+  async (request, user, context?: { params: Promise<{ postId: string }> }) => {
+    const resolvedParams = await context!.params;
     try {
-      const { params } = context!;
-
-      const parseResult = paramsSchema.safeParse(params);
+      const parseResult = paramsSchema.safeParse(resolvedParams);
 
       if (!parseResult.success) {
         return NextResponse.json(
@@ -149,7 +148,7 @@ export const GET = withAuth(
       });
     } catch (error) {
       logError('posts.detail.error', error, {
-        postId: context?.params?.postId,
+        postId: resolvedParams?.postId,
       });
       return NextResponse.json(
         {
@@ -165,11 +164,10 @@ export const GET = withAuth(
 );
 
 export const PUT = withAuth(
-  async (request, user, context?: { params: { postId: string } }) => {
-    const { params } = context!;
-    const postId = params.postId;
-
+  async (request, user, context?: { params: Promise<{ postId: string }> }) => {
+    const resolvedParams = await context!.params;
     try {
+      const { postId } = resolvedParams;
       const existingPost = await prisma.post.findFirst({
         where: {
           id: postId,
@@ -613,7 +611,9 @@ export const PUT = withAuth(
         post: updatedPost,
       });
     } catch (error) {
-      logError('posts.update.error', error, { postId });
+      logError('posts.update.error', error, {
+        postId: resolvedParams?.postId,
+      });
       if (error instanceof Error) {
         if (error.message === 'UNSUPPORTED_FILE_TYPE') {
           return NextResponse.json(
@@ -667,11 +667,10 @@ export const PUT = withAuth(
 );
 
 export const DELETE = withAuth(
-  async (request, user, context?: { params: { postId: string } }) => {
+  async (request, user, context?: { params: Promise<{ postId: string }> }) => {
+    const resolvedParams = await context!.params;
     try {
-      const { params } = context!;
-
-      const parseResult = paramsSchema.safeParse(params);
+      const parseResult = paramsSchema.safeParse(resolvedParams);
 
       if (!parseResult.success) {
         return NextResponse.json(
@@ -758,7 +757,7 @@ export const DELETE = withAuth(
       return NextResponse.json({ status: 'deleted' }, { status: 200 });
     } catch (error) {
       logError('posts.delete.error', error, {
-        postId: context?.params?.postId,
+        postId: resolvedParams?.postId,
       });
       return NextResponse.json(
         {

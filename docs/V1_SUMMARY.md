@@ -10,7 +10,7 @@
 
 - Next.js App Router with React + TypeScript, mobile-first UI styled with Tailwind utility classes and shared bottom navigation; mix of server components for data loading and client components for interactivity.
 - Backend is a REST-ish JSON API implemented with Next.js route handlers under `src/app/api`, consumed via `fetch` from client components. Eventually the goal is to move this to its own application.
-- Prisma ORM with SQLite locally (Postgres-ready) models the domain; routes use typed Zod validation.
+- Prisma ORM with Postgres (locally and in production) models the domain; routes use typed Zod validation.
 - Auth: credentials (email/username + password) plus Family Master Key on signup; passwords and master key stored as hashes; JWT issued to an HTTP-only `session` cookie; roles cover owner/admin/member; `(app)` layout redirects unauthenticated users.
 
 ## Core Domain Model

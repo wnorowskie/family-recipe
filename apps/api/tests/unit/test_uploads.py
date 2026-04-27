@@ -14,6 +14,8 @@ from src.uploads import (
     _sign_string_with_iam,
     _generate_signed_url_v4,
     _upload_to_gcs,
+    create_signed_url_resolver,
+    get_signed_upload_url,
     save_photo_file,
     delete_uploads,
 )
@@ -641,3 +643,94 @@ class TestEdgeCases:
 
         with pytest.raises(ValueError, match="FILE_TOO_LARGE"):
             await save_photo_file(mock_file)
+
+
+# =============================================================================
+# Signed URL Helper Tests (read side)
+# =============================================================================
+
+
+class TestGetSignedUploadUrl:
+    @pytest.mark.asyncio
+    async def test_returns_none_for_falsy_key(self):
+        assert await get_signed_upload_url(None) is None
+        assert await get_signed_upload_url("") is None
+
+    @pytest.mark.asyncio
+    async def test_returns_local_path_without_bucket(self):
+        with patch("src.uploads.settings") as mock_settings:
+            mock_settings.uploads_bucket = ""
+
+            assert await get_signed_upload_url("avatars/foo.jpg") == "/uploads/avatars/foo.jpg"
+
+    @pytest.mark.asyncio
+    async def test_returns_signed_url_with_bucket(self):
+        with patch("src.uploads.settings") as mock_settings:
+            mock_settings.uploads_bucket = "test-bucket"
+            mock_settings.uploads_signed_url_ttl_seconds = 3600
+
+            with patch("src.uploads._get_gcp_access_token", return_value="token"):
+                with patch("src.uploads._fetch_metadata", return_value="sa@gcp.com"):
+                    with patch(
+                        "src.uploads._generate_signed_url_v4",
+                        return_value="https://signed.example/foo",
+                    ) as mock_sign:
+                        result = await get_signed_upload_url("photo.jpg")
+
+            assert result == "https://signed.example/foo"
+            mock_sign.assert_called_once()
+            assert mock_sign.call_args.kwargs["object_key"] == "photo.jpg"
+            assert mock_sign.call_args.kwargs["bucket"] == "test-bucket"
+            assert mock_sign.call_args.kwargs["expires_in_seconds"] == 3600
+
+
+class TestCreateSignedUrlResolver:
+    @pytest.mark.asyncio
+    async def test_returns_none_for_falsy_key(self):
+        resolve = create_signed_url_resolver()
+
+        assert await resolve(None) is None
+        assert await resolve("") is None
+
+    @pytest.mark.asyncio
+    async def test_memoizes_calls_per_key(self):
+        resolve = create_signed_url_resolver()
+
+        async def fake(key):
+            return f"/uploads/{key}"
+
+        with patch("src.uploads.get_signed_upload_url", new=AsyncMock(side_effect=fake)) as mock_get:
+            first = await resolve("x")
+            second = await resolve("x")
+            other = await resolve("y")
+
+        assert first == "/uploads/x"
+        assert second == "/uploads/x"
+        assert other == "/uploads/y"
+        # "x" resolved once (cached), "y" resolved once → two total
+        assert mock_get.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_dedupes_concurrent_awaits_for_same_key(self):
+        import asyncio
+
+        resolve = create_signed_url_resolver()
+
+        async def fake(key):
+            await asyncio.sleep(0)  # yield so both resolvers can reach the cache miss
+            return f"/uploads/{key}"
+
+        with patch("src.uploads.get_signed_upload_url", new=AsyncMock(side_effect=fake)) as mock_get:
+            a, b = await asyncio.gather(resolve("shared"), resolve("shared"))
+
+        assert a == "/uploads/shared"
+        assert b == "/uploads/shared"
+        assert mock_get.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_surfaces_resolver_errors(self):
+        resolve = create_signed_url_resolver()
+
+        with patch("src.uploads.get_signed_upload_url", new=AsyncMock(side_effect=RuntimeError("boom"))):
+            with pytest.raises(RuntimeError, match="boom"):
+                await resolve("broken-key")

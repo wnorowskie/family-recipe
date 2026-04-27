@@ -107,7 +107,7 @@ describe('DELETE /api/posts/[postId]', () => {
   };
 
   const mockContext = {
-    params: { postId: 'post_123' },
+    params: Promise.resolve({ postId: 'post_123' }),
   };
 
   const mockRequest = new Request('http://localhost/api/posts/post_123', {
@@ -135,7 +135,7 @@ describe('DELETE /api/posts/[postId]', () => {
   describe('Validation', () => {
     it('returns 400 for invalid post ID', async () => {
       const invalidContext = {
-        params: { postId: '' }, // Empty post ID
+        params: Promise.resolve({ postId: '' }), // Empty post ID
       };
 
       const response = await DELETE(mockRequest, invalidContext);

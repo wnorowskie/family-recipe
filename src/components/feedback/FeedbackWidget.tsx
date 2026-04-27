@@ -57,12 +57,6 @@ export default function FeedbackWidget() {
   }, []);
 
   useEffect(() => {
-    if (open && typeof window !== 'undefined') {
-      setPageUrl(window.location.href);
-    }
-  }, [open]);
-
-  useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(timer);
@@ -138,7 +132,15 @@ export default function FeedbackWidget() {
       <button
         type="button"
         aria-label="Send feedback"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          // This button is the only path that sets open=true. If another
+          // opener is added (deep link, keyboard trigger, etc.), pageUrl
+          // must be captured there too or it will be stale.
+          if (typeof window !== 'undefined') {
+            setPageUrl(window.location.href);
+          }
+          setOpen(true);
+        }}
         className="fixed bottom-28 right-4 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-900 text-white shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 sm:bottom-6 sm:right-6"
       >
         ?

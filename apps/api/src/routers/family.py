@@ -6,6 +6,7 @@ from ..dependencies import get_current_user
 from ..errors import forbidden, internal_error, not_found
 from ..permissions import can_remove_member
 from ..schemas.auth import UserResponse
+from ..uploads import create_signed_url_resolver
 from ..utils import is_cuid
 
 router = APIRouter(prefix="/family/members", tags=["family"])
@@ -19,13 +20,16 @@ async def list_members(user: UserResponse = Depends(get_current_user)):
             include={"user": {"include": {"posts": True}}},
             order={"createdAt": "asc"},
         )
+        resolve_avatar = create_signed_url_resolver()
         members = [
             {
                 "userId": m.userId,
                 "membershipId": m.id,
                 "name": m.user.name,
-                "emailOrUsername": m.user.emailOrUsername,
-                "avatarUrl": m.user.avatarUrl,
+                "email": m.user.email,
+                "username": m.user.username,
+                "emailOrUsername": m.user.email,
+                "avatarUrl": await resolve_avatar(getattr(m.user, "avatarStorageKey", None)),
                 "role": m.role,
                 "joinedAt": m.createdAt.isoformat(),
                 "postCount": len(m.user.posts) if m.user.posts else 0,

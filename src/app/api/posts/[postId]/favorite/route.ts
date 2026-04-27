@@ -5,9 +5,9 @@ import { logError } from '@/lib/logger';
 import { notFoundError, internalError } from '@/lib/apiErrors';
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     postId: string;
-  };
+  }>;
 }
 
 async function ensurePostAccess(postId: string, familySpaceId: string) {
@@ -23,10 +23,9 @@ async function ensurePostAccess(postId: string, familySpaceId: string) {
 }
 
 export const POST = withAuth(async (request, user, context?: RouteContext) => {
-  const { params } = context!;
+  const resolvedParams = await context!.params;
   try {
-    const postId = params.postId;
-
+    const { postId } = resolvedParams;
     const canAccess = await ensurePostAccess(postId, user.familySpaceId);
 
     if (!canAccess) {
@@ -49,32 +48,35 @@ export const POST = withAuth(async (request, user, context?: RouteContext) => {
 
     return NextResponse.json({ status: 'favorited' }, { status: 200 });
   } catch (error) {
-    logError('favorites.add.error', error, { postId: context?.params?.postId });
+    logError('favorites.add.error', error, { postId: resolvedParams?.postId });
     return internalError('Unable to favorite post');
   }
 });
 
-export const DELETE = withAuth(async (request, user, context?: RouteContext) => {
-  const { params } = context!;
-  try {
-    const postId = params.postId;
+export const DELETE = withAuth(
+  async (request, user, context?: RouteContext) => {
+    const resolvedParams = await context!.params;
+    try {
+      const { postId } = resolvedParams;
+      const canAccess = await ensurePostAccess(postId, user.familySpaceId);
 
-    const canAccess = await ensurePostAccess(postId, user.familySpaceId);
+      if (!canAccess) {
+        return notFoundError('Post not found');
+      }
 
-    if (!canAccess) {
-      return notFoundError('Post not found');
+      await prisma.favorite.deleteMany({
+        where: {
+          userId: user.id,
+          postId,
+        },
+      });
+
+      return NextResponse.json({ status: 'unfavorited' }, { status: 200 });
+    } catch (error) {
+      logError('favorites.remove.error', error, {
+        postId: resolvedParams?.postId,
+      });
+      return internalError('Unable to remove favorite');
     }
-
-    await prisma.favorite.deleteMany({
-      where: {
-        userId: user.id,
-        postId,
-      },
-    });
-
-    return NextResponse.json({ status: 'unfavorited' }, { status: 200 });
-  } catch (error) {
-    logError('favorites.remove.error', error, { postId: context?.params?.postId });
-    return internalError('Unable to remove favorite');
   }
-});
+);

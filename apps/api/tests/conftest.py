@@ -66,6 +66,8 @@ def test_user() -> UserResponse:
     return UserResponse(
         id="test-user-id-123",
         name="Test User",
+        email="testuser@example.com",
+        username="testuser",
         emailOrUsername="testuser@example.com",
         avatarUrl=None,
         role="member",
@@ -80,6 +82,8 @@ def admin_user() -> UserResponse:
     return UserResponse(
         id="admin-user-id-456",
         name="Admin User",
+        email="admin@example.com",
+        username="adminuser",
         emailOrUsername="admin@example.com",
         avatarUrl=None,
         role="admin",
@@ -94,6 +98,8 @@ def owner_user() -> UserResponse:
     return UserResponse(
         id="owner-user-id-789",
         name="Owner User",
+        email="owner@example.com",
+        username="owneruser",
         emailOrUsername="owner@example.com",
         avatarUrl=None,
         role="owner",
@@ -198,7 +204,8 @@ def valid_signup_payload() -> dict:
     """Valid signup request payload."""
     return {
         "name": "New User",
-        "emailOrUsername": "newuser@example.com",
+        "email": "newuser@example.com",
+        "username": "newuser",
         "password": "securepassword123",
         "familyMasterKey": "family-secret-key",
         "rememberMe": False,

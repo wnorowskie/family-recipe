@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Family Recipe — Warm vs Grayscale Spike</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body {
+    background: #efeae3;
+    color: #2a2520;
+    padding: 40px 32px 80px;
+  }
+  .doc {
+    max-width: 1480px;
+    margin: 0 auto;
+  }
+  .doc-head {
+    margin-bottom: 36px;
+    max-width: 820px;
+  }
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #7a6f64;
+    font-weight: 500;
+    margin-bottom: 10px;
+  }
+  .doc-head h1 {
+    font-family: var(--font-display);
+    font-size: 38px;
+    line-height: 1.1;
+    color: #2a2520;
+    font-variation-settings: "SOFT" 50, "WONK" 0, "opsz" 48;
+    margin-bottom: 14px;
+    letter-spacing: -0.015em;
+  }
+  .doc-head p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #4a4039;
+    max-width: 720px;
+  }
+  .pair-section {
+    margin-top: 56px;
+  }
+  .pair-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 22px;
+    border-bottom: 1px solid #d6cdc1;
+    padding-bottom: 12px;
+  }
+  .pair-num {
+    font-family: var(--font-display);
+    font-size: 26px;
+    color: #6f6258;
+    font-variation-settings: "SOFT" 50, "WONK" 1, "opsz" 28;
+  }
+  .pair-head h2 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    color: #2a2520;
+    font-variation-settings: "SOFT" 50, "WONK" 0, "opsz" 24;
+  }
+  .pair-sub {
+    margin-left: auto;
+    font-size: 13px;
+    color: #6f6258;
+  }
+  .pair-stage {
+    display: flex;
+    gap: 56px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .stage-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .col-tag {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #6f6258;
+    margin-bottom: 14px;
+    padding: 4px 10px;
+    border: 1px solid #c9bfb1;
+    border-radius: 9999px;
+    background: #f6f1e9;
+  }
+  .col-tag.warm { background: #ece5d6; border-color: #c1b89e; color: #4d4738; }
+  .col-tag.gray { background: #f1f1f3; border-color: #c8c8cc; color: #45454a; }
+
+  /* Token diff table */
+  .diff-section { margin-top: 72px; }
+  .diff-section h2 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    color: #2a2520;
+    margin-bottom: 16px;
+    font-variation-settings: "SOFT" 50, "WONK" 0, "opsz" 24;
+    border-bottom: 1px solid #d6cdc1;
+    padding-bottom: 12px;
+  }
+  table.diff {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: #faf6ee;
+    border: 1px solid #d6cdc1;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  table.diff th, table.diff td {
+    padding: 12px 14px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid #e3dccf;
+  }
+  table.diff th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6f6258;
+    font-weight: 500;
+    background: #f1ead9;
+  }
+  table.diff tr:last-child td { border-bottom: 0; }
+  .swatch {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11.5px;
+    color: #2a2520;
+  }
+  .sw {
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.12);
+    flex-shrink: 0;
+  }
+  .role {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    color: #2a2520;
+    font-weight: 500;
+  }
+  .rationale {
+    color: #4a4039;
+    line-height: 1.5;
+    max-width: 360px;
+  }
+
+  /* Notes blocks */
+  .notes-grid {
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+  }
+  .note-card {
+    background: #faf6ee;
+    border: 1px solid #d6cdc1;
+    border-radius: 14px;
+    padding: 20px 22px;
+  }
+  .note-card.recommend {
+    background: #2a2520;
+    color: #f4ede0;
+    border-color: #2a2520;
+    grid-column: 1 / -1;
+  }
+  .note-card.recommend h3 { color: #f4ede0; }
+  .note-card.recommend p { color: #d8cdb8; }
+  .note-card.recommend strong { color: #f4ede0; }
+  .note-card h3 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: #2a2520;
+    margin-bottom: 8px;
+    font-variation-settings: "SOFT" 50, "WONK" 0, "opsz" 18;
+  }
+  .note-card p {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #4a4039;
+  }
+  .note-card p + p { margin-top: 8px; }
+  code.k {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    background: rgba(0,0,0,0.06);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .note-card.recommend code.k {
+    background: rgba(255,255,255,0.12);
+    color: #f4ede0;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    border: 1px solid currentColor;
+    margin-bottom: 6px;
+  }
+  .badge.pass { color: #4f6c3d; }
+  .badge.warn { color: #9b5a1f; }
+
+  /* Theme isolation: each frame gets its own theme attr */
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <header class="doc-head">
+    <div class="eyebrow">Spike #41 · Palette exploration</div>
+    <h1>Warm cozy palette vs shipped grayscale</h1>
+    <p>Same typography, spacing, radii, components — only color tokens change. The goal is to decide whether the warm direction (per the original brief) is meaningfully better than the grayscale we shipped, or just different. Honest critique below.</p>
+  </header>
+
+  <!-- ─── PAIR 1: TIMELINE ─────────────────────────────────────── -->
+  <section class="pair-section" data-screen-label="01 Timeline pair">
+    <div class="pair-head">
+      <span class="pair-num">01</span>
+      <h2>Timeline · mobile (390px)</h2>
+      <span class="pair-sub">Most-viewed surface. Mixed activity cards.</span>
+    </div>
+    <div class="pair-stage">
+      <div class="stage-col">
+        <span class="col-tag warm">Warm — proposed</span>
+        <div data-theme="warm"><div id="warm-timeline"></div></div>
+      </div>
+      <div class="stage-col">
+        <span class="col-tag gray">Grayscale — shipped</span>
+        <div data-theme="gray"><div id="gray-timeline"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── PAIR 2: POST DETAIL ──────────────────────────────────── -->
+  <section class="pair-section" data-screen-label="02 Post detail pair">
+    <div class="pair-head">
+      <span class="pair-num">02</span>
+      <h2>Post detail · mobile (390px)</h2>
+      <span class="pair-sub">Hero photo, recipe body, comment thread.</span>
+    </div>
+    <div class="pair-stage">
+      <div class="stage-col">
+        <span class="col-tag warm">Warm — proposed</span>
+        <div data-theme="warm"><div id="warm-detail"></div></div>
+      </div>
+      <div class="stage-col">
+        <span class="col-tag gray">Grayscale — shipped</span>
+        <div data-theme="gray"><div id="gray-detail"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── TOKEN DIFF TABLE ─────────────────────────────────────── -->
+  <section class="diff-section">
+    <h2>Token diff</h2>
+    <table class="diff">
+      <thead>
+        <tr>
+          <th style="width: 16%">Role</th>
+          <th style="width: 28%">Shipped (grayscale)</th>
+          <th style="width: 28%">Proposed (warm)</th>
+          <th>Rationale</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="role">--bg-page</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.985 0.002 247.839)"></span>gray-50 · cool</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.970 0.012 80)"></span>cream-50 · 80°</span></td>
+          <td class="rationale">Drop the cool blue cast; sit just-warm of pure white. Chroma stays low so it reads "unbleached paper", not yellow.</td>
+        </tr>
+        <tr>
+          <td><span class="role">--bg-surface</span></td>
+          <td><span class="swatch"><span class="sw" style="background: #fff; border-color: #d6cdc1"></span>#ffffff</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.992 0.005 85)"></span>paper-white</span></td>
+          <td class="rationale">Cards lift off the page with the same delta as before, but warm. Pure white next to cream-50 reads as a glitch.</td>
+        </tr>
+        <tr>
+          <td><span class="role">--fg-strong</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.210 0.034 264.665)"></span>gray-900 · cool</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.200 0.035 35)"></span>espresso-900</span></td>
+          <td class="rationale">Deep warm brown for headings — Fraunces was made for this. Cool near-black on cream looks like a print error.</td>
+        </tr>
+        <tr>
+          <td><span class="role">--fg-body</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.373 0.034 259.733)"></span>gray-700 · cool</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.350 0.038 40)"></span>brown-700</span></td>
+          <td class="rationale">Same lightness as shipped, hue rotated to a quiet brown. Body copy contrast preserved.</td>
+        </tr>
+        <tr>
+          <td><span class="role">--fg-meta</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.446 0.030 256.802)"></span>gray-600</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.430 0.035 45)"></span>clay-600</span></td>
+          <td class="rationale">"by Mom" attribution and meta lines pick up a clay tone — softer than gray, still legible.</td>
+        </tr>
+        <tr>
+          <td><span class="role">--bg-primary</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.278 0.033 256.848)"></span>gray-800 · near-black</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.520 0.085 145)"></span>sage-500</span></td>
+          <td class="rationale">The biggest call. Muted herb green for CTAs, FAB, active chip. "Cooked this" reads as encouragement, not authority.</td>
+        </tr>
+        <tr>
+          <td><span class="role">--bg-chip / soft</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.928 0.006 264.531)"></span>gray-200 · cool</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.890 0.018 75)"></span>taupe-200</span></td>
+          <td class="rationale">Tag chips warm to taupe. Same lightness; reads as paper-toned, not metal.</td>
+        </tr>
+        <tr>
+          <td><span class="role">--bg-muted</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.967 0.003 264.542)"></span>gray-100</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.940 0.014 78)"></span>cream-100</span></td>
+          <td class="rationale">Version-info bar and muted recipe-card chip. Subtle warm wash; integrates into the page.</td>
+        </tr>
+        <tr>
+          <td><span class="role">--border-card</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.928 0.006 264.531)"></span>gray-200</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.890 0.018 75)"></span>taupe-200</span></td>
+          <td class="rationale">Hairline borders pick up the same warm cast as the chip background. Stays at 1px.</td>
+        </tr>
+        <tr>
+          <td><span class="role">--border-input</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.872 0.010 258.338)"></span>gray-300</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.820 0.022 72)"></span>taupe-300</span></td>
+          <td class="rationale">Comment input + dashed photo upload border. One step darker than card border, same as before.</td>
+        </tr>
+        <tr>
+          <td><span class="role">--focus-ring</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.708 0 0)"></span>neutral 50% gray</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.520 0.085 145)"></span>sage-500</span></td>
+          <td class="rationale">Ring promoted from anonymous gray to the brand sage. Reads as intentional, not a default.</td>
+        </tr>
+        <tr>
+          <td><span class="role">--fg-destructive</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.577 0.245 27.325)"></span>red-600</span></td>
+          <td><span class="swatch"><span class="sw" style="background: oklch(0.560 0.180 30)"></span>terracotta-600</span></td>
+          <td class="rationale">Slightly desaturated, hue nudged warmer. Still unambiguously red against cream — not a brand-conflict situation.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ─── NOTES ────────────────────────────────────────────────── -->
+  <section class="diff-section">
+    <h2>Notes</h2>
+    <div class="notes-grid">
+
+      <div class="note-card">
+        <span class="badge pass">A11y · WCAG AA</span>
+        <h3>Focus ring contrast</h3>
+        <p>Sage-500 (<code class="k">oklch(0.520 0.085 145)</code>) on the warm page surface (<code class="k">oklch(0.970 0.012 80)</code>) measures ~3.9:1 — clears WCAG AA's 3:1 minimum for non-text UI components. Body and heading text against warm surfaces measure 9.8:1 and 14.1:1 respectively — well above 4.5:1 AA.</p>
+        <p>The "Cooked this" button (white text on sage) measures 4.7:1. Passes AA for normal text. If we ever drop it to 12px or smaller, bump primary to sage-600 (<code class="k">oklch(0.450 0.090 145)</code>) for a 5.6:1 floor.</p>
+      </div>
+
+      <div class="note-card">
+        <span class="badge pass">Implementation</span>
+        <h3>Pure CSS-variable swap</h3>
+        <p>Achievable as a clean <code class="k">[data-theme="warm"]</code> variable swap on top of the existing primitives — no component shape needs to change. Every change rides on the same eight semantic roles (<code class="k">--bg-page</code>, <code class="k">--bg-surface</code>, <code class="k">--bg-primary</code>, <code class="k">--fg-strong/body/meta</code>, <code class="k">--border-card/input</code>) the components already consume.</p>
+        <p>One small thing to verify in the codebase: any place a Tailwind <code class="k">gray-*</code> class is hard-coded instead of pointing at a token will need to be migrated to a token first. That's a one-afternoon sweep, not a redesign.</p>
+      </div>
+
+      <div class="note-card recommend">
+        <h3>Recommendation — ship as a toggleable theme, default stays grayscale</h3>
+        <p><strong>Where warm wins:</strong> the post detail. The hero photo of the lemon chicken sits inside warm chrome instead of being clamped between two cool gray bands — the photography belongs to the page instead of competing with it. Fraunces also genuinely looks better in warm brown than in cool near-black; that's what it was drawn for.</p>
+        <p><strong>Where grayscale still wins:</strong> the timeline. The mixed-card density (icon + text + photo + comment quote) is easier to scan in cool gray — the warm chrome adds a layer of warmth the activity log doesn't actually need. It's a status surface, not a reading surface.</p>
+        <p><strong>So:</strong> ship warm as a user-toggleable theme alongside grayscale. Don't make it the default — it's a real preference, not a clear upgrade, and the timeline is too central to risk on "different is fine". Ship the toggle in Profile under "Appearance"; remember the choice. Re-evaluate after 60 days if 60%+ of the family picks warm, promote it.</p>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+<script type="text/babel">
+  const w1 = ReactDOM.createRoot(document.getElementById('warm-timeline'));
+  const g1 = ReactDOM.createRoot(document.getElementById('gray-timeline'));
+  const w2 = ReactDOM.createRoot(document.getElementById('warm-detail'));
+  const g2 = ReactDOM.createRoot(document.getElementById('gray-detail'));
+
+  w1.render(<MobileFrame label="Warm · timeline"><Timeline/><BottomTabBar active="timeline"/></MobileFrame>);
+  g1.render(<MobileFrame label="Grayscale · timeline"><Timeline/><BottomTabBar active="timeline"/></MobileFrame>);
+  w2.render(<MobileFrame label="Warm · post detail"><PostDetail/><BottomTabBar active="recipes"/></MobileFrame>);
+  g2.render(<MobileFrame label="Grayscale · post detail"><PostDetail/><BottomTabBar active="recipes"/></MobileFrame>);
+
+  // Render lucide icons after React mounts
+  setTimeout(() => lucide.createIcons(), 50);
+  setTimeout(() => lucide.createIcons(), 400);
+</script>
+</body>
+</html>

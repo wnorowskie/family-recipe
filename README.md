@@ -64,7 +64,7 @@ cp .env.example .env
 Edit `.env` and update the values:
 
 ```
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://family_app:dev-only-password@localhost:5432/family_recipe_dev"
 JWT_SECRET="jwt-secret-placeholder"
 ```
 
@@ -76,7 +76,15 @@ JWT_SECRET="jwt-secret-placeholder"
 
 ### 4. Set Up the Database
 
+Local dev is Postgres-only (SQLite support was removed — see issue #80). Spin up a container once, then push the schema and seed:
+
 ```
+docker run -d --name family-recipe-pg \
+  -e POSTGRES_USER=family_app \
+  -e POSTGRES_PASSWORD=dev-only-password \
+  -e POSTGRES_DB=family_recipe_dev \
+  -p 5432:5432 postgres:16
+
 npm run db:generate
 npm run db:push
 npm run db:seed
@@ -124,16 +132,10 @@ docker compose exec app npm run db:seed
 
 ### Local Development Options
 
-- **SQLite (default):** Use the `.env` defaults and `npm run dev`.
-- **Local Postgres without Docker:** Set `DATABASE_URL` to the Postgres URL and `PRISMA_SCHEMA=prisma/schema.postgres.prisma`, then run:
+- **Standalone Postgres container (default):** the docker command in step 4 is the canonical path. `npm run db:*` scripts target `prisma/schema.postgres.node.prisma` by default.
+- **Full docker-compose stack:** use the section below (`Running with Docker`) when you want the Next app containerized too.
 
-```
-npx prisma generate --schema prisma/schema.postgres.prisma
-npx prisma db push --schema prisma/schema.postgres.prisma
-npm run dev
-```
-
-Prisma migrations are generated for Postgres; stick to `prisma db push` for SQLite workflows.
+Pre-PR verification playbooks — including the Postgres setup — live in [`docs/verification/`](docs/verification/).
 
 ### Connecting to Cloud SQL (dev)
 
@@ -190,9 +192,10 @@ curl -i http://127.0.0.1:9999/api/health
 ```
 family-recipe/
 ├── prisma/
-│ ├── schema.prisma # Database schema
-│ ├── seed.ts # Database seeding script
-│ └── migrations/ # Database migrations
+│ ├── schema.postgres.node.prisma # Postgres schema (JS client — Next runtime)
+│ ├── schema.postgres.prisma      # Postgres schema (Python client — FastAPI + migrations)
+│ ├── seed.ts                     # Database seeding script
+│ └── migrations/                 # Postgres migrations
 ├── src/
 │ ├── app/
 │ │ ├── (auth)/ # Authentication pages (signup, login)
@@ -213,7 +216,7 @@ family-recipe/
 │ │ ├── session.ts # Session management
 │ │ ├── validation.ts # Zod schemas
 │ │ └── ...
-│ └── middleware.ts # Next.js middleware (auth)
+│ └── proxy.ts # Next.js proxy / middleware (auth)
 ├── docs/ # Product and technical specs
 ├── figma/ # Figma design prototypes
 ├── public/ # Static assets
@@ -240,7 +243,7 @@ family-recipe/
 
 ## Database Schema
 
-The app uses **Prisma ORM** with support for SQLite (local dev) and PostgreSQL (production).
+The app uses **Prisma ORM** with PostgreSQL for both local development and production.
 
 ### Core Models
 
@@ -256,7 +259,7 @@ The app uses **Prisma ORM** with support for SQLite (local dev) and PostgreSQL (
 - **Favorite** – User's bookmarked posts
 - **Tag** – Recipe tags (e.g., "vegetarian", "quick")
 
-See [`prisma/schema.prisma`](prisma/schema.prisma) for the complete schema.
+See [`prisma/schema.postgres.node.prisma`](prisma/schema.postgres.node.prisma) for the complete schema.
 
 ---
 
@@ -284,15 +287,15 @@ Detailed documentation is available in the [`docs/`](docs/) directory:
 
 ## Tech Stack
 
-| Category         | Technology                                |
-| ---------------- | ----------------------------------------- |
-| **Framework**    | Next.js 14 (App Router)                   |
-| **Language**     | TypeScript (strict mode)                  |
-| **Database**     | Prisma + SQLite (dev) / PostgreSQL (prod) |
-| **Auth**         | Credentials-based with JWT sessions       |
-| **Styling**      | Tailwind CSS                              |
-| **Validation**   | Zod                                       |
-| **File Uploads** | Local filesystem (V1)                     |
+| Category         | Technology                          |
+| ---------------- | ----------------------------------- |
+| **Framework**    | Next.js 14 (App Router)             |
+| **Language**     | TypeScript (strict mode)            |
+| **Database**     | Prisma + PostgreSQL (dev and prod)  |
+| **Auth**         | Credentials-based with JWT sessions |
+| **Styling**      | Tailwind CSS                        |
+| **Validation**   | Zod                                 |
+| **File Uploads** | Local filesystem (V1)               |
 
 ---
 

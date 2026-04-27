@@ -57,6 +57,7 @@ const customJestConfig = {
     '/.next/',
     '/figma/',
     '/prisma/migrations/',
+    '/\\.claude/worktrees/',
   ],
 };
 

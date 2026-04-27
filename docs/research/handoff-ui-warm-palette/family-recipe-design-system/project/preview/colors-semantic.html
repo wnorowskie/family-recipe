@@ -1,0 +1,43 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;font-family:var(--font-sans);background:var(--bg-page);color:var(--fg-body);}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  .group h4{margin:0 0 8px 0;font-size:11px;color:var(--fg-meta);text-transform:uppercase;letter-spacing:.05em;font-weight:500;}
+  .stack{display:flex;flex-direction:column;gap:6px;}
+  .pill{display:flex;align-items:center;gap:8px;font-size:12px;}
+  .swatch{width:18px;height:18px;border-radius:5px;border:1px solid rgba(0,0,0,.08);}
+  code{font-family:var(--font-mono);font-size:11px;color:var(--fg-caption);}
+</style></head>
+<body>
+  <div class="grid">
+    <div class="group">
+      <h4>Surface</h4>
+      <div class="stack">
+        <div class="pill"><span class="swatch" style="background:var(--bg-page)"></span>page <code>gray-50</code></div>
+        <div class="pill"><span class="swatch" style="background:var(--bg-surface)"></span>surface <code>#fff</code></div>
+        <div class="pill"><span class="swatch" style="background:var(--bg-muted)"></span>muted <code>gray-100</code></div>
+        <div class="pill"><span class="swatch" style="background:var(--bg-primary)"></span>primary <code>gray-800</code></div>
+      </div>
+    </div>
+    <div class="group">
+      <h4>Text</h4>
+      <div class="stack">
+        <div class="pill" style="color:var(--fg-strong)">strong / headings</div>
+        <div class="pill" style="color:var(--fg-body)">body</div>
+        <div class="pill" style="color:var(--fg-meta)">meta · "by Mom"</div>
+        <div class="pill" style="color:var(--fg-caption)">caption · 2 hours ago</div>
+        <div class="pill" style="color:var(--fg-placeholder)">placeholder</div>
+      </div>
+    </div>
+    <div class="group">
+      <h4>Destructive</h4>
+      <div class="stack">
+        <div class="pill"><span class="swatch" style="background:var(--color-red-400)"></span>border <code>red-400</code></div>
+        <div class="pill"><span class="swatch" style="background:var(--color-red-500)"></span>required ★ <code>red-500</code></div>
+        <div class="pill"><span class="swatch" style="background:var(--color-red-600)"></span>destructive <code>red-600</code></div>
+        <div class="pill" style="color:var(--color-red-600);margin-top:6px;">↳ Log Out · Delete</div>
+      </div>
+    </div>
+  </div>
+</body></html>

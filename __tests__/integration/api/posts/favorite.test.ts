@@ -67,7 +67,7 @@ describe('POST/DELETE /api/posts/[postId]/favorite', () => {
   };
 
   const mockContext = {
-    params: { postId: 'post_123' },
+    params: Promise.resolve({ postId: 'post_123' }),
   };
 
   const mockRequest = new Request(

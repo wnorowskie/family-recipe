@@ -197,7 +197,7 @@ class TestGetPostDetail:
             updatedAt=now,
             mainPhotoUrl=None,
             authorId=author_id,
-            author=SimpleNamespace(id=author_id, name="Alice", avatarUrl=None),
+            author=SimpleNamespace(id=author_id, name="Alice", avatarStorageKey=None),
             editor=None,
             lastEditNote=None,
             lastEditAt=None,
@@ -242,14 +242,14 @@ class TestGetPostDetail:
                     text="Nice",
                     photoUrl=None,
                     createdAt=now,
-                    author=SimpleNamespace(id="u1", name="Bob", avatarUrl=None),
+                    author=SimpleNamespace(id="u1", name="Bob", avatarStorageKey=None),
                 ),
                 SimpleNamespace(
                     id="c2",
                     text="Great",
                     photoUrl=None,
                     createdAt=now,
-                    author=SimpleNamespace(id="u2", name="Ann", avatarUrl=None),
+                    author=SimpleNamespace(id="u2", name="Ann", avatarStorageKey=None),
                 ),
             ]
         )
@@ -271,9 +271,9 @@ class TestGetPostDetail:
         mock_prisma.favorite.find_unique = AsyncMock(return_value=None)
         mock_prisma.reaction.find_many = AsyncMock(
             return_value=[
-                SimpleNamespace(emoji="❤️", user=SimpleNamespace(id="u1", name="Bob", avatarUrl=None), targetType="post", targetId="post-1"),
-                SimpleNamespace(emoji="❤️", user=SimpleNamespace(id="u2", name="Sue", avatarUrl=None), targetType="post", targetId="post-1"),
-                SimpleNamespace(emoji="👍", user=SimpleNamespace(id="u3", name="Eve", avatarUrl=None), targetType="post", targetId="post-1"),
+                SimpleNamespace(emoji="❤️", user=SimpleNamespace(id="u1", name="Bob", avatarStorageKey=None), targetType="post", targetId="post-1"),
+                SimpleNamespace(emoji="❤️", user=SimpleNamespace(id="u2", name="Sue", avatarStorageKey=None), targetType="post", targetId="post-1"),
+                SimpleNamespace(emoji="👍", user=SimpleNamespace(id="u3", name="Eve", avatarStorageKey=None), targetType="post", targetId="post-1"),
             ]
         )
 
@@ -304,8 +304,8 @@ class TestGetPostDetail:
         mock_prisma.cookedevent.find_many = AsyncMock(
             side_effect=[
                 [
-                    SimpleNamespace(id="k1", rating=5, note=None, createdAt=now, user=SimpleNamespace(id="u1", name="Bob", avatarUrl=None)),
-                    SimpleNamespace(id="k2", rating=3, note=None, createdAt=now, user=SimpleNamespace(id="u2", name="Ann", avatarUrl=None)),
+                    SimpleNamespace(id="k1", rating=5, note=None, createdAt=now, user=SimpleNamespace(id="u1", name="Bob", avatarStorageKey=None)),
+                    SimpleNamespace(id="k2", rating=3, note=None, createdAt=now, user=SimpleNamespace(id="u2", name="Ann", avatarStorageKey=None)),
                 ],
                 [SimpleNamespace(id="k1", rating=5, note=None, createdAt=now), SimpleNamespace(id="k2", rating=3, note=None, createdAt=now)],
             ]
@@ -404,7 +404,7 @@ class TestUpdatePost:
             updatedAt=now,
             mainPhotoUrl=main_photo_url,
             authorId=author_id,
-            author=SimpleNamespace(id=author_id, name="Alice", avatarUrl=None),
+            author=SimpleNamespace(id=author_id, name="Alice", avatarStorageKey=None),
             editor=None,
             lastEditNote=last_edit_note,
             lastEditAt=last_edit_at or now,
@@ -849,8 +849,18 @@ class TestCookedEvents:
     def test_list_cooked_success(self, client, mock_prisma, member_auth):
         mock_prisma.cookedevent.find_many = AsyncMock(
             return_value=[
-                self._event("e1", rating=5, note=None, user=SimpleNamespace(id="u1")),
-                self._event("e2", rating=None, note="nice", user=SimpleNamespace(id="u2")),
+                self._event(
+                    "e1",
+                    rating=5,
+                    note=None,
+                    user=SimpleNamespace(id="u1", name="Alice", avatarStorageKey="avatars/a.jpg", passwordHash="secret"),
+                ),
+                self._event(
+                    "e2",
+                    rating=None,
+                    note="nice",
+                    user=SimpleNamespace(id="u2", name="Bob", avatarStorageKey=None, passwordHash="secret"),
+                ),
             ]
         )
 
@@ -859,12 +869,25 @@ class TestCookedEvents:
         assert response.status_code == 200, response.json()
         body = response.json()
         assert len(body["cookedEvents"]) == 2
+        assert body["cookedEvents"][0]["user"] == {
+            "id": "u1",
+            "name": "Alice",
+            "avatarUrl": "/uploads/avatars/a.jpg",
+        }
+        assert body["cookedEvents"][1]["user"] == {"id": "u2", "name": "Bob", "avatarUrl": None}
+        # Confirm the raw User model is not leaked (no passwordHash / avatarStorageKey)
+        raw = response.text
+        assert "passwordHash" not in raw
+        assert "avatarStorageKey" not in raw
         assert body["hasMore"] is False
         assert body["nextOffset"] == 2
 
     def test_list_cooked_pagination(self, client, mock_prisma, member_auth):
         mock_prisma.cookedevent.find_many = AsyncMock(
-            return_value=[self._event("e1"), self._event("e2")]
+            return_value=[
+                self._event("e1", user=SimpleNamespace(id="u1", name="A", avatarStorageKey=None)),
+                self._event("e2", user=SimpleNamespace(id="u2", name="B", avatarStorageKey=None)),
+            ]
         )
 
         response = client.get(f"/posts/{POST_ID}/cooked?limit=1", headers=member_auth)
