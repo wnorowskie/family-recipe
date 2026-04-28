@@ -110,6 +110,32 @@ describe('bootstrapFromCookies helpers', () => {
       expect(result).toEqual({ ok: false, reason: 'SESSION_INVALID' });
     });
 
+    it('returns SESSION_INVALID when user object lacks required fields', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ user: {} }));
+
+      const result = await fetchSessionUser('refresh_token=x; csrf_token=y');
+
+      expect(result).toEqual({ ok: false, reason: 'SESSION_INVALID' });
+    });
+
+    it('returns SESSION_INVALID when user.id is missing or non-string', async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({
+          user: {
+            name: 'X',
+            email: 'x@y',
+            username: 'x',
+            role: 'member',
+            familySpaceId: 'f',
+          },
+        })
+      );
+
+      const result = await fetchSessionUser('refresh_token=x; csrf_token=y');
+
+      expect(result).toEqual({ ok: false, reason: 'SESSION_INVALID' });
+    });
+
     it('returns NETWORK on fetch error', async () => {
       fetchMock.mockRejectedValueOnce(new Error('connection refused'));
 
@@ -220,6 +246,18 @@ describe('bootstrapFromCookies helpers', () => {
       fetchMock
         .mockResolvedValueOnce(jsonResponse({ accessToken: 'tok' }))
         .mockResolvedValueOnce(jsonResponse({ wrong: 'shape' }));
+
+      const result = await bootstrapAccessToken(
+        'refresh_token=opaque; csrf_token=csrf-abc'
+      );
+
+      expect(result).toEqual({ ok: false, reason: 'ME_INVALID' });
+    });
+
+    it('returns ME_INVALID when user object lacks required fields', async () => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse({ accessToken: 'tok' }))
+        .mockResolvedValueOnce(jsonResponse({ user: {} }));
 
       const result = await bootstrapAccessToken(
         'refresh_token=opaque; csrf_token=csrf-abc'

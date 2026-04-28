@@ -65,6 +65,24 @@ interface RefreshResponseShape {
   accessToken?: unknown;
 }
 
+// Minimal shape check for the upstream user payload. FastAPI's Pydantic
+// schema is the canonical producer, but a 502 / partial response could
+// still return `{ user: {} }` — without this guard the cast to AuthUser
+// would let undefined fields propagate and crash the SSR render
+// (e.g. `user.name.split(' ')`).
+function isAuthUserShape(value: unknown): value is AuthUser {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.name === 'string' &&
+    typeof candidate.email === 'string' &&
+    typeof candidate.username === 'string' &&
+    typeof candidate.role === 'string' &&
+    typeof candidate.familySpaceId === 'string'
+  );
+}
+
 function getFastApiBaseUrl(): string | null {
   const raw = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!raw) return null;
@@ -145,11 +163,11 @@ export async function fetchSessionUser(
     return { ok: false, reason: 'SESSION_INVALID' };
   }
 
-  if (!body.user || typeof body.user !== 'object') {
+  if (!isAuthUserShape(body.user)) {
     return { ok: false, reason: 'SESSION_INVALID' };
   }
 
-  return { ok: true, user: body.user as AuthUser };
+  return { ok: true, user: body.user };
 }
 
 // ---------------------------------------------------------------------------
@@ -224,14 +242,14 @@ export async function bootstrapAccessToken(
     return { ok: false, reason: 'ME_INVALID' };
   }
 
-  if (!meBody.user || typeof meBody.user !== 'object') {
+  if (!isAuthUserShape(meBody.user)) {
     return { ok: false, reason: 'ME_INVALID' };
   }
 
   return {
     ok: true,
     accessToken,
-    user: meBody.user as AuthUser,
+    user: meBody.user,
     setCookies: refreshResponse.headers.getSetCookie(),
   };
 }
