@@ -24,6 +24,10 @@ export function clearAccessTokenProvider(): void {
   accessTokenProvider = () => null;
 }
 
+// `NEXT_PUBLIC_*` is inlined by Next.js at build time for client bundles, not
+// read at runtime. Flipping this in env config alone won't redirect requests in
+// a deployed build — Phase 1 rollouts need a per-environment build (or a
+// runtime config endpoint).
 function getBaseUrl(): string {
   const raw = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!raw) return '';
@@ -129,8 +133,6 @@ async function request<T>(
   if (options.body !== undefined) {
     if (typeof FormData !== 'undefined' && options.body instanceof FormData) {
       body = options.body;
-    } else if (typeof Blob !== 'undefined' && options.body instanceof Blob) {
-      body = options.body;
     } else {
       body = JSON.stringify(options.body);
       if (!('Content-Type' in headers) && !('content-type' in headers)) {
@@ -139,6 +141,7 @@ async function request<T>(
     }
   }
 
+  // No-op until Phase 2 wires `setAccessTokenProvider` from the auth store.
   const token = accessTokenProvider();
   if (token && !('Authorization' in headers) && !('authorization' in headers)) {
     headers.Authorization = `Bearer ${token}`;

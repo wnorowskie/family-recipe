@@ -27,13 +27,17 @@ describe('apiClient', () => {
     clearAccessTokenProvider();
   });
 
-  afterAll(() => {
-    global.fetch = originalFetch;
+  afterEach(() => {
     if (originalBaseUrl === undefined) {
       delete process.env.NEXT_PUBLIC_API_BASE_URL;
     } else {
       process.env.NEXT_PUBLIC_API_BASE_URL = originalBaseUrl;
     }
+    clearAccessTokenProvider();
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
   });
 
   describe('base URL', () => {
