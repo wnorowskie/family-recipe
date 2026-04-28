@@ -112,6 +112,37 @@ async def _build_user_response(user, membership) -> UserResponse:
     )
 
 
+async def _lookup_active_refresh_row(*, jti: str, secret: str):
+    """DB-touching subset of refresh-cookie validation, shared between
+    /v1/auth/session and (potentially) future read-only auth surfaces.
+
+    Returns (row, None) on success or (None, error_response) on failure.
+
+    Critically, this helper does NOT trigger reuse-detection — that side
+    effect is exclusive to /refresh because rotation is the canonical reuse
+    signal. /session must be replay-safe so SSR can call it on every page
+    render without burning the chain.
+
+    The caller is expected to perform the CSRF double-submit check and the
+    cookie parse before calling this — keeping those out of the DB-touching
+    path means a CSRF/parse failure can never be masked by a sibling
+    `internal_error()` block on a Prisma exception.
+    """
+    row = await prisma.refreshtoken.find_unique(where={"jti": jti})
+    if row is None:
+        return None, unauthorized("Refresh token not recognized")
+
+    now = datetime.now(timezone.utc)
+    if row.expiresAt <= now:
+        return None, unauthorized("Refresh token expired")
+    if row.revokedAt is not None:
+        return None, unauthorized("Refresh token revoked")
+    if not constant_time_hash_eq(row.tokenHash, secret):
+        return None, unauthorized("Refresh token invalid")
+
+    return row, None
+
+
 # ---------------------------------------------------------------------------
 # POST /v1/auth/signup
 # ---------------------------------------------------------------------------
@@ -261,6 +292,12 @@ async def refresh(
         return unauthorized("Missing or malformed refresh token")
     jti, secret = parsed
 
+    # The basic validation (find row, check expired/revoked/hash) is
+    # intentionally NOT extracted into _lookup_active_refresh_row here. Doing
+    # so would split the reuse-detection branch (lines below) from the
+    # rejection logic it depends on, hiding a security-critical control flow
+    # behind a helper boundary. The cost is mild duplication with /session;
+    # the benefit is that the chain-burn signal stays auditable in one place.
     try:
         row = await prisma.refreshtoken.find_unique(where={"jti": jti})
         now = datetime.now(timezone.utc)
@@ -395,3 +432,60 @@ async def logout(request: Request, response: Response):
 @router.get("/me", response_model=MeResponse)
 async def me(user: UserResponse = Depends(get_current_user_v1)):
     return MeResponse(user=user)
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/auth/session
+# ---------------------------------------------------------------------------
+# Non-rotating session-verify endpoint. Used by Next SSR (issue #173) so that
+# server components can prefetch the user without advancing the refresh-token
+# chain. Returns the same shape as /me but accepts the refresh + CSRF cookies
+# instead of a Bearer access token.
+#
+# This endpoint is replay-safe by design: validating the same refresh cookie
+# repeatedly does NOT mark the row as rotated and does NOT trigger reuse
+# detection. Rotation and the reuse signal remain exclusive to /v1/auth/refresh.
+@router.get("/session", response_model=MeResponse)
+async def session(
+    request: Request,
+    x_csrf_token: Optional[str] = Header(default=None, alias="X-CSRF-Token"),
+):
+    refresh_cookie = request.cookies.get(settings.refresh_cookie_name)
+    csrf_cookie = request.cookies.get(settings.csrf_cookie_name)
+
+    # CSRF + cookie parse happen outside the try block so a malformed
+    # request can never be masked by the internal_error() catch-all (matches
+    # the structure of /v1/auth/refresh at line ~256 onwards).
+    if not csrf_token_matches(csrf_cookie, x_csrf_token):
+        return unauthorized("Invalid CSRF token")
+
+    parsed = parse_refresh_cookie(refresh_cookie or "")
+    if not parsed:
+        return unauthorized("Missing or malformed refresh token")
+    jti, secret = parsed
+
+    try:
+        row, error_response = await _lookup_active_refresh_row(jti=jti, secret=secret)
+        if error_response is not None:
+            return error_response
+
+        user = await prisma.user.find_unique(
+            where={"id": row.userId},
+            include={
+                "memberships": {
+                    "where": {"familySpaceId": row.familySpaceId},
+                    "include": {"familySpace": True},
+                }
+            },
+        )
+        if not user or not user.memberships:
+            return unauthorized("Membership no longer valid")
+
+        user_response = await _build_user_response(user, user.memberships[0])
+        return MeResponse(user=user_response)
+    except PrismaError as error:
+        logger.exception("auth_v1.session.prisma_error: %s", error)
+        return internal_error("Database error during session check")
+    except Exception as error:  # noqa: BLE001
+        logger.exception("auth_v1.session.error: %s", error)
+        return internal_error("Failed to validate session")

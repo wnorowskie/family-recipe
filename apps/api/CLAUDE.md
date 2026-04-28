@@ -21,6 +21,18 @@ The Python Prisma client is generated from the postgres schema:
 npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy
 ```
 
+## Auth endpoint roles
+
+`/v1/auth/*` exposes four read paths and one rotating mutation. Keep this split intact when changing anything in [src/routers/v1/auth.py](src/routers/v1/auth.py):
+
+- **`POST /v1/auth/refresh`** is the **only** endpoint that rotates the refresh-token chain. Reuse-detection (chain-burn on a stale `REVOKED_ROTATED` cookie) is exclusive to this path. The double-submit CSRF check applies.
+- **`GET /v1/auth/session`** is a **non-rotating** verify-and-return-user path. Used by Next SSR ([src/lib/auth/bootstrapFromCookies.ts](../../src/lib/auth/bootstrapFromCookies.ts)) so server components can prefetch the user on every page render without burning the chain. Replay-safe by design — calling it repeatedly with the same cookie does not mutate the DB. CSRF check applies; reuse-detection does NOT (replaying a `REVOKED_ROTATED` cookie returns 401 but does not escalate).
+- **`GET /v1/auth/me`** returns the user via `Authorization: Bearer <accessToken>`. Used after a successful login/signup/refresh, when the client already holds an access token.
+- **`POST /v1/auth/login` / `POST /v1/auth/signup`** mint a fresh chain.
+- **`POST /v1/auth/logout`** revokes the current chain link (no rotation, no reuse-detection).
+
+Validation logic for the cookie + CSRF gate is shared via `_validate_refresh_cookie` in [src/routers/v1/auth.py](src/routers/v1/auth.py). The `/refresh` handler keeps its own copy because the reuse-detection branch is intertwined with the rejection logic — splitting it would obscure the security-critical control flow.
+
 ## Module layout
 
 - [src/main.py](src/main.py) — FastAPI app, includes routers, manages prisma connect/disconnect lifespan
