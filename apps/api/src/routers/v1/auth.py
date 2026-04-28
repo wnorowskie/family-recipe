@@ -112,6 +112,40 @@ async def _build_user_response(user, membership) -> UserResponse:
     )
 
 
+async def _validate_refresh_cookie(
+    *, refresh_cookie: Optional[str], csrf_cookie: Optional[str], x_csrf_token: Optional[str]
+):
+    """Shared validation for /v1/auth/refresh and /v1/auth/session.
+
+    Returns the row on success. Raises (returns) the unauthorized() response on
+    failure. Critically, this helper does NOT trigger reuse-detection — that
+    side effect is exclusive to /refresh because rotation is the canonical
+    reuse signal. /session must be replay-safe so SSR can call it on every
+    page render without burning the chain.
+    """
+    if not csrf_token_matches(csrf_cookie, x_csrf_token):
+        return None, unauthorized("Invalid CSRF token")
+
+    parsed = parse_refresh_cookie(refresh_cookie or "")
+    if not parsed:
+        return None, unauthorized("Missing or malformed refresh token")
+    jti, secret = parsed
+
+    row = await prisma.refreshtoken.find_unique(where={"jti": jti})
+    if row is None:
+        return None, unauthorized("Refresh token not recognized")
+
+    now = datetime.now(timezone.utc)
+    if row.expiresAt <= now:
+        return None, unauthorized("Refresh token expired")
+    if row.revokedAt is not None:
+        return None, unauthorized("Refresh token revoked")
+    if not constant_time_hash_eq(row.tokenHash, secret):
+        return None, unauthorized("Refresh token invalid")
+
+    return row, None
+
+
 # ---------------------------------------------------------------------------
 # POST /v1/auth/signup
 # ---------------------------------------------------------------------------
@@ -395,3 +429,53 @@ async def logout(request: Request, response: Response):
 @router.get("/me", response_model=MeResponse)
 async def me(user: UserResponse = Depends(get_current_user_v1)):
     return MeResponse(user=user)
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/auth/session
+# ---------------------------------------------------------------------------
+# Non-rotating session-verify endpoint. Used by Next SSR (issue #173) so that
+# server components can prefetch the user without advancing the refresh-token
+# chain. Returns the same shape as /me but accepts the refresh + CSRF cookies
+# instead of a Bearer access token.
+#
+# This endpoint is replay-safe by design: validating the same refresh cookie
+# repeatedly does NOT mark the row as rotated and does NOT trigger reuse
+# detection. Rotation and the reuse signal remain exclusive to /v1/auth/refresh.
+@router.get("/session", response_model=MeResponse)
+async def session(
+    request: Request,
+    x_csrf_token: Optional[str] = Header(default=None, alias="X-CSRF-Token"),
+):
+    refresh_cookie = request.cookies.get(settings.refresh_cookie_name)
+    csrf_cookie = request.cookies.get(settings.csrf_cookie_name)
+
+    try:
+        row, error_response = await _validate_refresh_cookie(
+            refresh_cookie=refresh_cookie,
+            csrf_cookie=csrf_cookie,
+            x_csrf_token=x_csrf_token,
+        )
+        if error_response is not None:
+            return error_response
+
+        user = await prisma.user.find_unique(
+            where={"id": row.userId},
+            include={
+                "memberships": {
+                    "where": {"familySpaceId": row.familySpaceId},
+                    "include": {"familySpace": True},
+                }
+            },
+        )
+        if not user or not user.memberships:
+            return unauthorized("Membership no longer valid")
+
+        user_response = await _build_user_response(user, user.memberships[0])
+        return MeResponse(user=user_response)
+    except PrismaError as error:
+        logger.exception("auth_v1.session.prisma_error: %s", error)
+        return internal_error("Database error during session check")
+    except Exception as error:  # noqa: BLE001
+        logger.exception("auth_v1.session.error: %s", error)
+        return internal_error("Failed to validate session")

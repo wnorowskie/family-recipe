@@ -1943,6 +1943,55 @@
         ]
       }
     },
+    "/v1/auth/session": {
+      "get": {
+        "operationId": "session_v1_auth_session_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Session",
+        "tags": [
+          "auth-v1"
+        ]
+      }
+    },
     "/v1/auth/signup": {
       "post": {
         "operationId": "signup_v1_auth_signup_post",

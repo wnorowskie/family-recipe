@@ -587,3 +587,269 @@ class TestRefreshConcurrency:
         assert len(success) == 1, f"expected 1 success, got {success}"
         assert len(failure) == 1, f"expected 1 failure, got {failure}"
         assert failure[0].status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# /v1/auth/session — non-rotating SSR-prefetch endpoint (issue #173)
+# ---------------------------------------------------------------------------
+
+
+class TestV1Session:
+    """Validates the non-rotating session endpoint used by Next SSR.
+
+    Critical invariants this class proves:
+      - /session does NOT mutate the refresh-token chain (no update_many,
+        no update, no create).
+      - /session does NOT trigger reuse-detection on a stale REVOKED_ROTATED
+        cookie (that signal is reserved for /refresh).
+      - /session can be called repeatedly with the same cookie without
+        side effects (replay-safe).
+    """
+
+    def _seed_active_row(
+        self,
+        mock_prisma,
+        *,
+        secret: str,
+        jti: str = "jti_session_active",
+        chain_id: str = "chain_session",
+        user_id: str = "u1",
+        family_space_id: str = "fs1",
+    ):
+        token_hash = tokens._hash_refresh_secret(secret)
+        row = make_mock_refresh_token(
+            jti=jti,
+            tokenHash=token_hash,
+            chainId=chain_id,
+            userId=user_id,
+            familySpaceId=family_space_id,
+            expiresAt=datetime.now(timezone.utc) + timedelta(days=7),
+        )
+        mock_prisma.refreshtoken.find_unique = AsyncMock(return_value=row)
+        return row
+
+    def _seed_user_with_membership(self, mock_prisma, mock_user, mock_family_space):
+        membership = make_mock_membership(
+            userId=mock_user.id,
+            familySpaceId=mock_family_space.id,
+            familySpace=mock_family_space,
+        )
+        user_with_membership = make_mock_user(
+            memberships=[membership], id=mock_user.id
+        )
+        mock_prisma.user.find_unique = AsyncMock(return_value=user_with_membership)
+
+    def test_session_happy_path_returns_user_without_rotating(
+        self, client, mock_prisma, mock_user, mock_family_space
+    ):
+        secret = "session-secret"
+        row = self._seed_active_row(
+            mock_prisma,
+            secret=secret,
+            user_id=mock_user.id,
+            family_space_id=mock_family_space.id,
+        )
+        self._seed_user_with_membership(mock_prisma, mock_user, mock_family_space)
+        # Defensive: arm the mutation methods so the test fails loudly if
+        # /session ever calls them.
+        mock_prisma.refreshtoken.update = AsyncMock(return_value=None)
+        mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
+        mock_prisma.refreshtoken.create = AsyncMock(return_value=None)
+
+        client.cookies.set(settings.refresh_cookie_name, f"{row.jti}.{secret}")
+        client.cookies.set(settings.csrf_cookie_name, "csrf-abc")
+
+        response = client.get(
+            "/v1/auth/session",
+            headers={"X-CSRF-Token": "csrf-abc"},
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert "user" in body
+        assert body["user"]["id"] == mock_user.id
+        # Critical: no rotation, no chain mutation.
+        mock_prisma.refreshtoken.update.assert_not_called()
+        mock_prisma.refreshtoken.update_many.assert_not_called()
+        mock_prisma.refreshtoken.create.assert_not_called()
+        # No rotated cookies on the response.
+        cookie_header = response.headers.get("set-cookie", "")
+        assert settings.refresh_cookie_name not in cookie_header
+
+    def test_session_repeated_calls_are_replay_safe(
+        self, client, mock_prisma, mock_user, mock_family_space
+    ):
+        secret = "session-secret"
+        row = self._seed_active_row(
+            mock_prisma,
+            secret=secret,
+            user_id=mock_user.id,
+            family_space_id=mock_family_space.id,
+        )
+        self._seed_user_with_membership(mock_prisma, mock_user, mock_family_space)
+        mock_prisma.refreshtoken.update = AsyncMock(return_value=None)
+        mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
+
+        client.cookies.set(settings.refresh_cookie_name, f"{row.jti}.{secret}")
+        client.cookies.set(settings.csrf_cookie_name, "csrf-abc")
+
+        for _ in range(3):
+            response = client.get(
+                "/v1/auth/session",
+                headers={"X-CSRF-Token": "csrf-abc"},
+            )
+            assert response.status_code == 200
+
+        # No mutation across three calls — chain is exactly as it started.
+        mock_prisma.refreshtoken.update.assert_not_called()
+        mock_prisma.refreshtoken.update_many.assert_not_called()
+
+    def test_session_rejects_missing_csrf_header(
+        self, client, mock_prisma, mock_user, mock_family_space
+    ):
+        row = self._seed_active_row(
+            mock_prisma, secret="s", user_id=mock_user.id
+        )
+        client.cookies.set(settings.refresh_cookie_name, f"{row.jti}.s")
+        client.cookies.set(settings.csrf_cookie_name, "csrf-cookie-value")
+
+        response = client.get("/v1/auth/session")
+        assert response.status_code == 401
+
+    def test_session_rejects_csrf_mismatch(
+        self, client, mock_prisma, mock_user, mock_family_space
+    ):
+        row = self._seed_active_row(
+            mock_prisma, secret="s", user_id=mock_user.id
+        )
+        client.cookies.set(settings.refresh_cookie_name, f"{row.jti}.s")
+        client.cookies.set(settings.csrf_cookie_name, "csrf-cookie-value")
+
+        response = client.get(
+            "/v1/auth/session",
+            headers={"X-CSRF-Token": "different-value"},
+        )
+        assert response.status_code == 401
+
+    def test_session_missing_refresh_cookie_returns_401(self, client, mock_prisma):
+        client.cookies.set(settings.csrf_cookie_name, "x")
+        response = client.get(
+            "/v1/auth/session", headers={"X-CSRF-Token": "x"}
+        )
+        assert response.status_code == 401
+
+    def test_session_unknown_jti_returns_401(self, client, mock_prisma):
+        mock_prisma.refreshtoken.find_unique = AsyncMock(return_value=None)
+        client.cookies.set(settings.refresh_cookie_name, "ghost.secret")
+        client.cookies.set(settings.csrf_cookie_name, "x")
+        response = client.get(
+            "/v1/auth/session", headers={"X-CSRF-Token": "x"}
+        )
+        assert response.status_code == 401
+
+    def test_session_expired_token_returns_401(
+        self, client, mock_prisma, mock_user
+    ):
+        secret = "secret"
+        token_hash = tokens._hash_refresh_secret(secret)
+        expired_row = make_mock_refresh_token(
+            jti="jti_expired",
+            tokenHash=token_hash,
+            userId=mock_user.id,
+            expiresAt=datetime.now(timezone.utc) - timedelta(days=1),
+        )
+        mock_prisma.refreshtoken.find_unique = AsyncMock(return_value=expired_row)
+
+        client.cookies.set(settings.refresh_cookie_name, f"jti_expired.{secret}")
+        client.cookies.set(settings.csrf_cookie_name, "x")
+        response = client.get(
+            "/v1/auth/session", headers={"X-CSRF-Token": "x"}
+        )
+        assert response.status_code == 401
+
+    def test_session_revoked_logout_token_returns_401(
+        self, client, mock_prisma, mock_user
+    ):
+        secret = "secret"
+        token_hash = tokens._hash_refresh_secret(secret)
+        revoked_row = make_mock_refresh_token(
+            jti="jti_logout",
+            tokenHash=token_hash,
+            userId=mock_user.id,
+            revokedAt=datetime.now(timezone.utc),
+            revokedReason=tokens.REVOKED_LOGOUT,
+        )
+        mock_prisma.refreshtoken.find_unique = AsyncMock(return_value=revoked_row)
+
+        client.cookies.set(settings.refresh_cookie_name, f"jti_logout.{secret}")
+        client.cookies.set(settings.csrf_cookie_name, "x")
+        response = client.get(
+            "/v1/auth/session", headers={"X-CSRF-Token": "x"}
+        )
+        assert response.status_code == 401
+
+    def test_session_revoked_rotated_token_returns_401_without_chain_burn(
+        self, client, mock_prisma, mock_user
+    ):
+        """Critical: a stale REVOKED_ROTATED cookie hitting /session must
+        NOT trigger the reuse-detection branch (which would burn the chain).
+        Reuse detection is exclusive to /refresh — /session is replay-safe.
+        """
+        secret = "secret"
+        token_hash = tokens._hash_refresh_secret(secret)
+        rotated_row = make_mock_refresh_token(
+            jti="jti_rotated",
+            tokenHash=token_hash,
+            userId=mock_user.id,
+            revokedAt=datetime.now(timezone.utc),
+            revokedReason=tokens.REVOKED_ROTATED,
+        )
+        mock_prisma.refreshtoken.find_unique = AsyncMock(return_value=rotated_row)
+        mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
+
+        client.cookies.set(settings.refresh_cookie_name, f"jti_rotated.{secret}")
+        client.cookies.set(settings.csrf_cookie_name, "x")
+        response = client.get(
+            "/v1/auth/session", headers={"X-CSRF-Token": "x"}
+        )
+
+        assert response.status_code == 401
+        # The chain MUST NOT be burned — that is /refresh's exclusive concern.
+        mock_prisma.refreshtoken.update_many.assert_not_called()
+
+    def test_session_wrong_secret_returns_401(self, client, mock_prisma, mock_user):
+        secret = "real-secret"
+        self._seed_active_row(
+            mock_prisma, secret=secret, jti="jti_x", user_id=mock_user.id
+        )
+        mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
+
+        client.cookies.set(settings.refresh_cookie_name, "jti_x.WRONG-secret")
+        client.cookies.set(settings.csrf_cookie_name, "x")
+        response = client.get(
+            "/v1/auth/session", headers={"X-CSRF-Token": "x"}
+        )
+
+        assert response.status_code == 401
+        mock_prisma.refreshtoken.update_many.assert_not_called()
+
+    def test_session_user_without_membership_returns_401(
+        self, client, mock_prisma, mock_user, mock_family_space
+    ):
+        secret = "s"
+        row = self._seed_active_row(
+            mock_prisma,
+            secret=secret,
+            user_id=mock_user.id,
+            family_space_id=mock_family_space.id,
+        )
+        # User exists but has no membership in the requested family space.
+        user_no_membership = make_mock_user(memberships=[], id=mock_user.id)
+        mock_prisma.user.find_unique = AsyncMock(return_value=user_no_membership)
+
+        client.cookies.set(settings.refresh_cookie_name, f"{row.jti}.{secret}")
+        client.cookies.set(settings.csrf_cookie_name, "x")
+        response = client.get(
+            "/v1/auth/session", headers={"X-CSRF-Token": "x"}
+        )
+        assert response.status_code == 401
