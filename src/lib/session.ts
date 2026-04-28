@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
 import { prisma } from './prisma';
 import {
-  getSessionFromRequest,
-  setSessionCookie,
   clearSessionCookie,
+  getSessionFromRequest,
+  hasAnySessionFromRequest,
+  setSessionCookie,
 } from './session-core';
 
 type GetSignedUploadUrl = (typeof import('./uploads'))['getSignedUploadUrl'];
@@ -65,4 +66,9 @@ export async function getCurrentUser(request: NextRequest) {
   }
 }
 
-export { setSessionCookie, clearSessionCookie, getSessionFromRequest };
+export {
+  setSessionCookie,
+  clearSessionCookie,
+  getSessionFromRequest,
+  hasAnySessionFromRequest,
+};

@@ -3,6 +3,15 @@
 import { useState, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+import { apiClient, ApiError } from '@/lib/apiClient';
+import { type AuthUser, setSession } from '@/lib/authStore';
+import { isFastApiAuthEnabled } from '@/lib/featureFlags';
+
+interface AuthTokenResponse {
+  accessToken: string;
+  user: AuthUser;
+}
+
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -19,12 +28,30 @@ function LoginContent() {
     setError('');
     setIsLoading(true);
 
-    try {
-      const redirectParam = searchParams?.get('redirect') ?? '/timeline';
-      const safeRedirect = redirectParam.startsWith('/')
-        ? redirectParam
-        : '/timeline';
+    const redirectParam = searchParams?.get('redirect') ?? '/timeline';
+    const safeRedirect = redirectParam.startsWith('/')
+      ? redirectParam
+      : '/timeline';
 
+    if (isFastApiAuthEnabled()) {
+      try {
+        const data = await apiClient.post<AuthTokenResponse>('/v1/auth/login', {
+          body: formData,
+        });
+        setSession(data.accessToken, data.user);
+        router.replace(safeRedirect);
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setError(err.message);
+        } else {
+          setError('Failed to connect to the server');
+        }
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {

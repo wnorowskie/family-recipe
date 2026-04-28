@@ -16,6 +16,7 @@ import {
   clearSessionCookie,
   getSessionFromRequest,
   getCurrentUser,
+  hasAnySessionFromRequest,
 } from '@/lib/session';
 import { verifyToken, JWTPayload } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
@@ -319,6 +320,92 @@ describe('Session Management', () => {
 
       expect(mockVerifyToken).toHaveBeenCalledWith('multi-cookie-token');
       expect(result).toEqual(mockPayload);
+    });
+  });
+
+  describe('hasAnySessionFromRequest() — Phase 2 dual-mode', () => {
+    it('returns false when neither cookie is present', async () => {
+      const request = new NextRequest('http://localhost/timeline');
+
+      const result = await hasAnySessionFromRequest(request);
+
+      expect(result).toBe(false);
+      expect(mockVerifyToken).not.toHaveBeenCalled();
+    });
+
+    it('returns true when only a valid Next session cookie is present', async () => {
+      mockVerifyToken.mockResolvedValue({
+        userId: 'u1',
+        familySpaceId: 'f1',
+        role: 'member',
+      });
+      const request = new NextRequest('http://localhost/timeline', {
+        headers: { cookie: 'session=valid-jwt' },
+      });
+
+      const result = await hasAnySessionFromRequest(request);
+
+      expect(result).toBe(true);
+    });
+
+    it('returns true when only a refresh_token cookie is present (presence-only check)', async () => {
+      const request = new NextRequest('http://localhost/timeline', {
+        headers: { cookie: 'refresh_token=opaque.jti.value' },
+      });
+
+      const result = await hasAnySessionFromRequest(request);
+
+      expect(result).toBe(true);
+      // Critical: no JWT decode happens for the FastAPI cookie. The middleware
+      // runs on Edge and must not crypto-verify the FastAPI token.
+      expect(mockVerifyToken).not.toHaveBeenCalled();
+    });
+
+    it('returns true when both cookies are present', async () => {
+      mockVerifyToken.mockResolvedValue({
+        userId: 'u1',
+        familySpaceId: 'f1',
+        role: 'member',
+      });
+      const request = new NextRequest('http://localhost/timeline', {
+        headers: { cookie: 'session=valid-jwt; refresh_token=opaque' },
+      });
+
+      const result = await hasAnySessionFromRequest(request);
+
+      expect(result).toBe(true);
+    });
+
+    it('returns true on invalid Next session + valid refresh_token', async () => {
+      mockVerifyToken.mockResolvedValue(null);
+      const request = new NextRequest('http://localhost/timeline', {
+        headers: { cookie: 'session=expired; refresh_token=opaque' },
+      });
+
+      const result = await hasAnySessionFromRequest(request);
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false when refresh_token cookie value is empty', async () => {
+      const request = new NextRequest('http://localhost/timeline', {
+        headers: { cookie: 'refresh_token=' },
+      });
+
+      const result = await hasAnySessionFromRequest(request);
+
+      expect(result).toBe(false);
+    });
+
+    it('returns false on invalid Next session + missing refresh_token', async () => {
+      mockVerifyToken.mockResolvedValue(null);
+      const request = new NextRequest('http://localhost/timeline', {
+        headers: { cookie: 'session=expired' },
+      });
+
+      const result = await hasAnySessionFromRequest(request);
+
+      expect(result).toBe(false);
     });
   });
 
