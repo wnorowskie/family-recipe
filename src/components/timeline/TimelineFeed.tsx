@@ -4,6 +4,14 @@ import { useState } from 'react';
 import TimelineCard from './TimelineCard';
 import EmptyState from './EmptyState';
 import { TimelineItem } from '@/lib/timeline';
+import { apiClient, ApiError } from '@/lib/apiClient';
+import { API_ERROR_CODES } from '@/lib/apiErrors';
+
+interface TimelinePage {
+  items: TimelineItem[];
+  hasMore: boolean;
+  nextOffset: number;
+}
 
 interface TimelineFeedProps {
   initialItems: TimelineItem[];
@@ -25,16 +33,24 @@ export default function TimelineFeed({
   const handleLoadMore = async () => {
     setIsLoadingMore(true);
     try {
-      const response = await fetch(`/api/timeline?limit=20&offset=${offset}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch timeline');
-      }
-      const data = await response.json();
+      const data = await apiClient.get<TimelinePage>('/api/timeline', {
+        query: { limit: 20, offset },
+      });
       setItems((prev) => [...prev, ...data.items]);
       setHasMore(data.hasMore);
       setOffset(data.nextOffset);
     } catch (err) {
-      setError('Failed to load timeline');
+      if (err instanceof ApiError) {
+        if (err.code === API_ERROR_CODES.UNAUTHORIZED) {
+          setError('Your session has expired. Please log in again.');
+        } else if (err.code === API_ERROR_CODES.RATE_LIMIT_EXCEEDED) {
+          setError('Too many requests. Please wait a moment and try again.');
+        } else {
+          setError('Failed to load timeline');
+        }
+      } else {
+        setError('Failed to load timeline');
+      }
       console.error('Timeline fetch error:', err);
     } finally {
       setIsLoadingMore(false);

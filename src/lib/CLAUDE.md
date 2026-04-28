@@ -35,6 +35,7 @@ Module map for the shared backend logic. Most of these are imported from API rou
 
 ## Infrastructure
 
+- [apiClient.ts](apiClient.ts) — shared `fetch` wrapper used by frontend (client components). Honors `NEXT_PUBLIC_API_BASE_URL` (unset = same-origin), normalizes non-2xx responses to `ApiError` carrying the codes from [apiErrors.ts](apiErrors.ts), and exposes `setAccessTokenProvider` for the FastAPI token flow ([docs/API_BACKEND_MIGRATION_PLAN.md](../../docs/API_BACKEND_MIGRATION_PLAN.md)). Phase 0: provider stays unset, behavior unchanged.
 - [uploads.ts](uploads.ts) — dual-mode photo storage. Local disk under `public/uploads` when `UPLOADS_BUCKET` is unset; GCS with signed URLs otherwise. **DB stores `storageKey`, never URLs** — resolve at read time via `getSignedUploadUrl` or `createSignedUrlResolver`. Enforces 8MB cap and JPEG/PNG/WEBP/GIF only.
 - [rateLimit.ts](rateLimit.ts) — in-process LRU limiters: `signupLimiter`, `loginLimiter`, `postCreationLimiter`, `commentLimiter`, `reactionLimiter`, `cookedEventLimiter`. Globally mocked in [jest.setup.js](../../jest.setup.js). Per-instance — does not share across replicas.
 - [logger.ts](logger.ts) — `logError`, `logWarn`. Use these instead of `console.*`; tests silence console by default (override with `ALLOW_TEST_LOGS=true`).
