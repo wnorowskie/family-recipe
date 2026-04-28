@@ -47,3 +47,25 @@ def make_mock_membership(**overrides: Any) -> SimpleNamespace:
     }
     data.update(overrides)
     return SimpleNamespace(**data)
+
+
+def make_mock_refresh_token(**overrides: Any) -> SimpleNamespace:
+    now = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    data = {
+        "id": overrides.get("id", "rt_test_123"),
+        "userId": overrides.get("userId", "user_test_123"),
+        "familySpaceId": overrides.get("familySpaceId", "family_test_123"),
+        "jti": overrides.get("jti", "jti_test_123"),
+        "tokenHash": overrides.get("tokenHash", "stored-hash-placeholder"),
+        "chainId": overrides.get("chainId", "chain_test_123"),
+        "rotatedFromJti": overrides.get("rotatedFromJti", None),
+        "rememberMe": overrides.get("rememberMe", False),
+        "issuedAt": overrides.get("issuedAt", now),
+        "expiresAt": overrides.get("expiresAt", datetime(2099, 1, 1, tzinfo=timezone.utc)),
+        "revokedAt": overrides.get("revokedAt", None),
+        "revokedReason": overrides.get("revokedReason", None),
+        "userAgent": overrides.get("userAgent", None),
+        "ipAddress": overrides.get("ipAddress", None),
+    }
+    data.update(overrides)
+    return SimpleNamespace(**data)

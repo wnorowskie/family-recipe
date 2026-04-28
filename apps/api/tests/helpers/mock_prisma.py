@@ -14,6 +14,7 @@ MODEL_NAMES = [
     "familyspace",
     "familymembership",
     "tag",
+    "refreshtoken",
 ]
 
 
@@ -24,6 +25,7 @@ def _make_model_mock() -> MagicMock:
     model_mock.find_many = AsyncMock(return_value=[])
     model_mock.create = AsyncMock(return_value=None)
     model_mock.update = AsyncMock(return_value=None)
+    model_mock.update_many = AsyncMock(return_value=None)
     model_mock.delete = AsyncMock(return_value=None)
     model_mock.delete_many = AsyncMock(return_value=None)
     model_mock.count = AsyncMock(return_value=0)
@@ -42,6 +44,10 @@ def create_mock_prisma_client() -> MagicMock:
         def __init__(self, prisma_mock: MagicMock):
             self.post = prisma_mock.post
             self.postphoto = prisma_mock.postphoto
+            self.user = prisma_mock.user
+            self.familymembership = prisma_mock.familymembership
+            self.refreshtoken = prisma_mock.refreshtoken
+            self.execute_raw = AsyncMock(return_value=0)
 
         async def __aenter__(self):
             return self
@@ -65,6 +71,7 @@ def reset_mock_prisma(mock_prisma: MagicMock) -> None:
             "find_many",
             "create",
             "update",
+            "update_many",
             "delete",
             "delete_many",
             "count",
