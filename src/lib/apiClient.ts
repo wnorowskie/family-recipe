@@ -24,6 +24,98 @@ export function clearAccessTokenProvider(): void {
   accessTokenProvider = () => null;
 }
 
+// Phase 2 refresh-and-retry hooks. The auth store registers these at module
+// load (avoids an apiClient ↔ authStore import cycle). When unset, the retry
+// loop is a no-op and 401s propagate as before.
+interface RefreshHooks {
+  onRefreshed: (accessToken: string) => void;
+  onRefreshFailed: () => void;
+}
+
+let refreshHooks: RefreshHooks | null = null;
+
+export function setRefreshHooks(hooks: RefreshHooks): void {
+  refreshHooks = hooks;
+}
+
+export function clearRefreshHooks(): void {
+  refreshHooks = null;
+}
+
+const REFRESH_PATH = '/v1/auth/refresh';
+const AUTH_BYPASS_PATHS = new Set([
+  REFRESH_PATH,
+  '/v1/auth/login',
+  '/v1/auth/signup',
+  '/v1/auth/logout',
+]);
+
+function isAuthEndpoint(path: string): boolean {
+  // Exact match after stripping the query string. Paths reach this function
+  // without the base URL prefix (apiClient.request passes the original path
+  // and buildUrl adds the prefix later), so a substring/endsWith check is
+  // unnecessary and would incorrectly match e.g. `/something/v1/auth/login`.
+  const withoutQuery = path.split('?')[0];
+  return AUTH_BYPASS_PATHS.has(withoutQuery);
+}
+
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const target = `${name}=`;
+  const parts = document.cookie ? document.cookie.split(';') : [];
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(target)) {
+      return decodeURIComponent(trimmed.slice(target.length));
+    }
+  }
+  return null;
+}
+
+let inflightRefresh: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  if (typeof document === 'undefined') {
+    throw new Error('apiClient.tryRefresh must not run on the server');
+  }
+  if (inflightRefresh) return inflightRefresh;
+
+  const csrf = readCookie('csrf_token');
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (csrf) headers['X-CSRF-Token'] = csrf;
+
+  inflightRefresh = (async () => {
+    try {
+      const response = await fetch(buildUrl(REFRESH_PATH), {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        refreshHooks?.onRefreshFailed();
+        return false;
+      }
+      const body = (await response.json()) as { accessToken?: unknown };
+      if (
+        typeof body.accessToken !== 'string' ||
+        body.accessToken.length === 0
+      ) {
+        refreshHooks?.onRefreshFailed();
+        return false;
+      }
+      refreshHooks?.onRefreshed(body.accessToken);
+      return true;
+    } catch {
+      refreshHooks?.onRefreshFailed();
+      return false;
+    } finally {
+      inflightRefresh = null;
+    }
+  })();
+
+  return inflightRefresh;
+}
+
 // `NEXT_PUBLIC_*` is inlined by Next.js at build time for client bundles, not
 // read at runtime. Flipping this in env config alone won't redirect requests in
 // a deployed build — Phase 1 rollouts need a per-environment build (or a
@@ -119,11 +211,11 @@ function appendQuery(path: string, query: RequestOptions['query']): string {
   return path.includes('?') ? `${path}&${qs}` : `${path}?${qs}`;
 }
 
-async function request<T>(
+async function executeRequest(
   method: string,
   path: string,
-  options: RequestOptions = {}
-): Promise<T> {
+  options: RequestOptions
+): Promise<Response> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     ...(options.headers ?? {}),
@@ -141,20 +233,43 @@ async function request<T>(
     }
   }
 
-  // No-op until Phase 2 wires `setAccessTokenProvider` from the auth store.
+  // Read the access token fresh on every request so a retry after refresh
+  // picks up the rotated token.
   const token = accessTokenProvider();
   if (token && !('Authorization' in headers) && !('authorization' in headers)) {
     headers.Authorization = `Bearer ${token}`;
   }
 
   const url = buildUrl(appendQuery(path, options.query));
-  const response = await fetch(url, {
+  return fetch(url, {
     method,
     headers,
     body,
     signal: options.signal,
     credentials: options.credentials ?? 'include',
   });
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  let response = await executeRequest(method, path, options);
+
+  // On 401, attempt a single refresh and retry the original request once.
+  // Skip auth endpoints to avoid recursion (refresh failures must surface
+  // as 401s, not trigger another refresh).
+  if (
+    response.status === 401 &&
+    refreshHooks !== null &&
+    !isAuthEndpoint(path)
+  ) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      response = await executeRequest(method, path, options);
+    }
+  }
 
   if (!response.ok) {
     throw await normalizeError(response);

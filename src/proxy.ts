@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getSessionFromRequest } from './lib/session-core';
+import { hasAnySessionFromRequest } from './lib/session-core';
+
+// Phase 2 dual-mode middleware: accepts either the Next session cookie or
+// the FastAPI refresh_token cookie as proof of authentication. Edge-runtime
+// safe — the FastAPI cookie is checked for presence only, not decoded.
+// Phase 4 removes the Next branch and goes refresh_token-only.
 
 export async function proxy(request: NextRequest) {
-  const session = await getSessionFromRequest(request);
+  const hasSession = await hasAnySessionFromRequest(request);
   const { pathname } = request.nextUrl;
 
   // Check if user is accessing auth pages (login, signup)
@@ -21,12 +26,12 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/posts');
 
   // If user is logged in and trying to access auth pages, redirect to timeline
-  if (session && isAuthPage) {
+  if (hasSession && isAuthPage) {
     return NextResponse.redirect(new URL('/timeline', request.url));
   }
 
   // If user is not logged in and trying to access protected routes, redirect to login
-  if (!session && isAppRoute) {
+  if (!hasSession && isAppRoute) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);

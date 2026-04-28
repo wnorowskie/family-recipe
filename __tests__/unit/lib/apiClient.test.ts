@@ -1,8 +1,10 @@
 import {
   apiClient,
   ApiError,
-  setAccessTokenProvider,
   clearAccessTokenProvider,
+  clearRefreshHooks,
+  setAccessTokenProvider,
+  setRefreshHooks,
 } from '@/lib/apiClient';
 import { API_ERROR_CODES } from '@/lib/apiErrors';
 
@@ -34,6 +36,7 @@ describe('apiClient', () => {
       process.env.NEXT_PUBLIC_API_BASE_URL = originalBaseUrl;
     }
     clearAccessTokenProvider();
+    clearRefreshHooks();
   });
 
   afterAll(() => {
@@ -255,6 +258,237 @@ describe('apiClient', () => {
       const data = await apiClient.del('/api/posts/1');
 
       expect(data).toBeUndefined();
+    });
+  });
+
+  describe('refresh-and-retry on 401', () => {
+    const originalDocument = (global as { document?: unknown }).document;
+
+    function setCookie(value: string): void {
+      Object.defineProperty(global, 'document', {
+        value: { cookie: value },
+        configurable: true,
+        writable: true,
+      });
+    }
+
+    afterEach(() => {
+      if (originalDocument === undefined) {
+        delete (global as { document?: unknown }).document;
+      } else {
+        Object.defineProperty(global, 'document', {
+          value: originalDocument,
+          configurable: true,
+          writable: true,
+        });
+      }
+    });
+
+    it('attempts a single refresh on 401 and retries the original request', async () => {
+      setCookie('csrf_token=csrf-abc');
+      const onRefreshed = jest.fn();
+      const onRefreshFailed = jest.fn();
+      setRefreshHooks({ onRefreshed, onRefreshFailed });
+
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+        )
+        .mockResolvedValueOnce(jsonResponse({ accessToken: 'new-token' }))
+        .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+      const data = await apiClient.get<{ ok: boolean }>('/api/timeline');
+
+      expect(data).toEqual({ ok: true });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock.mock.calls[1][0]).toBe('/v1/auth/refresh');
+      expect(fetchMock.mock.calls[1][1]?.headers).toEqual(
+        expect.objectContaining({ 'X-CSRF-Token': 'csrf-abc' })
+      );
+      expect(onRefreshed).toHaveBeenCalledWith('new-token');
+      expect(onRefreshFailed).not.toHaveBeenCalled();
+    });
+
+    it('throws the original 401 and calls onRefreshFailed when refresh returns non-2xx', async () => {
+      setCookie('csrf_token=csrf-abc');
+      const onRefreshed = jest.fn();
+      const onRefreshFailed = jest.fn();
+      setRefreshHooks({ onRefreshed, onRefreshFailed });
+
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+        );
+
+      await expect(apiClient.get('/api/timeline')).rejects.toMatchObject({
+        status: 401,
+        code: API_ERROR_CODES.UNAUTHORIZED,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(onRefreshed).not.toHaveBeenCalled();
+      expect(onRefreshFailed).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not loop when the retried request also returns 401', async () => {
+      setCookie('csrf_token=csrf-abc');
+      setRefreshHooks({ onRefreshed: jest.fn(), onRefreshFailed: jest.fn() });
+
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+        )
+        .mockResolvedValueOnce(jsonResponse({ accessToken: 'new-token' }))
+        .mockResolvedValueOnce(
+          jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+        );
+
+      await expect(apiClient.get('/api/timeline')).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('dedups concurrent 401s into a single refresh call', async () => {
+      setCookie('csrf_token=csrf-abc');
+      setRefreshHooks({ onRefreshed: jest.fn(), onRefreshFailed: jest.fn() });
+
+      fetchMock.mockImplementation((url: string) => {
+        if (url === '/v1/auth/refresh') {
+          return Promise.resolve(jsonResponse({ accessToken: 'new-token' }));
+        }
+        // Each non-refresh URL: first call 401, second call 200.
+        const callsForUrl = fetchMock.mock.calls.filter(
+          ([u]) => u === url
+        ).length;
+        if (callsForUrl === 1) {
+          return Promise.resolve(
+            jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+          );
+        }
+        return Promise.resolve(jsonResponse({ url }));
+      });
+
+      const [a, b] = await Promise.all([
+        apiClient.get<{ url: string }>('/api/a'),
+        apiClient.get<{ url: string }>('/api/b'),
+      ]);
+
+      expect(a).toEqual({ url: '/api/a' });
+      expect(b).toEqual({ url: '/api/b' });
+      const refreshCalls = fetchMock.mock.calls.filter(
+        ([url]) => url === '/v1/auth/refresh'
+      );
+      expect(refreshCalls).toHaveLength(1);
+    });
+
+    it('does not attempt refresh when the failing request is /v1/auth/refresh itself', async () => {
+      setCookie('csrf_token=csrf-abc');
+      const onRefreshed = jest.fn();
+      const onRefreshFailed = jest.fn();
+      setRefreshHooks({ onRefreshed, onRefreshFailed });
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+      );
+
+      await expect(apiClient.post('/v1/auth/refresh')).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(onRefreshed).not.toHaveBeenCalled();
+      expect(onRefreshFailed).not.toHaveBeenCalled();
+    });
+
+    it('does not attempt refresh when the failing request is /v1/auth/login', async () => {
+      setCookie('csrf_token=csrf-abc');
+      setRefreshHooks({ onRefreshed: jest.fn(), onRefreshFailed: jest.fn() });
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+      );
+
+      await expect(
+        apiClient.post('/v1/auth/login', {
+          body: { emailOrUsername: 'x', password: 'y' },
+        })
+      ).rejects.toMatchObject({ status: 401 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not attempt refresh on 429 (rate limit)', async () => {
+      setCookie('csrf_token=csrf-abc');
+      const onRefreshed = jest.fn();
+      const onRefreshFailed = jest.fn();
+      setRefreshHooks({ onRefreshed, onRefreshFailed });
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(
+          { error: { code: 'RATE_LIMIT_EXCEEDED' } },
+          { status: 429 }
+        )
+      );
+
+      await expect(apiClient.get('/api/timeline')).rejects.toMatchObject({
+        status: 429,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(onRefreshed).not.toHaveBeenCalled();
+      expect(onRefreshFailed).not.toHaveBeenCalled();
+    });
+
+    it('does not attempt refresh when no hooks are registered', async () => {
+      setCookie('csrf_token=csrf-abc');
+
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+      );
+
+      await expect(apiClient.get('/api/timeline')).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('omits the X-CSRF-Token header when the cookie is absent', async () => {
+      setCookie('');
+      setRefreshHooks({ onRefreshed: jest.fn(), onRefreshFailed: jest.fn() });
+
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+        )
+        .mockResolvedValueOnce(jsonResponse({ accessToken: 'new-token' }))
+        .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+      await apiClient.get('/api/timeline');
+
+      const refreshHeaders = fetchMock.mock.calls[1][1]?.headers as Record<
+        string,
+        string
+      >;
+      expect(refreshHeaders).not.toHaveProperty('X-CSRF-Token');
+    });
+
+    it('treats a malformed refresh response (no accessToken) as a failure', async () => {
+      setCookie('csrf_token=csrf-abc');
+      const onRefreshed = jest.fn();
+      const onRefreshFailed = jest.fn();
+      setRefreshHooks({ onRefreshed, onRefreshFailed });
+
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
+        )
+        .mockResolvedValueOnce(jsonResponse({ wrongField: 'oops' }));
+
+      await expect(apiClient.get('/api/timeline')).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(onRefreshed).not.toHaveBeenCalled();
+      expect(onRefreshFailed).toHaveBeenCalledTimes(1);
     });
   });
 });

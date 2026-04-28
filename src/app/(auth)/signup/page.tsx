@@ -3,6 +3,15 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { apiClient, ApiError } from '@/lib/apiClient';
+import { type AuthUser, setSession } from '@/lib/authStore';
+import { isFastApiAuthEnabled } from '@/lib/featureFlags';
+
+interface AuthTokenResponse {
+  accessToken: string;
+  user: AuthUser;
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -20,6 +29,25 @@ export default function SignupPage() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
+
+    if (isFastApiAuthEnabled()) {
+      try {
+        const data = await apiClient.post<AuthTokenResponse>(
+          '/v1/auth/signup',
+          { body: formData }
+        );
+        setSession(data.accessToken, data.user);
+        router.replace('/timeline');
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setError(err.message);
+        } else {
+          setError('Failed to connect to the server');
+        }
+        setIsLoading(false);
+      }
+      return;
+    }
 
     try {
       const response = await fetch('/api/auth/signup', {

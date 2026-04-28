@@ -3,13 +3,31 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { apiClient } from '@/lib/apiClient';
+import { clearSession } from '@/lib/authStore';
+import { isFastApiAuthEnabled } from '@/lib/featureFlags';
+
 export default function LogoutButton() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogout = async () => {
     setIsLoading(true);
-    
+
+    if (isFastApiAuthEnabled()) {
+      try {
+        await apiClient.post('/v1/auth/logout');
+      } catch {
+        // Fall through — clearing the local session is more important than
+        // surfacing a logout API error to the user.
+      }
+      clearSession();
+      router.push('/login');
+      router.refresh();
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
