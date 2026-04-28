@@ -51,12 +51,12 @@ const AUTH_BYPASS_PATHS = new Set([
 ]);
 
 function isAuthEndpoint(path: string): boolean {
-  // Match exact path or path with query string; ignore base URL prefix.
+  // Exact match after stripping the query string. Paths reach this function
+  // without the base URL prefix (apiClient.request passes the original path
+  // and buildUrl adds the prefix later), so a substring/endsWith check is
+  // unnecessary and would incorrectly match e.g. `/something/v1/auth/login`.
   const withoutQuery = path.split('?')[0];
-  for (const bypass of AUTH_BYPASS_PATHS) {
-    if (withoutQuery === bypass || withoutQuery.endsWith(bypass)) return true;
-  }
-  return false;
+  return AUTH_BYPASS_PATHS.has(withoutQuery);
 }
 
 function readCookie(name: string): string | null {

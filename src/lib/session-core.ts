@@ -53,6 +53,14 @@ export async function getSessionFromRequest(
 // present. The refresh_token check is presence-only (no JWT decode) so the
 // helper stays Edge-runtime safe. Phase 4 removes the Next session branch
 // entirely once the FastAPI cutover completes.
+//
+// Trade-off: an attacker setting `Cookie: refresh_token=anything` will be
+// routed to /timeline instead of /login by the middleware. This is NOT an
+// auth bypass — every protected data route still authenticates the cookie
+// against FastAPI and 401s on a forgery. The only consequence is a worse
+// UX surface (the gate page render is wasted on a forged cookie). Acceptable
+// for V1 single-family scope; a future Edge-compatible verifier (e.g.
+// shared HMAC signature on the cookie) could tighten this.
 const REFRESH_COOKIE_NAME = 'refresh_token';
 
 export async function hasAnySessionFromRequest(

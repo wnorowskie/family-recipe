@@ -103,7 +103,10 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 \
 
 - Login: form posts to `/v1/auth/login`. After redirect, DevTools shows `refresh_token` (HttpOnly) + `csrf_token` cookies; **no** `session` cookie.
 - Console: `localStorage` and `sessionStorage` empty. No JWT-shaped strings (`eyJ…`) anywhere in storage.
-- Reload: stays on `/timeline`, no flash. Network tab shows one POST to `/api/auth/bootstrap` (server-side flow) and one client-initiated POST.
+- Reload: stays on `/timeline`, no flash. Network tab shows:
+  - **One** server-side `GET /v1/auth/session` (issued by the SSR layout, non-rotating, no `Set-Cookie` rotation).
+  - **One** client-side `POST /api/auth/bootstrap` (issued by `<AuthBootstrap>` after hydration, which internally calls `/v1/auth/refresh` + `/v1/auth/me` and propagates rotated cookies via the route handler's response).
+  - Net effect: the refresh-token chain advances exactly once per page load.
 - Logout: cookies cleared, redirect to `/login`. Subsequent navigation to `/timeline` redirects back.
 - Force token expiry (shorten `ACCESS_TOKEN_TTL_SECONDS` to 30 in FastAPI dev config): make any API call → exactly one `/v1/auth/refresh` fires → original request retries and succeeds.
 - 429 response from a rate-limited endpoint does NOT trigger `/v1/auth/refresh` (only 401 does).

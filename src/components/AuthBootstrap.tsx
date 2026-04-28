@@ -17,9 +17,11 @@ interface BootstrapResponse {
 }
 
 // Mounts inside the protected (app) layout when the FastAPI auth flag is on.
-// The SSR layout has already verified the session via /api/auth/bootstrap, so
-// the rendered UI is correct from first paint. This component runs after
-// hydration to mint the client's own access token for subsequent API calls.
+// The SSR layout has already verified the session via /v1/auth/session
+// (non-rotating), so the rendered UI is correct from first paint. This
+// component runs after hydration to call /api/auth/bootstrap, which performs
+// the single per-page rotating /v1/auth/refresh + /v1/auth/me round-trip and
+// propagates the rotated cookies back to the browser.
 
 export default function AuthBootstrap({
   children,
