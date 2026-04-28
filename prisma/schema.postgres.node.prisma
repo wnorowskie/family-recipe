@@ -31,6 +31,7 @@ model User {
   feedbackSubmissions FeedbackSubmission[]
   receivedNotifications Notification[] @relation("NotificationRecipient")
   sentNotifications     Notification[] @relation("NotificationActor")
+  refreshTokens         RefreshToken[]
 
   @@map("users")
 }
@@ -48,6 +49,7 @@ model FamilySpace {
   posts           Post[]
   feedbackSubmissions FeedbackSubmission[]
   notifications   Notification[]
+  refreshTokens   RefreshToken[]
 
   @@map("family_spaces")
 }
@@ -293,4 +295,33 @@ model Notification {
   @@map("notifications")
   @@index([recipientId, readAt, createdAt], map: "notifications_recipient_read_idx")
   @@index([familySpaceId, postId], map: "notifications_family_post_idx")
+}
+
+// RefreshToken stores rotating refresh tokens for the FastAPI token-auth flow
+// Design: docs/research/refresh-token-store.md
+model RefreshToken {
+  id             String    @id @default(cuid())
+  userId         String    @map("user_id")
+  familySpaceId  String    @map("family_space_id")
+  jti            String    @unique
+  tokenHash      String    @map("token_hash")
+  chainId        String    @map("chain_id")
+  rotatedFromJti String?   @map("rotated_from_jti")
+  rememberMe     Boolean   @default(false) @map("remember_me")
+  issuedAt       DateTime  @default(now()) @map("issued_at")
+  expiresAt      DateTime  @map("expires_at")
+  revokedAt      DateTime? @map("revoked_at")
+  revokedReason  String?   @map("revoked_reason")
+  userAgent      String?   @map("user_agent")
+  ipAddress      String?   @map("ip_address")
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familySpace FamilySpace @relation(fields: [familySpaceId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+  @@index([userId, revokedAt])
+  @@index([chainId])
+  @@index([familySpaceId])
+  @@index([expiresAt])
+  @@index([revokedAt])
 }

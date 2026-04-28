@@ -36,7 +36,9 @@ def mock_prisma(monkeypatch):
     monkeypatch.setattr("src.routers.me.prisma", mock)
     monkeypatch.setattr("src.routers.family.prisma", mock)
     monkeypatch.setattr("src.routers.recipes.prisma", mock)
+    monkeypatch.setattr("src.routers.v1.auth.prisma", mock)
     monkeypatch.setattr("src.dependencies.prisma", mock)
+    monkeypatch.setattr("src.dependencies_v1.prisma", mock)
     yield mock
     reset_mock_prisma(mock)
 
