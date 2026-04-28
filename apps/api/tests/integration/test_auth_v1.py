@@ -165,9 +165,27 @@ class TestV1Signup:
 
 
 class TestV1Me:
-    def test_me_without_authorization_header_returns_401(self, client):
+    def test_me_without_authorization_header_returns_401_envelope(self, client):
         response = client.get("/v1/auth/me")
         assert response.status_code == 401
+        # Must use the canonical envelope, not FastAPI's default {"detail": ...}.
+        # The Phase 2 SPA keys off `error.code`.
+        body = response.json()
+        assert body == {"error": {"code": "UNAUTHORIZED", "message": "Unauthorized"}}
+
+    def test_me_with_invalid_bearer_token_returns_401_envelope(self, client):
+        response = client.get(
+            "/v1/auth/me", headers={"Authorization": "Bearer not-a-jwt"}
+        )
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "UNAUTHORIZED"
+
+    def test_me_with_non_bearer_scheme_returns_401_envelope(self, client):
+        response = client.get(
+            "/v1/auth/me", headers={"Authorization": "Basic abc123"}
+        )
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "UNAUTHORIZED"
 
     def test_me_with_valid_access_token_returns_user(
         self, client, mock_prisma, mock_user, mock_family_space

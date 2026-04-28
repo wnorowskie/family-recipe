@@ -6,10 +6,11 @@ site doesn't accidentally accept both auth modes.
 """
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .db import prisma
+from .errors import ApiError
 from .schemas.auth import UserResponse
 from .tokens import verify_access_token
 from .uploads import get_signed_upload_url
@@ -17,16 +18,19 @@ from .uploads import get_signed_upload_url
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+def _unauthorized() -> ApiError:
+    return ApiError("UNAUTHORIZED", "Unauthorized", status.HTTP_401_UNAUTHORIZED)
+
+
 async def get_current_user_v1(
-    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> UserResponse:
     if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise _unauthorized()
 
     claims = verify_access_token(credentials.credentials)
     if claims is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise _unauthorized()
 
     user = await prisma.user.find_unique(
         where={"id": claims.sub},
@@ -38,7 +42,7 @@ async def get_current_user_v1(
         },
     )
     if not user or not user.memberships:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise _unauthorized()
 
     membership = user.memberships[0]
     avatar_url = await get_signed_upload_url(getattr(user, "avatarStorageKey", None))

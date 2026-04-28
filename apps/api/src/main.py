@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import connect_db, disconnect_db
+from .errors import ApiError, error_response
 from .routers import auth, comments, family, health, me, posts, profile, reactions, recipes, tags, timeline
 from .routers.v1 import auth as auth_v1
 from .settings import settings
@@ -19,6 +20,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Family Recipe API", lifespan=lifespan)
+
+
+@app.exception_handler(ApiError)
+async def _api_error_handler(_request: Request, exc: ApiError):
+    return error_response(exc.code, exc.message, exc.status_code)
 
 
 if settings.cors_origins_list:
