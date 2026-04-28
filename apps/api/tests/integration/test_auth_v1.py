@@ -707,6 +707,8 @@ class TestV1Session:
     def test_session_rejects_missing_csrf_header(
         self, client, mock_prisma, mock_user, mock_family_space
     ):
+        # Cookie pair is present; the X-CSRF-Token request header is missing.
+        # Missing-cookie cases are covered by test_session_missing_refresh_cookie_returns_401.
         row = self._seed_active_row(
             mock_prisma, secret="s", user_id=mock_user.id
         )

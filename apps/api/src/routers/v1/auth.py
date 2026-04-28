@@ -112,25 +112,22 @@ async def _build_user_response(user, membership) -> UserResponse:
     )
 
 
-async def _validate_refresh_cookie(
-    *, refresh_cookie: Optional[str], csrf_cookie: Optional[str], x_csrf_token: Optional[str]
-):
-    """Shared validation for /v1/auth/refresh and /v1/auth/session.
+async def _lookup_active_refresh_row(*, jti: str, secret: str):
+    """DB-touching subset of refresh-cookie validation, shared between
+    /v1/auth/session and (potentially) future read-only auth surfaces.
 
-    Returns the row on success. Raises (returns) the unauthorized() response on
-    failure. Critically, this helper does NOT trigger reuse-detection — that
-    side effect is exclusive to /refresh because rotation is the canonical
-    reuse signal. /session must be replay-safe so SSR can call it on every
-    page render without burning the chain.
+    Returns (row, None) on success or (None, error_response) on failure.
+
+    Critically, this helper does NOT trigger reuse-detection — that side
+    effect is exclusive to /refresh because rotation is the canonical reuse
+    signal. /session must be replay-safe so SSR can call it on every page
+    render without burning the chain.
+
+    The caller is expected to perform the CSRF double-submit check and the
+    cookie parse before calling this — keeping those out of the DB-touching
+    path means a CSRF/parse failure can never be masked by a sibling
+    `internal_error()` block on a Prisma exception.
     """
-    if not csrf_token_matches(csrf_cookie, x_csrf_token):
-        return None, unauthorized("Invalid CSRF token")
-
-    parsed = parse_refresh_cookie(refresh_cookie or "")
-    if not parsed:
-        return None, unauthorized("Missing or malformed refresh token")
-    jti, secret = parsed
-
     row = await prisma.refreshtoken.find_unique(where={"jti": jti})
     if row is None:
         return None, unauthorized("Refresh token not recognized")
@@ -295,6 +292,12 @@ async def refresh(
         return unauthorized("Missing or malformed refresh token")
     jti, secret = parsed
 
+    # The basic validation (find row, check expired/revoked/hash) is
+    # intentionally NOT extracted into _lookup_active_refresh_row here. Doing
+    # so would split the reuse-detection branch (lines below) from the
+    # rejection logic it depends on, hiding a security-critical control flow
+    # behind a helper boundary. The cost is mild duplication with /session;
+    # the benefit is that the chain-burn signal stays auditable in one place.
     try:
         row = await prisma.refreshtoken.find_unique(where={"jti": jti})
         now = datetime.now(timezone.utc)
@@ -450,12 +453,19 @@ async def session(
     refresh_cookie = request.cookies.get(settings.refresh_cookie_name)
     csrf_cookie = request.cookies.get(settings.csrf_cookie_name)
 
+    # CSRF + cookie parse happen outside the try block so a malformed
+    # request can never be masked by the internal_error() catch-all (matches
+    # the structure of /v1/auth/refresh at line ~256 onwards).
+    if not csrf_token_matches(csrf_cookie, x_csrf_token):
+        return unauthorized("Invalid CSRF token")
+
+    parsed = parse_refresh_cookie(refresh_cookie or "")
+    if not parsed:
+        return unauthorized("Missing or malformed refresh token")
+    jti, secret = parsed
+
     try:
-        row, error_response = await _validate_refresh_cookie(
-            refresh_cookie=refresh_cookie,
-            csrf_cookie=csrf_cookie,
-            x_csrf_token=x_csrf_token,
-        )
+        row, error_response = await _lookup_active_refresh_row(jti=jti, secret=secret)
         if error_response is not None:
             return error_response
 
