@@ -32,6 +32,7 @@ model User {
   receivedNotifications Notification[] @relation("NotificationRecipient")
   sentNotifications     Notification[] @relation("NotificationActor")
   refreshTokens         RefreshToken[]
+  idempotencyKeys       IdempotencyKey[]
 
   @@map("users")
 }
@@ -324,4 +325,19 @@ model RefreshToken {
   @@index([familySpaceId])
   @@index([expiresAt])
   @@index([revokedAt])
+}
+
+model IdempotencyKey {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  requestId    String   @map("request_id")
+  statusCode   Int      @map("status_code")
+  responseBody Json     @map("response_body")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("idempotency_keys")
+  @@unique([userId, requestId])
+  @@index([createdAt])
 }
