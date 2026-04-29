@@ -44,7 +44,7 @@ async def my_favorites(limit: int = 20, offset: int = 0, user: UserResponse = De
     except PrismaError as e:
         logger.exception("me.favorites.prisma_error: %s", e)
         return internal_error("Failed to load favorites")
-    except Exception as e:
+    except (ValueError, TypeError, AttributeError, KeyError) as e:
         logger.exception("me.favorites.error: %s", e)
         return internal_error("Failed to load favorites")
 
@@ -84,7 +84,7 @@ async def update_profile(
         }
     except PrismaError:
         return internal_error("Failed to update profile")
-    except Exception:
+    except (ValueError, TypeError, AttributeError, KeyError):
         return internal_error("Failed to update profile")
 
 
@@ -109,5 +109,5 @@ async def change_password(payload: dict, user: UserResponse = Depends(get_curren
         return {"message": "Password updated"}
     except PrismaError:
         return internal_error("Failed to update password")
-    except Exception:
+    except (ValueError, TypeError, AttributeError, KeyError):
         return internal_error("Failed to update password")

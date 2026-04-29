@@ -140,6 +140,6 @@ async def get_timeline(
     except PrismaError as e:
         logger.exception("timeline.prisma_error: %s", e)
         return internal_error("Failed to load timeline")
-    except Exception as e:
+    except (ValueError, TypeError, AttributeError, KeyError) as e:
         logger.exception("timeline.error: %s", e)
         return internal_error("Failed to load timeline")

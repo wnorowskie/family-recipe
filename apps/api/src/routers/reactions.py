@@ -58,5 +58,5 @@ async def toggle_reaction(payload: ReactionRequest, user: UserResponse = Depends
         return {"reacted": True}
     except PrismaError:
         return internal_error("Failed to toggle reaction")
-    except Exception:
+    except (ValueError, TypeError, AttributeError, KeyError):
         return bad_request("Invalid reaction payload")

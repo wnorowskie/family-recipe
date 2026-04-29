@@ -94,7 +94,7 @@ async def my_cooked(
     except PrismaError as e:
         logger.exception("profile.cooked.prisma_error: %s", e)
         return internal_error("Failed to load cooked events")
-    except Exception as e:
+    except (ValueError, TypeError, AttributeError, KeyError) as e:
         logger.exception("profile.cooked.error: %s", e)
         return internal_error("Failed to load cooked events")
 
@@ -132,6 +132,6 @@ async def my_favorites(
     except PrismaError as e:
         logger.exception("profile.favorites.prisma_error: %s", e)
         return internal_error("Failed to load favorites")
-    except Exception as e:
+    except (ValueError, TypeError, AttributeError, KeyError) as e:
         logger.exception("profile.favorites.error: %s", e)
         return internal_error("Failed to load favorites")
