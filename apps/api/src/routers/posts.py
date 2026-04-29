@@ -36,7 +36,7 @@ def _parse_courses_from_recipe_details(details: Any) -> List[str]:
                 values = [c for c in parsed if isinstance(c, str) and c in COURSE_VALUES]
         elif isinstance(courses_raw, list):
             values = [c for c in courses_raw if isinstance(c, str) and c in COURSE_VALUES]
-    except Exception:
+    except (json.JSONDecodeError, TypeError):
         values = []
     if not values and getattr(details, "course", None) in COURSE_VALUES:
         values = [getattr(details, "course")]
@@ -48,7 +48,7 @@ def _clamp_limit(value: Optional[int], default: int, max_value: int) -> int:
         return default
     try:
         v = int(value)
-    except Exception:
+    except (ValueError, TypeError):
         return default
     v = max(1, v)
     return min(v, max_value)
@@ -164,7 +164,7 @@ async def create_post(
         return internal_error("Failed to create post")
     except PrismaError:
         return internal_error("Failed to create post")
-    except Exception:
+    except (TypeError, AttributeError, KeyError):
         return internal_error("Failed to create post")
 
 
@@ -435,7 +435,7 @@ async def update_post(
                     continue
                 try:
                     file_index = int(file_index_raw)
-                except Exception:
+                except (ValueError, TypeError):
                     continue
                 if 0 <= file_index < len(saved_photos):
                     resolved_photos.append((saved_photos[file_index]["url"], f"new-{file_index}"))
@@ -527,7 +527,7 @@ async def update_post(
         return internal_error("Failed to update post")
     except PrismaError:
         return internal_error("Failed to update post")
-    except Exception:
+    except (TypeError, AttributeError, KeyError):
         return internal_error("Failed to update post")
 
 
@@ -552,7 +552,7 @@ async def delete_post(
         return {"message": "Post deleted"}
     except PrismaError:
         return internal_error("Failed to delete post")
-    except Exception:
+    except (ValueError, TypeError, AttributeError, KeyError):
         return internal_error("Failed to delete post")
 
 

@@ -41,7 +41,7 @@ def _clamp_limit(value: Optional[int], default: int, max_value: int) -> int:
         return default
     try:
         v = int(value)
-    except Exception:
+    except (ValueError, TypeError):
         return default
     v = max(1, v)
     return min(v, max_value)

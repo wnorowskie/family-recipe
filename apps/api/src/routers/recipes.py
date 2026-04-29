@@ -1,3 +1,4 @@
+import json
 from typing import List, Optional, cast
 
 from fastapi import APIRouter, Depends, Query
@@ -44,14 +45,12 @@ def _parse_courses_from_recipe_details(recipe_details: Optional[object]) -> List
     try:
         courses_raw = recipe_details.courses  # type: ignore[attr-defined]
         if isinstance(courses_raw, str):
-            import json as _json
-
-            parsed = _json.loads(courses_raw)
+            parsed = json.loads(courses_raw)
             if isinstance(parsed, list):
                 return [c for c in parsed if isinstance(c, str) and c in COURSE_VALUES]
         if isinstance(courses_raw, list):
             return [c for c in courses_raw if isinstance(c, str) and c in COURSE_VALUES]
-    except Exception:
+    except (json.JSONDecodeError, TypeError):
         return []
     return []
 
