@@ -1,5 +1,6 @@
 import logging
 
+import jwt
 from fastapi import APIRouter, Depends, Response, status
 from prisma.errors import PrismaError
 
@@ -85,7 +86,7 @@ async def signup(payload: SignupRequest, response: Response):
     except PrismaError as error:
         logger.exception("auth.signup.prisma_error: %s", error)
         return internal_error("Database error during signup")
-    except Exception as error:  # noqa: BLE001
+    except (jwt.PyJWTError, ValueError) as error:
         logger.exception("auth.signup.error: %s", error)
         return internal_error("Failed to signup")
 
@@ -154,7 +155,7 @@ async def login(payload: LoginRequest, response: Response):
     except PrismaError as error:
         logger.exception("auth.login.prisma_error: %s", error)
         return internal_error("Database error during login")
-    except Exception as error:  # noqa: BLE001
+    except (jwt.PyJWTError, ValueError) as error:
         logger.exception("auth.login.error: %s", error)
         return internal_error("Failed to login")
 
@@ -166,9 +167,5 @@ async def me(user: UserResponse = Depends(get_current_user)):
 
 @router.post("/logout", response_model=dict[str, str])
 async def logout(response: Response, user: UserResponse = Depends(get_current_user)):
-    try:
-        clear_session_cookie(response)
-        return {"message": "Logged out successfully"}
-    except Exception as error:  # noqa: BLE001
-        logger.exception("auth.logout.error: %s", error)
-        return internal_error("Failed to logout")
+    clear_session_cookie(response)
+    return {"message": "Logged out successfully"}

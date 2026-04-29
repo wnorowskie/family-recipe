@@ -13,6 +13,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+import jwt
 from fastapi import APIRouter, Depends, Header, Request, Response, status
 from prisma.errors import PrismaError
 
@@ -213,7 +214,10 @@ async def signup(payload: SignupRequest, request: Request, response: Response):
     except PrismaError as error:
         logger.exception("auth_v1.signup.prisma_error: %s", error)
         return internal_error("Database error during signup")
-    except Exception as error:  # noqa: BLE001
+    except (jwt.PyJWTError, ValueError) as error:
+        # JWT mint failure or input-shape errors (e.g. bcrypt rejecting an
+        # over-long password). Genuinely unexpected exceptions propagate so
+        # we get a real stack trace instead of a sanitized 500.
         logger.exception("auth_v1.signup.error: %s", error)
         return internal_error("Failed to signup")
 
@@ -265,7 +269,7 @@ async def login(payload: LoginRequest, request: Request, response: Response):
     except PrismaError as error:
         logger.exception("auth_v1.login.prisma_error: %s", error)
         return internal_error("Database error during login")
-    except Exception as error:  # noqa: BLE001
+    except (jwt.PyJWTError, ValueError) as error:
         logger.exception("auth_v1.login.error: %s", error)
         return internal_error("Failed to login")
 
@@ -396,7 +400,7 @@ async def refresh(
     except PrismaError as error:
         logger.exception("auth_v1.refresh.prisma_error: %s", error)
         return internal_error("Database error during refresh")
-    except Exception as error:  # noqa: BLE001
+    except (jwt.PyJWTError, ValueError) as error:
         logger.exception("auth_v1.refresh.error: %s", error)
         return internal_error("Failed to refresh")
 
@@ -486,6 +490,6 @@ async def session(
     except PrismaError as error:
         logger.exception("auth_v1.session.prisma_error: %s", error)
         return internal_error("Database error during session check")
-    except Exception as error:  # noqa: BLE001
+    except (jwt.PyJWTError, ValueError) as error:
         logger.exception("auth_v1.session.error: %s", error)
         return internal_error("Failed to validate session")

@@ -7,11 +7,15 @@ from .db import connect_db, disconnect_db
 from .errors import ApiError, error_response
 from .routers import auth, comments, family, health, me, posts, profile, reactions, recipes, tags, timeline
 from .routers.v1 import auth as auth_v1
-from .settings import settings
+from .settings import settings, validate_settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fail-fast on misconfigured prod env BEFORE accepting traffic. A bad
+    # config used to surface lazily on the first /v1/auth/login call (silent
+    # 500s); now uvicorn exits non-zero before /health becomes reachable.
+    validate_settings(settings)
     await connect_db()
     try:
         yield
