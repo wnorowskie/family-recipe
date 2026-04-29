@@ -79,7 +79,12 @@ class Settings(BaseSettings):
 
     @property
     def effective_refresh_pepper(self) -> str:
-        """Required pepper; falls back to jwt_secret in non-production."""
+        """Required pepper; falls back to jwt_secret in non-production.
+
+        validate_settings() enforces this at startup in production, but we
+        keep a local raise too: defense-in-depth for code paths that construct
+        Settings outside the lifespan (tests, scripts, future entrypoints).
+        """
         if self.refresh_pepper:
             return self.refresh_pepper
         if self.is_production:
@@ -89,6 +94,57 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_allow_origins.split(",") if o.strip()]
+
+
+# Minimum entropy for HMAC secrets in production. 32 bytes ≈ 256 bits, the
+# standard floor for HMAC-SHA256 keying material.
+_MIN_PROD_SECRET_LEN = 32
+
+
+def validate_settings(s: Settings) -> None:
+    """Fail-fast validation called from main.py's lifespan in production.
+
+    Raises RuntimeError with all problems concatenated so a misconfigured
+    deploy surfaces every issue at once instead of fixing them one at a time.
+    No-op outside production — dev runs intentionally tolerate weak/missing
+    values so a fresh clone works without ceremony.
+    """
+    if not s.is_production:
+        return
+
+    problems: list[str] = []
+
+    if not s.refresh_pepper:
+        problems.append("REFRESH_PEPPER must be set in production")
+    elif len(s.refresh_pepper) < _MIN_PROD_SECRET_LEN:
+        problems.append(
+            f"REFRESH_PEPPER must be at least {_MIN_PROD_SECRET_LEN} characters in production"
+        )
+
+    if len(s.jwt_secret) < _MIN_PROD_SECRET_LEN:
+        problems.append(
+            f"JWT_SECRET must be at least {_MIN_PROD_SECRET_LEN} characters in production"
+        )
+
+    samesite = s.refresh_cookie_samesite.lower()
+    if samesite not in ("lax", "strict"):
+        # SameSite=None requires a documented cross-site need. Frontend and
+        # API are same-origin in prod, so this is almost certainly a misconfig.
+        problems.append(
+            "REFRESH_COOKIE_SAMESITE must be 'lax' or 'strict' in production "
+            f"(got {s.refresh_cookie_samesite!r})"
+        )
+
+    if s.access_token_signing_keys:
+        try:
+            _ = s.signing_keys
+        except ValueError as exc:
+            problems.append(f"ACCESS_TOKEN_SIGNING_KEYS invalid: {exc}")
+
+    if problems:
+        raise RuntimeError(
+            "Invalid production configuration:\n  - " + "\n  - ".join(problems)
+        )
 
 
 settings = Settings()
