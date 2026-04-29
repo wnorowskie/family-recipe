@@ -81,11 +81,14 @@ class Settings(BaseSettings):
     def effective_refresh_pepper(self) -> str:
         """Required pepper; falls back to jwt_secret in non-production.
 
-        In production, validate_settings() guarantees `refresh_pepper` is set
-        at startup, so the fallback branch is unreachable when ENVIRONMENT=production.
+        validate_settings() enforces this at startup in production, but we
+        keep a local raise too: defense-in-depth for code paths that construct
+        Settings outside the lifespan (tests, scripts, future entrypoints).
         """
         if self.refresh_pepper:
             return self.refresh_pepper
+        if self.is_production:
+            raise RuntimeError("REFRESH_PEPPER must be set in production")
         return self.jwt_secret
 
     @property
@@ -98,7 +101,7 @@ class Settings(BaseSettings):
 _MIN_PROD_SECRET_LEN = 32
 
 
-def validate_settings(s: "Settings") -> None:
+def validate_settings(s: Settings) -> None:
     """Fail-fast validation called from main.py's lifespan in production.
 
     Raises RuntimeError with all problems concatenated so a misconfigured

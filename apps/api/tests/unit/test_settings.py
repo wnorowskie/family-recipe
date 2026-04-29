@@ -115,3 +115,14 @@ class TestEffectiveRefreshPepper:
             refresh_pepper=None,
         )
         assert s.effective_refresh_pepper == "dev-secret"
+
+    def test_raises_in_prod_when_pepper_missing(self):
+        """Defense-in-depth: even if validate_settings() is bypassed, prod fails loud."""
+        s = Settings(
+            environment="production",
+            database_url="postgresql://x/y",
+            jwt_secret="x" * 32,
+            refresh_pepper=None,
+        )
+        with pytest.raises(RuntimeError, match="REFRESH_PEPPER must be set"):
+            _ = s.effective_refresh_pepper
