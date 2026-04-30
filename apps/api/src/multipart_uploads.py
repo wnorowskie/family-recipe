@@ -138,11 +138,13 @@ async def process_upload(
 def _strip_exif_and_resize(raw: bytes, content_type: str) -> bytes:
     """Decode, apply EXIF rotation, drop metadata, clamp longest edge to 2048px."""
     try:
-        with Image.open(io.BytesIO(raw)) as img:
+        with Image.open(io.BytesIO(raw)) as opened:
             # ImageOps.exif_transpose applies the EXIF orientation tag and then
             # returns an image whose pixel data already reflects the intended
-            # rotation — necessary because we strip EXIF below.
-            img = ImageOps.exif_transpose(img)
+            # rotation — necessary because we strip EXIF below. Annotated as
+            # Image.Image (not the narrower ImageFile that Image.open returns)
+            # because exif_transpose / convert widen the type.
+            img: Image.Image = ImageOps.exif_transpose(opened)
 
             longest = max(img.size)
             if longest > MAX_LONGEST_EDGE_PX:
@@ -161,11 +163,10 @@ def _strip_exif_and_resize(raw: bytes, content_type: str) -> bytes:
             # Re-encode without saving EXIF/ICC. Pillow does not pass through
             # the original metadata unless we explicitly hand it back, so this
             # is the strip step.
-            save_kwargs: dict[str, object] = {"format": pil_format}
             if pil_format == "JPEG":
-                save_kwargs["quality"] = 90
-                save_kwargs["optimize"] = True
-            img.save(out, **save_kwargs)
+                img.save(out, format="JPEG", quality=90, optimize=True)
+            else:
+                img.save(out, format=pil_format)
             return out.getvalue()
     except (UnidentifiedImageError, OSError, ValueError) as exc:
         raise UploadError("INVALID_IMAGE", "Could not decode image") from exc
