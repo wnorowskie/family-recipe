@@ -12,6 +12,11 @@ Differences from the existing src/uploads.py#save_photo_file:
 - Returns only the opaque storage key — callers resolve URLs at response time.
 - Raises a typed UploadError so handlers can map to 400 VALIDATION_ERROR cleanly.
 
+Scope: this helper validates and stores ONE file per call. The migration plan's
+multi-file post media limits (max 10 files, 50MB total request size) are the
+responsibility of the route adopter (#187) — typically by counting the
+`UploadFile[]` fanout and summing returned `ProcessedUpload.size_bytes`.
+
 Once #187 lands and posts/profile multipart endpoints adopt this helper,
 src/uploads.py#save_photo_file can be deleted.
 """
@@ -114,15 +119,20 @@ async def process_upload(
                 content_type=content_type,
             )
         except (httpx.HTTPError, RuntimeError) as exc:
-            # Fall through to local write — matches the legacy helper's
-            # behaviour. A misconfigured bucket / metadata server in dev
-            # shouldn't 500 the request, but production deployments should
-            # see this in logs.
+            # Dev: a misconfigured bucket / metadata server shouldn't 500 the
+            # request — fall through to local write so a fresh clone works.
+            # Prod: re-raise. A failed GCS write that silently lands on Cloud
+            # Run's ephemeral disk would 404 on the next read; silent-failure.
             logger.warning(
-                "multipart_uploads.gcs.fallback_to_local: %s",
+                "multipart_uploads.gcs.write_failed: %s",
                 exc,
                 exc_info=True,
             )
+            if settings.is_production:
+                raise UploadError(
+                    "STORAGE_UNAVAILABLE",
+                    "Photo storage is temporarily unavailable",
+                ) from exc
 
     upload_dir = Path("public/uploads")
     upload_dir.mkdir(parents=True, exist_ok=True)
@@ -165,6 +175,8 @@ def _strip_exif_and_resize(raw: bytes, content_type: str) -> bytes:
             # is the strip step.
             if pil_format == "JPEG":
                 img.save(out, format="JPEG", quality=90, optimize=True)
+            elif pil_format == "PNG":
+                img.save(out, format="PNG", optimize=True)
             else:
                 img.save(out, format=pil_format)
             return out.getvalue()
@@ -173,8 +185,8 @@ def _strip_exif_and_resize(raw: bytes, content_type: str) -> bytes:
 
 
 async def _store_in_gcs(filename: str, body: bytes, content_type: str) -> None:
-    access_token = await legacy_uploads._get_gcp_access_token()
-    await legacy_uploads._upload_to_gcs(
+    access_token = await legacy_uploads.get_gcp_access_token()
+    await legacy_uploads.upload_to_gcs(
         bucket=settings.uploads_bucket or "",
         object_key=filename,
         buffer=body,

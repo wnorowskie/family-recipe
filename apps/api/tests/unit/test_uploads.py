@@ -10,10 +10,10 @@ from src.uploads import (
     ALLOWED_MIME_TYPES,
     MAX_PHOTO_COUNT,
     _fetch_metadata,
-    _get_gcp_access_token,
+    get_gcp_access_token,
     _sign_string_with_iam,
     _generate_signed_url_v4,
-    _upload_to_gcs,
+    upload_to_gcs,
     create_signed_url_resolver,
     get_signed_upload_url,
     save_photo_file,
@@ -129,7 +129,7 @@ class TestGetGcpAccessToken:
             mock_instance.__aexit__ = AsyncMock(return_value=None)
             mock_client.return_value = mock_instance
 
-            result = await _get_gcp_access_token()
+            result = await get_gcp_access_token()
             assert result == "ya29.test-token"
 
     @pytest.mark.asyncio
@@ -146,7 +146,7 @@ class TestGetGcpAccessToken:
             mock_client.return_value = mock_instance
 
             with pytest.raises(RuntimeError, match="METADATA_TOKEN_MISSING"):
-                await _get_gcp_access_token()
+                await get_gcp_access_token()
 
 
 class TestSignStringWithIam:
@@ -215,7 +215,7 @@ class TestUploadToGcs:
             mock_client.return_value = mock_instance
 
             with patch("src.uploads._encode_rfc3986", side_effect=lambda x: x):
-                await _upload_to_gcs(
+                await upload_to_gcs(
                     bucket="test-bucket",
                     object_key="uploads/test.jpg",
                     buffer=b"fake image data",
@@ -442,9 +442,9 @@ class TestSavePhotoFile:
             mock_settings.uploads_bucket = "test-bucket"
             mock_settings.uploads_signed_url_ttl_seconds = 3600
 
-            with patch("src.uploads._get_gcp_access_token", return_value="token"):
+            with patch("src.uploads.get_gcp_access_token", return_value="token"):
                 with patch("src.uploads._fetch_metadata", return_value="sa@gcp.com"):
-                    with patch("src.uploads._upload_to_gcs") as mock_upload:
+                    with patch("src.uploads.upload_to_gcs") as mock_upload:
                         with patch("src.uploads._generate_signed_url_v4", return_value="https://signed.url"):
                             result = await save_photo_file(mock_file)
 
@@ -459,7 +459,7 @@ class TestSavePhotoFile:
         with patch("src.uploads.settings") as mock_settings:
             mock_settings.uploads_bucket = "test-bucket"
 
-            with patch("src.uploads._get_gcp_access_token", side_effect=Exception("GCP Error")):
+            with patch("src.uploads.get_gcp_access_token", side_effect=Exception("GCP Error")):
                 with patch.object(Path, "mkdir"):
                     with patch.object(Path, "write_bytes"):
                         result = await save_photo_file(mock_file)
@@ -532,7 +532,7 @@ class TestDeleteUploads:
         with patch("src.uploads.settings") as mock_settings:
             mock_settings.uploads_bucket = "test-bucket"
 
-            with patch("src.uploads._get_gcp_access_token", return_value="token"):
+            with patch("src.uploads.get_gcp_access_token", return_value="token"):
                 with patch("src.uploads._encode_rfc3986", side_effect=lambda x: x):
                     with patch("src.uploads.httpx.AsyncClient") as mock_client:
                         mock_instance = AsyncMock()
@@ -553,7 +553,7 @@ class TestDeleteUploads:
         with patch("src.uploads.settings") as mock_settings:
             mock_settings.uploads_bucket = "test-bucket"
 
-            with patch("src.uploads._get_gcp_access_token", side_effect=Exception("GCP Error")):
+            with patch("src.uploads.get_gcp_access_token", side_effect=Exception("GCP Error")):
                 with patch.object(Path, "unlink") as mock_unlink:
                     await delete_uploads(["/uploads/test.jpg"])
 
@@ -669,7 +669,7 @@ class TestGetSignedUploadUrl:
             mock_settings.uploads_bucket = "test-bucket"
             mock_settings.uploads_signed_url_ttl_seconds = 3600
 
-            with patch("src.uploads._get_gcp_access_token", return_value="token"):
+            with patch("src.uploads.get_gcp_access_token", return_value="token"):
                 with patch("src.uploads._fetch_metadata", return_value="sa@gcp.com"):
                     with patch(
                         "src.uploads._generate_signed_url_v4",

@@ -1,11 +1,16 @@
 """Unit tests for src/multipart_uploads.py — issue #181.
 
-Covers each AC checkpoint:
+Covers each AC checkpoint plus the GCS branch:
 - Oversized file → UploadError
 - Allowed mime + size → ProcessedUpload returned, file written to public/uploads
 - EXIF GPS tag absent in the stored image
-- 4000x3000 image is resized to 2048x1500 (longest-edge clamp, aspect preserved)
+- 4000x3000 image is resized to 2048x1536 (longest-edge clamp, aspect preserved)
 - Disallowed mime → UploadError
+- PNG alpha preserved on round-trip
+- Undecodable payload → INVALID_IMAGE
+- GCS branch: happy path calls upload_to_gcs with the right args
+- GCS failure in dev → silent local-disk fallback
+- GCS failure in prod → re-raised as STORAGE_UNAVAILABLE
 """
 
 from __future__ import annotations
@@ -176,3 +181,103 @@ async def test_undecodable_payload_raises_invalid_image():
             upload, max_bytes=multipart_uploads.POSTS_MEDIA_MAX_BYTES, kind="post-media"
         )
     assert exc.value.code == "INVALID_IMAGE"
+
+
+# ---------------------------------------------------------------------------
+# GCS branch — exercised when settings.uploads_bucket is set
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_gcs_happy_path_writes_via_legacy_helpers(monkeypatch, tmp_path):
+    """When uploads_bucket is set, the helper writes to GCS and returns the key."""
+    monkeypatch.setattr(multipart_uploads.settings, "uploads_bucket", "test-bucket")
+
+    captured: dict[str, object] = {}
+
+    async def fake_get_token() -> str:
+        return "fake-token"
+
+    async def fake_upload_to_gcs(**kwargs: object) -> None:
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        multipart_uploads.legacy_uploads, "get_gcp_access_token", fake_get_token
+    )
+    monkeypatch.setattr(
+        multipart_uploads.legacy_uploads, "upload_to_gcs", fake_upload_to_gcs
+    )
+
+    upload = _make_upload(_jpeg_bytes(800, 600), "ok.jpg", "image/jpeg")
+
+    result = await multipart_uploads.process_upload(
+        upload, max_bytes=multipart_uploads.POSTS_MEDIA_MAX_BYTES, kind="post-media"
+    )
+
+    assert isinstance(result, multipart_uploads.ProcessedUpload)
+    assert result.storage_key.endswith(".jpg")
+    assert result.content_type == "image/jpeg"
+
+    # Confirm the GCS path was actually exercised — and with the right args
+    assert captured.get("bucket") == "test-bucket"
+    assert captured.get("object_key") == result.storage_key
+    assert captured.get("content_type") == "image/jpeg"
+    assert isinstance(captured.get("buffer"), bytes)
+    assert captured.get("access_token") == "fake-token"
+
+    # Local-fallback path should NOT have run when GCS succeeded
+    assert not (tmp_path / "public" / "uploads").exists()
+
+
+@pytest.mark.asyncio
+async def test_gcs_failure_in_dev_falls_back_to_local_write(monkeypatch, tmp_path):
+    monkeypatch.setattr(multipart_uploads.settings, "uploads_bucket", "test-bucket")
+    monkeypatch.setattr(multipart_uploads.settings, "environment", "development")
+
+    async def boom(**_kwargs: object) -> None:
+        raise RuntimeError("simulated GCS outage")
+
+    async def fake_get_token() -> str:
+        return "fake-token"
+
+    monkeypatch.setattr(
+        multipart_uploads.legacy_uploads, "get_gcp_access_token", fake_get_token
+    )
+    monkeypatch.setattr(multipart_uploads.legacy_uploads, "upload_to_gcs", boom)
+
+    upload = _make_upload(_jpeg_bytes(400, 400), "ok.jpg", "image/jpeg")
+
+    result = await multipart_uploads.process_upload(
+        upload, max_bytes=multipart_uploads.POSTS_MEDIA_MAX_BYTES, kind="post-media"
+    )
+
+    # In dev, the GCS failure is logged and we silently fall back to local disk.
+    stored = tmp_path / "public" / "uploads" / result.storage_key
+    assert stored.exists(), "dev fallback should have written the file locally"
+
+
+@pytest.mark.asyncio
+async def test_gcs_failure_in_production_raises_storage_unavailable(monkeypatch):
+    monkeypatch.setattr(multipart_uploads.settings, "uploads_bucket", "test-bucket")
+    monkeypatch.setattr(multipart_uploads.settings, "environment", "production")
+
+    async def boom(**_kwargs: object) -> None:
+        raise RuntimeError("simulated GCS outage")
+
+    async def fake_get_token() -> str:
+        return "fake-token"
+
+    monkeypatch.setattr(
+        multipart_uploads.legacy_uploads, "get_gcp_access_token", fake_get_token
+    )
+    monkeypatch.setattr(multipart_uploads.legacy_uploads, "upload_to_gcs", boom)
+
+    upload = _make_upload(_jpeg_bytes(400, 400), "ok.jpg", "image/jpeg")
+
+    # In prod the silent fallback would land on Cloud Run's ephemeral disk
+    # and 404 on the next read — re-raise instead.
+    with pytest.raises(multipart_uploads.UploadError) as exc:
+        await multipart_uploads.process_upload(
+            upload, max_bytes=multipart_uploads.POSTS_MEDIA_MAX_BYTES, kind="post-media"
+        )
+    assert exc.value.code == "STORAGE_UNAVAILABLE"
