@@ -1,9 +1,14 @@
 """Unit tests for src/idempotency.py — X-Request-Id replay (issue #180).
 
-The helper is exercised against a mocked prisma.idempotencykey model. Tests
-cover the four AC checkpoints: missing header is a no-op, same id replays the
-captured (body, status), different ids each run the handler, and the 24-hour
-window expires correctly.
+The helper is exercised against the shared `mock_prisma` fixture from
+tests/conftest.py — same fixture the rest of the suite uses, so future
+model surface changes (added methods, new models) propagate without a
+parallel test-only mock to maintain.
+
+Tests cover the four AC checkpoints: missing header is a no-op, same id
+replays the captured (body, status), different ids each run the handler,
+and the 24-hour window expires correctly. Plus per-user scoping and the
+naive-UTC datetime promotion.
 """
 
 from __future__ import annotations
@@ -15,16 +20,6 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src import idempotency
-
-
-@pytest.fixture
-def mock_idempotency(monkeypatch):
-    fake = SimpleNamespace(
-        find_unique=AsyncMock(return_value=None),
-        upsert=AsyncMock(return_value=None),
-    )
-    monkeypatch.setattr(idempotency.prisma, "idempotencykey", fake, raising=False)
-    return fake
 
 
 async def _do_once_factory():
@@ -39,7 +34,7 @@ async def _do_once_factory():
 
 
 @pytest.mark.asyncio
-async def test_no_request_id_runs_handler_and_skips_store(mock_idempotency):
+async def test_no_request_id_runs_handler_and_skips_store(mock_prisma):
     handler, counter = await _do_once_factory()
 
     body, status = await idempotency.replay_or_record(
@@ -48,12 +43,12 @@ async def test_no_request_id_runs_handler_and_skips_store(mock_idempotency):
 
     assert (body, status) == ({"created": 1}, 201)
     assert counter.calls == 1
-    mock_idempotency.find_unique.assert_not_awaited()
-    mock_idempotency.upsert.assert_not_awaited()
+    mock_prisma.idempotencykey.find_unique.assert_not_awaited()
+    mock_prisma.idempotencykey.upsert.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_first_call_records_then_second_replays_without_running_handler(mock_idempotency):
+async def test_first_call_records_then_second_replays_without_running_handler(mock_prisma):
     handler, counter = await _do_once_factory()
 
     # First call: cache miss → handler runs, result is stored.
@@ -62,7 +57,7 @@ async def test_first_call_records_then_second_replays_without_running_handler(mo
     )
     assert (body1, status1) == ({"created": 1}, 201)
     assert counter.calls == 1
-    assert mock_idempotency.upsert.await_count == 1
+    assert mock_prisma.idempotencykey.upsert.await_count == 1
 
     # Simulate the row landing in the store: subsequent find_unique returns it.
     stored = SimpleNamespace(
@@ -70,7 +65,7 @@ async def test_first_call_records_then_second_replays_without_running_handler(mo
         statusCode=201,
         createdAt=datetime.now(timezone.utc),
     )
-    mock_idempotency.find_unique = AsyncMock(return_value=stored)
+    mock_prisma.idempotencykey.find_unique = AsyncMock(return_value=stored)
 
     # Second call with same id: replayed from cache; handler not invoked.
     body2, status2 = await idempotency.replay_or_record(
@@ -81,7 +76,7 @@ async def test_first_call_records_then_second_replays_without_running_handler(mo
 
 
 @pytest.mark.asyncio
-async def test_different_request_ids_each_run_the_handler(mock_idempotency):
+async def test_different_request_ids_each_run_the_handler(mock_prisma):
     handler, counter = await _do_once_factory()
 
     body1, _ = await idempotency.replay_or_record(
@@ -97,7 +92,7 @@ async def test_different_request_ids_each_run_the_handler(mock_idempotency):
 
 
 @pytest.mark.asyncio
-async def test_idempotency_is_per_user(mock_idempotency):
+async def test_idempotency_is_per_user(mock_prisma):
     """User A's request id must not collide with user B's same id."""
     handler, counter = await _do_once_factory()
 
@@ -109,12 +104,12 @@ async def test_idempotency_is_per_user(mock_idempotency):
     # Second call with the same request id but a different user: the helper
     # must look up via the (user_id, request_id) composite, so the userB
     # find_unique returns None and the handler runs again.
-    mock_idempotency.find_unique = AsyncMock(return_value=None)
+    mock_prisma.idempotencykey.find_unique = AsyncMock(return_value=None)
     await idempotency.replay_or_record(user_id="userB", request_id="shared", do=handler)
     assert counter.calls == 2
 
     # Confirm both lookups went through the composite-key path.
-    calls = mock_idempotency.find_unique.await_args_list
+    calls = mock_prisma.idempotencykey.find_unique.await_args_list
     assert all(
         "userId_requestId" in call.kwargs.get("where", {})
         for call in calls
@@ -122,7 +117,7 @@ async def test_idempotency_is_per_user(mock_idempotency):
 
 
 @pytest.mark.asyncio
-async def test_stored_row_older_than_window_is_treated_as_miss(mock_idempotency):
+async def test_stored_row_older_than_window_is_treated_as_miss(mock_prisma):
     """A row past REPLAY_WINDOW must NOT replay; the handler runs again."""
     handler, counter = await _do_once_factory()
 
@@ -131,7 +126,7 @@ async def test_stored_row_older_than_window_is_treated_as_miss(mock_idempotency)
         statusCode=201,
         createdAt=datetime.now(timezone.utc) - idempotency.REPLAY_WINDOW - timedelta(seconds=1),
     )
-    mock_idempotency.find_unique = AsyncMock(return_value=stale)
+    mock_prisma.idempotencykey.find_unique = AsyncMock(return_value=stale)
 
     body, status = await idempotency.replay_or_record(
         user_id="u1", request_id="req-old", do=handler
@@ -140,11 +135,11 @@ async def test_stored_row_older_than_window_is_treated_as_miss(mock_idempotency)
     assert body == {"created": 1}
     assert status == 201
     assert counter.calls == 1, "stale row must not short-circuit the handler"
-    mock_idempotency.upsert.assert_awaited_once()
+    mock_prisma.idempotencykey.upsert.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_naive_created_at_from_prisma_is_treated_as_utc(mock_idempotency):
+async def test_naive_created_at_from_prisma_is_treated_as_utc(mock_prisma):
     """Python Prisma client returns naive datetimes; the helper must promote to aware UTC."""
     handler, counter = await _do_once_factory()
 
@@ -153,7 +148,7 @@ async def test_naive_created_at_from_prisma_is_treated_as_utc(mock_idempotency):
         statusCode=201,
         createdAt=datetime.now(timezone.utc).replace(tzinfo=None),  # naive — no tzinfo
     )
-    mock_idempotency.find_unique = AsyncMock(return_value=fresh_naive)
+    mock_prisma.idempotencykey.find_unique = AsyncMock(return_value=fresh_naive)
 
     body, status = await idempotency.replay_or_record(
         user_id="u1", request_id="req-naive", do=handler

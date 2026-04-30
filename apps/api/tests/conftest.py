@@ -123,24 +123,29 @@ def mock_prisma(mocker):
             # ... test code
     """
     mock = MagicMock()
-    
+
     # Set up common async methods
-    for model in ["user", "post", "comment", "reaction", "favorite", 
-                  "cookedevent", "familyspace", "familymembership", "tag"]:
+    for model in ["user", "post", "comment", "reaction", "favorite",
+                  "cookedevent", "familyspace", "familymembership", "tag",
+                  "idempotencykey"]:
         model_mock = MagicMock()
         model_mock.find_unique = AsyncMock(return_value=None)
         model_mock.find_first = AsyncMock(return_value=None)
         model_mock.find_many = AsyncMock(return_value=[])
         model_mock.create = AsyncMock(return_value=None)
         model_mock.update = AsyncMock(return_value=None)
+        model_mock.upsert = AsyncMock(return_value=None)
         model_mock.delete = AsyncMock(return_value=None)
         model_mock.delete_many = AsyncMock(return_value=None)
         model_mock.count = AsyncMock(return_value=0)
         setattr(mock, model, model_mock)
-    
-    # Patch the prisma instance in the db module
+
+    # Patch the prisma instance in the db module AND any module that
+    # captured a reference at import time (e.g. `from .db import prisma`
+    # in src/idempotency.py rebinds prisma into that module's namespace).
     mocker.patch("src.db.prisma", mock)
-    
+    mocker.patch("src.idempotency.prisma", mock)
+
     return mock
 
 

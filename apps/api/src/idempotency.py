@@ -27,10 +27,37 @@ idempotency is opt-in per request, never enforced when the header is absent.
 When the same `(user_id, request_id)` pair is seen within 24h, the original
 `(body, status_code)` is replayed without re-running the handler.
 
-The replay window is enforced at read time (rows older than 24h are ignored
-and a fresh one is written), so we don't need a background pruner. A periodic
-delete sweep can be added later if the table grows uncomfortably; the
-`(created_at)` index is in place for that.
+## TTL strategy: passive overwrite, not lazy delete
+
+Stale rows are not deleted. The replay window is enforced at *read* time:
+when a row older than 24h is found, the helper ignores it and runs the
+handler again, then `upsert`s — overwriting the stale row with the new
+`(status, body, created_at)` under the same `(user_id, request_id)` key.
+
+Net effect on table size is the same as lazy delete (bounded by the
+active key set, not history) but no DELETE is ever issued. A periodic
+sweep can be added later if the active key set itself grows
+uncomfortably; the `(created_at)` index is in place for that.
+
+## Concurrent-handler race (acknowledged limitation)
+
+The helper protects against duplicate `idempotency_keys` rows but does
+NOT serialize concurrent handler executions. If two retries with the
+same `(user_id, request_id)` arrive within milliseconds of each other:
+
+1. Both call `find_unique` and miss (no row yet).
+2. Both call `do()` — the underlying handler runs twice, potentially
+   creating two rows in *its* table (post, comment, etc.).
+3. Both call `upsert` — the second overwrites the first idempotency-key
+   row, which is harmless but means the cached body matches whichever
+   call landed second.
+
+For the Phase 3 family-only scope this is acceptable: the SPA's retry
+policy is sequential (retry on 5xx after timeout), not concurrent. If a
+write endpoint later takes the helper into a high-traffic / financial
+context, swap the find→upsert dance for `INSERT ... ON CONFLICT DO
+NOTHING RETURNING` (Postgres-native row-level lock) before relying on
+it for at-most-once semantics.
 """
 
 from __future__ import annotations
@@ -67,15 +94,20 @@ async def replay_or_record(
 
     if existing is not None:
         # Stale row past the replay window — ignore it. We let the new request
-        # run, then upsert below to overwrite the old capture.
+        # run, then upsert below to overwrite the old capture (passive TTL —
+        # see module docstring; we never DELETE).
         if datetime.now(timezone.utc) - _aware(existing.createdAt) <= REPLAY_WINDOW:
             return existing.responseBody, existing.statusCode
 
     body, status_code = await do()
 
     # Upsert: a parallel duplicate may have raced ahead of us between the
-    # find_unique and the create. Whichever write lands first wins; subsequent
-    # calls hit the find_unique fast-path on the next request.
+    # find_unique and the create — whichever write lands first wins for the
+    # idempotency-key row, and subsequent calls hit the find_unique fast-path.
+    #
+    # NOTE: this protects the key row from duplicate-PK errors but does NOT
+    # protect the handler from running twice in a tight retry race. See the
+    # module docstring (Concurrent-handler race) for the full rationale.
     await prisma.idempotencykey.upsert(
         where={"userId_requestId": {"userId": user_id, "requestId": request_id}},
         data={
