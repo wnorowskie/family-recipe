@@ -9,4 +9,4 @@ python-dotenv==1.2.2
 httpx==0.27.2
 rsa==4.9
 python-multipart==0.0.26
-Pillow==11.3.0
+Pillow==12.2.0
