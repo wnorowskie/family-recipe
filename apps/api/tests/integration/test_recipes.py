@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock
 import pytest
 from prisma.errors import PrismaError
 
+from tests.helpers.error_envelope import assert_error_envelope
+
 
 pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership")
 
@@ -453,7 +455,7 @@ def test_browse_recipes_sort_rating_rejects_invalid_pattern(client, mock_prisma,
 
     response = client.get("/recipes?sort=popularity", headers=member_auth)
 
-    assert response.status_code == 422
+    assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
 
 
 def test_browse_recipes_sort_rating_caps_candidate_fetch(client, mock_prisma, member_auth):
