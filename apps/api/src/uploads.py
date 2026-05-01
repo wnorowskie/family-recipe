@@ -43,7 +43,7 @@ async def _fetch_metadata(pathname: str) -> str:
     return response.text
 
 
-async def _get_gcp_access_token() -> str:
+async def get_gcp_access_token() -> str:
     async with httpx.AsyncClient() as client:
         response = await client.get(
             "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
@@ -137,7 +137,7 @@ async def _generate_signed_url_v4(
     return f"{GCS_API_BASE}{canonical_uri}?{canonical_query}&X-Goog-Signature={signature}"
 
 
-async def _upload_to_gcs(
+async def upload_to_gcs(
     bucket: str,
     object_key: str,
     buffer: bytes,
@@ -179,11 +179,11 @@ async def save_photo_file(file: UploadFile) -> SavedUpload:
 
     if settings.uploads_bucket:
         try:
-            access_token = await _get_gcp_access_token()
+            access_token = await get_gcp_access_token()
             service_account_email = await _fetch_metadata("instance/service-accounts/default/email")
             private_key = os.environ.get("GCS_SIGNING_PRIVATE_KEY")
 
-            await _upload_to_gcs(
+            await upload_to_gcs(
                 bucket=settings.uploads_bucket,
                 object_key=filename,
                 buffer=contents,
@@ -218,7 +218,7 @@ async def delete_uploads(urls: List[Union[str, None, float, int]]) -> None:
         return
     if settings.uploads_bucket:
         try:
-            access_token = await _get_gcp_access_token()
+            access_token = await get_gcp_access_token()
             async with httpx.AsyncClient() as client:
                 for url in filtered:
                     try:
@@ -257,7 +257,7 @@ async def get_signed_upload_url(storage_key: Optional[str]) -> Optional[str]:
     if not settings.uploads_bucket:
         return f"/uploads/{storage_key}"
 
-    access_token = await _get_gcp_access_token()
+    access_token = await get_gcp_access_token()
     service_account_email = await _fetch_metadata("instance/service-accounts/default/email")
     private_key = os.environ.get("GCS_SIGNING_PRIVATE_KEY")
 
