@@ -29,3 +29,11 @@ def test_health_response_shape(client):
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_v1_alias_serves_same_response_as_legacy_path(client):
+    legacy = client.get("/health")
+    v1 = client.get("/v1/health")
+
+    assert legacy.status_code == v1.status_code == 200
+    assert legacy.json() == v1.json()
