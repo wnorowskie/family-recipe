@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from src.security import COOKIE_MAX_AGE_EXTENDED
 from tests.helpers.auth import make_auth_cookie
+from tests.helpers.error_envelope import assert_error_envelope
 from tests.helpers.test_data import make_mock_family_space, make_mock_membership, make_mock_user
 
 
@@ -19,7 +20,7 @@ class TestAuthMe:
     def test_me_unauthenticated(self, client):
         response = client.get("/auth/me")
 
-        assert response.status_code == 401
+        assert_error_envelope(response, status_code=401, code="UNAUTHORIZED")
 
     def test_me_authenticated(self, client, mock_prisma, mock_user, mock_family_space):
         membership = make_mock_membership(
@@ -212,7 +213,7 @@ class TestAuthLogin:
             json={"emailOrUsername": "ab", "password": "123"},
         )
 
-        assert response.status_code == 422
+        assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
 
     def test_login_user_not_found(self, client, mock_prisma):
         mock_prisma.user.find_first.return_value = None
