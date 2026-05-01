@@ -15,6 +15,7 @@ MODEL_NAMES = [
     "familymembership",
     "tag",
     "refreshtoken",
+    "idempotencykey",
 ]
 
 
@@ -26,6 +27,7 @@ def _make_model_mock() -> MagicMock:
     model_mock.create = AsyncMock(return_value=None)
     model_mock.update = AsyncMock(return_value=None)
     model_mock.update_many = AsyncMock(return_value=None)
+    model_mock.upsert = AsyncMock(return_value=None)
     model_mock.delete = AsyncMock(return_value=None)
     model_mock.delete_many = AsyncMock(return_value=None)
     model_mock.count = AsyncMock(return_value=0)
@@ -72,6 +74,7 @@ def reset_mock_prisma(mock_prisma: MagicMock) -> None:
             "create",
             "update",
             "update_many",
+            "upsert",
             "delete",
             "delete_many",
             "count",

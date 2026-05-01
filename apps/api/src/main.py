@@ -41,16 +41,32 @@ if settings.cors_origins_list:
     )
 
 
-app.include_router(health.router)
+# Per the migration plan, every endpoint is reachable under `/v1`. Each
+# resource router is included twice — once at its native prefix (the
+# un-prefixed alias kept for the duration of the rollout) and once under `/v1`.
+# The aliases sunset after the Phase 4 cutover (#38).
+#
+# `auth.router` is the legacy session-cookie auth path and is NOT dual-included
+# — `/v1/auth/*` is owned by `auth_v1.router`, which implements the
+# token+refresh flow and is a deliberate behavioural divergence from
+# `auth.router`, not a path alias.
+_DUAL_INCLUDED_ROUTERS = (
+    health.router,
+    posts.router,
+    comments.comments_router,
+    comments.delete_router,
+    reactions.router,
+    timeline.router,
+    recipes.router,
+    profile.router,
+    family.router,
+    tags.router,
+    me.router,
+)
+
+for _router in _DUAL_INCLUDED_ROUTERS:
+    app.include_router(_router)
+    app.include_router(_router, prefix="/v1")
+
 app.include_router(auth.router)
 app.include_router(auth_v1.router)
-app.include_router(posts.router)
-app.include_router(comments.comments_router)
-app.include_router(comments.delete_router)
-app.include_router(reactions.router)
-app.include_router(timeline.router)
-app.include_router(recipes.router)
-app.include_router(profile.router)
-app.include_router(family.router)
-app.include_router(tags.router)
-app.include_router(me.router)
