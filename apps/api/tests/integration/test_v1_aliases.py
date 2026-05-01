@@ -26,6 +26,11 @@ V1_ONLY_PATHS: frozenset[str] = frozenset(
     {
         "/v1/auth/refresh",
         "/v1/auth/session",
+        # /v1/notifications/* (issue #182) is Bearer-token only — never had a
+        # cookie-auth Next twin behind FastAPI, so no unprefixed alias.
+        "/v1/notifications",
+        "/v1/notifications/mark-read",
+        "/v1/notifications/unread-count",
     }
 )
 

@@ -7,6 +7,7 @@ from .db import connect_db, disconnect_db
 from .errors import ApiError, error_response
 from .routers import auth, comments, family, health, me, posts, profile, reactions, recipes, tags, timeline
 from .routers.v1 import auth as auth_v1
+from .routers.v1 import notifications as notifications_v1
 from .settings import settings, validate_settings
 
 
@@ -70,3 +71,8 @@ for _router in _DUAL_INCLUDED_ROUTERS:
 
 app.include_router(auth.router)
 app.include_router(auth_v1.router)
+# `/v1/notifications/*` is owned exclusively by the v1 namespace — Bearer
+# auth, no cookie-auth twin. The Phase 2 frontend only hits these endpoints
+# when `USE_FASTAPI_AUTH` is on (and is therefore already sending access
+# tokens); a dual-mounted unprefixed cookie-auth alias would have no caller.
+app.include_router(notifications_v1.router)

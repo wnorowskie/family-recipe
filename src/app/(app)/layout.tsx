@@ -27,11 +27,12 @@ export default async function AppLayout({
       redirect('/login');
     }
 
-    // Notifications still read directly from Prisma in Phase 2 — see issue #171
-    // for the follow-up to move this onto a /v1 FastAPI endpoint.
-    const initialUnreadCount = await prisma.notification.count({
-      where: { recipientId: result.user.id, readAt: null },
-    });
+    // Flag-on path: defer the unread-count fetch to <NotificationBell>'s
+    // client-side effect, which calls /v1/notifications/unread-count via
+    // apiClient with the in-memory access token. The badge briefly shows 0
+    // before the first tick replaces it — acceptable trade-off vs. minting a
+    // server-side access token (which would rotate the refresh chain on
+    // every layout render, defeating the /session split from #173).
 
     return (
       <AuthBootstrap>
@@ -47,7 +48,7 @@ export default async function AppLayout({
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <NotificationBell initialCount={initialUnreadCount} />
+                <NotificationBell initialCount={0} />
                 <LogoutButton />
               </div>
             </div>
