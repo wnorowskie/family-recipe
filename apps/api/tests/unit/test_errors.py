@@ -9,8 +9,11 @@ from src.errors import (
     forbidden,
     internal_error,
     invalid_credentials,
+    invalid_tag,
     not_found,
+    too_many_photos,
     unauthorized,
+    unsupported_file_type,
     validation_error,
 )
 
@@ -93,3 +96,31 @@ class TestErrorHelpers:
         import json
         body = json.loads(response.body)
         assert body["error"]["code"] == "INTERNAL_ERROR"
+
+    def test_too_many_photos(self):
+        """too_many_photos should return 400 with TOO_MANY_PHOTOS code."""
+        response = too_many_photos("Upload up to 10 photos")
+        assert response.status_code == 400
+        import json
+        body = json.loads(response.body)
+        assert body["error"]["code"] == "TOO_MANY_PHOTOS"
+        assert body["error"]["message"] == "Upload up to 10 photos"
+
+    def test_unsupported_file_type(self):
+        """unsupported_file_type should return 400 with UNSUPPORTED_FILE_TYPE code."""
+        response = unsupported_file_type("Only JPEG/PNG/WEBP/GIF allowed")
+        assert response.status_code == 400
+        import json
+        body = json.loads(response.body)
+        assert body["error"]["code"] == "UNSUPPORTED_FILE_TYPE"
+        assert body["error"]["message"] == "Only JPEG/PNG/WEBP/GIF allowed"
+
+    def test_invalid_tag(self):
+        """invalid_tag should return 400 with INVALID_TAG code."""
+        response = invalid_tag()
+        assert response.status_code == 400
+        import json
+        body = json.loads(response.body)
+        assert body["error"]["code"] == "INVALID_TAG"
+        # Default message comes from the helper.
+        assert "not available" in body["error"]["message"].lower()
