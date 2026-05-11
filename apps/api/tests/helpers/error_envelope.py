@@ -23,6 +23,12 @@ VALID_ERROR_CODES = {
     "CONFLICT",
     "RATE_LIMITED",
     "INTERNAL_ERROR",
+    # Photo-upload validation codes the frontend keys off — narrower than
+    # VALIDATION_ERROR so client UX can disambiguate (matches the Next handlers
+    # in src/app/api/posts/[postId]/route.ts and src/lib/uploads.ts).
+    "TOO_MANY_PHOTOS",
+    "UNSUPPORTED_FILE_TYPE",
+    "INVALID_TAG",
 }
 
 

@@ -7,7 +7,15 @@ from prisma.errors import PrismaError
 
 from ..db import prisma
 from ..dependencies import get_current_user
-from ..errors import conflict, forbidden, internal_error, not_found
+from ..errors import (
+    forbidden,
+    internal_error,
+    invalid_tag,
+    not_found,
+    too_many_photos,
+    unsupported_file_type,
+    validation_error,
+)
 from ..permissions import can_edit_post
 from ..schemas.auth import UserResponse
 from ..schemas.posts import CookedRequest, CreatePostRequest, FavoriteResponse, UpdatePostRequest
@@ -112,7 +120,7 @@ async def create_post(
         try:
             payload_data = json.loads(payload)
         except json.JSONDecodeError:
-            return conflict("Payload must be valid JSON")
+            return validation_error("Payload must be valid JSON")
 
         post_payload = CreatePostRequest.model_validate(payload_data)
         tag_names = post_payload.recipe.tags if post_payload.recipe and post_payload.recipe.tags else []
@@ -121,12 +129,14 @@ async def create_post(
         recipe_data = _build_recipe_data(post_payload.recipe.model_dump() if post_payload.recipe else None)
 
         if len(photos) > MAX_PHOTO_COUNT:
-            return conflict(f"You can upload up to {MAX_PHOTO_COUNT} photos")
+            return too_many_photos(f"You can upload up to {MAX_PHOTO_COUNT} photos")
 
         saved_photos = []
         for upload in photos:
             if (upload.content_type or "") not in ALLOWED_MIME_TYPES:
-                return conflict("Only JPEG, PNG, WEBP, or GIF images are allowed")
+                return unsupported_file_type(
+                    "Only JPEG, PNG, WEBP, or GIF images are allowed"
+                )
             saved_photos.append(await save_photo_file(upload))
 
         created = await prisma.post.create(
@@ -160,7 +170,7 @@ async def create_post(
         return {"post": created}
     except ValueError as exc:
         if str(exc) == "INVALID_TAG":
-            return conflict("One or more tags are not available")
+            return invalid_tag("One or more tags are not available")
         return internal_error("Failed to create post")
     except PrismaError:
         return internal_error("Failed to create post")
@@ -399,7 +409,7 @@ async def update_post(
         try:
             payload_data = json.loads(payload)
         except json.JSONDecodeError:
-            return conflict("Payload must be valid JSON")
+            return validation_error("Payload must be valid JSON")
 
         update_payload = UpdatePostRequest.model_validate(payload_data)
         photo_order: List[Dict[str, Any]] = payload_data.get("photoOrder") or []
@@ -409,7 +419,7 @@ async def update_post(
         recipe_data = _build_recipe_data(update_payload.recipe.model_dump() if update_payload.recipe else None)
 
         if len(photo_order) > MAX_PHOTO_COUNT:
-            return conflict(f"You can include up to {MAX_PHOTO_COUNT} photos")
+            return too_many_photos(f"You can include up to {MAX_PHOTO_COUNT} photos")
 
         saved_photos = [await save_photo_file(upload) for upload in photos]
 
@@ -452,7 +462,7 @@ async def update_post(
                 resolved_photos.append((photo["url"], key))
 
         if len(resolved_photos) > MAX_PHOTO_COUNT:
-            return conflict(f"You can include up to {MAX_PHOTO_COUNT} photos")
+            return too_many_photos(f"You can include up to {MAX_PHOTO_COUNT} photos")
 
         keep_existing_ids = {src for _, src in resolved_photos if not src.startswith("new-")}
         removed_urls = [p.url for p in post.photos if p.id not in keep_existing_ids]
@@ -523,7 +533,7 @@ async def update_post(
         return refreshed or not_found("Post not found")
     except ValueError as exc:
         if str(exc) == "INVALID_TAG":
-            return conflict("One or more tags are not available")
+            return invalid_tag("One or more tags are not available")
         return internal_error("Failed to update post")
     except PrismaError:
         return internal_error("Failed to update post")

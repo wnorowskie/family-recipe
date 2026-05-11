@@ -55,5 +55,33 @@ def conflict(message: str = "Conflict") -> JSONResponse:
     return error_response("CONFLICT", message, 409)
 
 
+def too_many_photos(message: str = "Too many photos") -> JSONResponse:
+    """400 — caller exceeded the per-post photo count cap.
+
+    Dedicated code so the frontend can key off `TOO_MANY_PHOTOS` (matches the
+    Next handler in src/app/api/posts/[postId]/route.ts) rather than the
+    generic VALIDATION_ERROR bucket.
+    """
+    return error_response("TOO_MANY_PHOTOS", message, 400)
+
+
+def unsupported_file_type(message: str = "Unsupported file type") -> JSONResponse:
+    """400 — uploaded file's MIME type is not in the allowlist.
+
+    Dedicated code so the frontend can key off `UNSUPPORTED_FILE_TYPE` (matches
+    the Next handler) rather than the generic VALIDATION_ERROR bucket.
+    """
+    return error_response("UNSUPPORTED_FILE_TYPE", message, 400)
+
+
+def invalid_tag(message: str = "One or more tags are not available") -> JSONResponse:
+    """400 — one or more requested tag names did not resolve to a Tag row.
+
+    Dedicated code so the frontend can key off `INVALID_TAG` (matches the Next
+    handler) rather than the generic VALIDATION_ERROR bucket.
+    """
+    return error_response("INVALID_TAG", message, 400)
+
+
 def internal_error(message: str = "Internal server error") -> JSONResponse:
     return error_response("INTERNAL_ERROR", message, 500)

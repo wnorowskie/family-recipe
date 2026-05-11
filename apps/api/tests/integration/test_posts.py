@@ -11,6 +11,7 @@ from prisma.errors import PrismaError
 import pytest
 
 from src.uploads import MAX_PHOTO_COUNT
+from tests.helpers.error_envelope import assert_error_envelope
 
 pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership")
 POST_ID = "ckpost1234567890123456789"
@@ -129,33 +130,67 @@ class TestCreatePost:
         tag_names = [t["tag"]["name"] for t in response.json()["post"]["tags"]]
         assert tag_names == ["spicy", "quick"]
 
-    def test_create_post_invalid_tag_409(self, client, mock_prisma, member_auth):
+    def test_create_post_invalid_tag_400(self, client, mock_prisma, member_auth):
+        # Matches Next handler at src/app/api/posts/route.ts: 400 INVALID_TAG
+        # ("One or more tags are not available"). Previously 409 CONFLICT on
+        # the FastAPI side; aligned in #200.
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
 
         payload = {"title": "Bad Tags", "recipe": {"tags": ["missing"]}}
         response = client.post("/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
 
-        assert response.status_code == 409, response.json()
-        assert response.json()["error"]["code"] == "CONFLICT"
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="INVALID_TAG",
+            message_contains="not available",
+        )
 
-    def test_create_post_max_photos_exceeded_409(self, client, member_auth):
+    def test_create_post_max_photos_exceeded_400(self, client, member_auth):
+        # Matches Next PATCH handler's TOO_MANY_PHOTOS (the Next POST handler
+        # uses BAD_REQUEST, but TOO_MANY_PHOTOS is what the frontend keys off
+        # — see src/app/api/posts/[postId]/route.ts).
         files = [("photos", (f"p{i}.jpg", b"data", "image/jpeg")) for i in range(MAX_PHOTO_COUNT + 1)]
         payload = {"title": "Too many"}
 
         response = client.post("/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth)
 
-        assert response.status_code == 409
-        assert "upload up to" in response.json()["error"]["message"].lower()
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="TOO_MANY_PHOTOS",
+            message_contains="upload up to",
+        )
 
-    def test_create_post_invalid_mime_type_409(self, client, mock_prisma, member_auth):
+    def test_create_post_invalid_mime_type_400(self, client, mock_prisma, member_auth):
+        # Matches Next handler's UNSUPPORTED_FILE_TYPE
+        # (src/app/api/posts/route.ts catches savePhotoFile's throw).
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
         payload = {"title": "Bad mime"}
         files = [("photos", ("bad.txt", b"data", "text/plain"))]
 
         response = client.post("/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth)
 
-        assert response.status_code == 409
-        assert "only jpeg" in response.json()["error"]["message"].lower()
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="UNSUPPORTED_FILE_TYPE",
+            message_contains="only jpeg",
+        )
+
+    def test_create_post_malformed_payload_json_400(self, client, member_auth):
+        # Previously 409 CONFLICT; aligned to 400 VALIDATION_ERROR in #200 so
+        # malformed JSON returns the canonical bad-input envelope.
+        response = client.post(
+            "/posts", data={"payload": "{not-json"}, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="VALIDATION_ERROR",
+            message_contains="valid json",
+        )
 
     def test_create_post_requires_auth(self, client):
         payload = {"title": "No auth"}
@@ -645,6 +680,65 @@ class TestUpdatePost:
 
         assert response.status_code == 200, response.json()
         assert response.json()["post"]["lastEditNote"] == "Fixed typo"
+
+    def test_update_post_invalid_tag_400(self, client, mock_prisma, member_auth):
+        # Matches Next PUT handler at src/app/api/posts/[postId]/route.ts: 400
+        # INVALID_TAG when a requested tag name doesn't resolve. Previously
+        # 409 CONFLICT on the FastAPI side; aligned in #200.
+        initial = self._post()
+        mock_prisma.post.find_first = AsyncMock(return_value=initial)
+        mock_prisma.tag.find_many = AsyncMock(return_value=[])  # no tag matches "missing"
+
+        payload = {"title": "Bad Tags", "recipe": {"tags": ["missing"]}}
+        response = client.put(
+            f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="INVALID_TAG",
+            message_contains="not available",
+        )
+
+    def test_update_post_photo_order_exceeds_max_400(self, client, mock_prisma, member_auth):
+        # Matches Next PUT handler's TOO_MANY_PHOTOS guard on `photoOrder`
+        # length. Previously 409 CONFLICT on the FastAPI side; aligned in #200.
+        initial = self._post()
+        mock_prisma.post.find_first = AsyncMock(return_value=initial)
+
+        payload = {
+            "title": "Too many ordered",
+            "photoOrder": [
+                {"type": "new", "fileIndex": i} for i in range(MAX_PHOTO_COUNT + 1)
+            ],
+        }
+        response = client.put(
+            f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="TOO_MANY_PHOTOS",
+            message_contains="include up to",
+        )
+
+    def test_update_post_malformed_payload_json_400(self, client, mock_prisma, member_auth):
+        # Previously 409 CONFLICT; aligned to 400 VALIDATION_ERROR in #200.
+        initial = self._post()
+        mock_prisma.post.find_first = AsyncMock(return_value=initial)
+
+        response = client.put(
+            f"/posts/{POST_ID}", data={"payload": "{not-json"}, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="VALIDATION_ERROR",
+            message_contains="valid json",
+        )
 
     def test_update_post_requires_auth(self, client):
         payload = {"title": "No auth"}
