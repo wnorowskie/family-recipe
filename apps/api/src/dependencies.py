@@ -1,21 +1,26 @@
-from fastapi import HTTPException, Request, status
+from fastapi import Request, status
 
 from .db import prisma
+from .errors import ApiError
 from .schemas.auth import UserResponse
 from .security import verify_token
 from .settings import settings
 from .uploads import get_signed_upload_url
 
 
+def _unauthorized() -> ApiError:
+    return ApiError("UNAUTHORIZED", "Unauthorized", status.HTTP_401_UNAUTHORIZED)
+
+
 async def get_current_user(request: Request) -> UserResponse:
     token = request.cookies.get(settings.cookie_name)
     if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise _unauthorized()
 
     payload = verify_token(token)
 
     if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise _unauthorized()
 
     user = await prisma.user.find_unique(
         where={"id": payload["userId"]},
@@ -28,7 +33,7 @@ async def get_current_user(request: Request) -> UserResponse:
     )
 
     if not user or not user.memberships:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise _unauthorized()
 
     membership = user.memberships[0]
     avatar_url = await get_signed_upload_url(getattr(user, "avatarStorageKey", None))

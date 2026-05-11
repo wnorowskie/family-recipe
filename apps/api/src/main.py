@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import connect_db, disconnect_db
-from .errors import ApiError, error_response
+from .errors import ApiError, error_response, validation_error
 from .routers import auth, comments, family, health, me, posts, profile, reactions, recipes, tags, timeline
 from .routers.v1 import auth as auth_v1
 from .routers.v1 import notifications as notifications_v1
@@ -30,6 +31,15 @@ app = FastAPI(title="Family Recipe API", lifespan=lifespan)
 @app.exception_handler(ApiError)
 async def _api_error_handler(_request: Request, exc: ApiError):
     return error_response(exc.code, exc.message, exc.status_code)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error_handler(_request: Request, _exc: RequestValidationError):
+    # FastAPI's default 422 `{detail: [...]}` shape is not the documented
+    # contract — the migration plan specifies 400 VALIDATION_ERROR for every
+    # endpoint. Per-field detail is intentionally dropped: the envelope is
+    # public surface, the field list is not.
+    return validation_error("Invalid input")
 
 
 if settings.cors_origins_list:
