@@ -231,7 +231,7 @@ export const PUT = withAuth(
         return NextResponse.json(
           {
             error: {
-              code: 'INVALID_JSON',
+              code: 'VALIDATION_ERROR',
               message: 'Payload must be valid JSON',
             },
           },

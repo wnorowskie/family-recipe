@@ -323,7 +323,7 @@ describe('PUT /api/posts/[postId]', () => {
       expect(response.status).toBe(400);
 
       const data = await parseResponseJSON(response);
-      expect(data.error.code).toBe('INVALID_JSON');
+      expect(data.error.code).toBe('VALIDATION_ERROR');
     });
 
     it('requires title', async () => {

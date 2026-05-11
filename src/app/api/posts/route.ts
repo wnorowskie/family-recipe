@@ -11,6 +11,7 @@ import { postCreationLimiter, applyRateLimit } from '@/lib/rateLimit';
 import {
   badRequestError,
   validationError,
+  tooManyPhotosError,
   internalError,
 } from '@/lib/apiErrors';
 
@@ -36,7 +37,7 @@ export const POST = withAuth(async (request, user) => {
     try {
       parsedPayload = JSON.parse(rawPayload);
     } catch {
-      return badRequestError('Payload must be valid JSON');
+      return validationError('Payload must be valid JSON');
     }
 
     const normalizedPayload = normalizePostPayload(parsedPayload);
@@ -65,7 +66,9 @@ export const POST = withAuth(async (request, user) => {
       .filter((entry): entry is File => isFormDataFile(entry));
 
     if (files.length > MAX_PHOTO_COUNT) {
-      return badRequestError(`You can upload up to ${MAX_PHOTO_COUNT} photos`);
+      return tooManyPhotosError(
+        `You can upload up to ${MAX_PHOTO_COUNT} photos`
+      );
     }
 
     const savedPhotos = await Promise.all(
