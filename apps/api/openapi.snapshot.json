@@ -898,8 +898,8 @@
         "description": "Master-key-gated password reset \u2014 mirrors the Next handler at\n`src/app/api/auth/reset/route.ts`.\n\nNo email/token flow: the caller proves identity by supplying the family\nmaster key. Aligned with what's deployed today; a token-based flow is\ndeferred to a future ticket gated on email infrastructure.",
         "properties": {
           "email": {
+            "format": "email",
             "maxLength": 200,
-            "minLength": 3,
             "title": "Email",
             "type": "string"
           },
@@ -939,8 +939,8 @@
       "SignupRequest": {
         "properties": {
           "email": {
+            "format": "email",
             "maxLength": 200,
-            "minLength": 3,
             "title": "Email",
             "type": "string"
           },

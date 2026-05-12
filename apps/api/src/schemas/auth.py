@@ -1,11 +1,17 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class SignupRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    email: str = Field(min_length=3, max_length=200)
+    # `EmailStr` enforces RFC-shape parity with Next's `z.string().email()`
+    # in src/lib/validation.ts, so malformed addresses fail at the validation
+    # boundary (400 VALIDATION_ERROR) instead of reaching the DB lookup.
+    # Side-effect: the validator strips surrounding whitespace and lowercases
+    # the domain part — the handler's existing `.strip()` was already
+    # tolerating whitespace, and domain-case-insensitivity is RFC-correct.
+    email: EmailStr = Field(max_length=200)
     username: str = Field(min_length=3, max_length=30, pattern=r"^[a-zA-Z0-9_]+$")
     password: str = Field(min_length=6, max_length=200)
     familyMasterKey: str = Field(min_length=6, max_length=200)
@@ -13,6 +19,11 @@ class SignupRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
+    # Intentionally a plain `str`, not `EmailStr` — this field accepts
+    # either an email OR a username (see `loginSchema.emailOrUsername` in
+    # src/lib/validation.ts), and `EmailStr` would reject perfectly valid
+    # username logins. The `min_length=3` is a pre-existing divergence
+    # from Next's `z.string().min(1)`, tracked separately in #211.
     emailOrUsername: str = Field(min_length=3, max_length=200)
     password: str = Field(min_length=6, max_length=200)
     rememberMe: bool = False
@@ -44,7 +55,10 @@ class ResetPasswordRequest(BaseModel):
     master key. Aligned with what's deployed today; a token-based flow is
     deferred to a future ticket gated on email infrastructure.
     """
-    email: str = Field(min_length=3, max_length=200)
+    # See `SignupRequest.email` for the rationale on using `EmailStr` —
+    # malformed addresses now fail at validation with 400 VALIDATION_ERROR
+    # instead of falling through to the DB lookup and 401 INVALID_CREDENTIALS.
+    email: EmailStr = Field(max_length=200)
     masterKey: str = Field(min_length=1, max_length=200)
     newPassword: str = Field(min_length=8, max_length=200)
 
