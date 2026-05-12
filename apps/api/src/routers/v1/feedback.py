@@ -121,10 +121,13 @@ async def create_feedback(
             )
         except PrismaError as e:
             logger.exception("feedback.create.prisma_error: %s", e)
-            # Surface as a tuple so replay_or_record returns the 500 body
-            # rather than letting the exception escape. The exception
-            # handler in main.py would also produce a 500 envelope, but
-            # we'd lose the structured log line tying it to this handler.
+            # Return a 500 tuple instead of re-raising so we keep the
+            # structured log line that ties the failure to this handler.
+            # replay_or_record will NOT cache this (status_code >= 500
+            # short-circuits the upsert — see src/idempotency.py docstring
+            # "Server errors (5xx) are NOT cached"), so a subsequent retry
+            # under the same X-Request-Id runs the handler fresh against a
+            # potentially-recovered DB rather than replaying the failure.
             return {"error": {"code": "INTERNAL_ERROR", "message": "Failed to record feedback"}}, 500
 
         logger.info(

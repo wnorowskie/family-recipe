@@ -139,6 +139,69 @@ async def test_stored_row_older_than_window_is_treated_as_miss(mock_prisma):
 
 
 @pytest.mark.asyncio
+async def test_5xx_response_is_not_cached_and_retries_run_fresh(mock_prisma):
+    """A handler that returns 5xx must NOT have its result cached.
+
+    Rationale (see idempotency.py docstring "Server errors (5xx) are NOT
+    cached"): a transient backend failure is not deterministic; caching
+    it would convert a recoverable error into a sticky one for the next
+    24h under the same X-Request-Id.
+    """
+    # First call: handler returns 500. Mock find_unique to miss so we go
+    # through the "no existing row" path.
+    mock_prisma.idempotencykey.find_unique = AsyncMock(return_value=None)
+    counter = SimpleNamespace(calls=0)
+
+    async def flaky_handler():
+        counter.calls += 1
+        if counter.calls == 1:
+            return ({"error": {"code": "INTERNAL_ERROR", "message": "boom"}}, 500)
+        return ({"created": counter.calls}, 201)
+
+    body1, status1 = await idempotency.replay_or_record(
+        user_id="u1", request_id="req-flaky", do=flaky_handler
+    )
+    assert (body1, status1) == (
+        {"error": {"code": "INTERNAL_ERROR", "message": "boom"}}, 500,
+    )
+    # The whole point: upsert must NOT have been called for a 5xx body,
+    # otherwise the retry below would replay the cached 500.
+    mock_prisma.idempotencykey.upsert.assert_not_awaited()
+
+    # Second call with the same id: find_unique still misses (no row was
+    # cached), so the handler runs again and this time succeeds.
+    body2, status2 = await idempotency.replay_or_record(
+        user_id="u1", request_id="req-flaky", do=flaky_handler
+    )
+    assert (body2, status2) == ({"created": 2}, 201)
+    assert counter.calls == 2
+    # The successful 2xx IS cached — upsert runs exactly once across the
+    # two calls (the 5xx call skipped it; the 2xx call recorded it).
+    assert mock_prisma.idempotencykey.upsert.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_4xx_response_is_cached(mock_prisma):
+    """Client errors (4xx) reflect deterministic input/auth state and MUST
+    cache so a retry returns the same envelope rather than letting the
+    client "shake out" a different outcome by hammering the same id."""
+    mock_prisma.idempotencykey.find_unique = AsyncMock(return_value=None)
+    counter = SimpleNamespace(calls=0)
+
+    async def validation_failing_handler():
+        counter.calls += 1
+        return ({"error": {"code": "VALIDATION_ERROR", "message": "bad"}}, 400)
+
+    body, status = await idempotency.replay_or_record(
+        user_id="u1", request_id="req-400", do=validation_failing_handler
+    )
+    assert (body, status) == (
+        {"error": {"code": "VALIDATION_ERROR", "message": "bad"}}, 400,
+    )
+    mock_prisma.idempotencykey.upsert.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_naive_created_at_from_prisma_is_treated_as_utc(mock_prisma):
     """Python Prisma client returns naive datetimes; the helper must promote to aware UTC."""
     handler, counter = await _do_once_factory()
