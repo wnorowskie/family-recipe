@@ -219,10 +219,10 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
   - Success: `200 { items: Recipe[], total }`
   - Errors: `401 UNAUTHORIZED`
 
-- **POST /api/recipes/import` (TBD)`** → **POST /v1/recipes/import` (TBD)`**
-  - Request: `{ url, mapping? }`
-  - Success: `201 { recipe }`
-  - Errors: `400 VALIDATION_ERROR`, `401 UNAUTHORIZED`
+- **POST /api/recipes/import** → **POST /v1/recipes/import**
+  - Request: `{ url }`
+  - Success: `200 { request_id, recipe, confidence, warnings, missing_fields }` — the importer's full RecipeDraft response, returned verbatim. **No DB write happens here**; the SPA uses the result to prefill the create-post form and persistence is downstream via `POST /v1/posts`.
+  - Errors: `400 VALIDATION_ERROR` (bad url / importer's INVALID_URL / BLOCKED_HOST), `401 UNAUTHORIZED`, `408 IMPORT_FAILED` (upstream fetch timeout against target site), `502 IMPORT_FAILED` (upstream fetch failure), `503 SERVICE_UNAVAILABLE` (importer not configured), `504 GATEWAY_TIMEOUT` (per-request budget exceeded).
 
 #### Tags
 
@@ -337,10 +337,10 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ### Non‑Multipart Uploads
 
-- **POST /v1/recipes/import** (TBD)
-  - Standard JSON payload `{ url, mapping? }` (no file upload)
-  - Success: `201 { recipe }`
-  - Errors: `400 VALIDATION_ERROR`, `401 UNAUTHORIZED`
+- **POST /v1/recipes/import**
+  - Standard JSON payload `{ url }` (no file upload)
+  - Success: `200` with the importer's full RecipeDraft passthrough (see Recipes section above for the exact shape)
+  - Errors: `400 VALIDATION_ERROR`, `401 UNAUTHORIZED`, `408 / 502 IMPORT_FAILED`, `503 SERVICE_UNAVAILABLE`, `504 GATEWAY_TIMEOUT`
 
 ### Idempotency & Retries
 

@@ -514,6 +514,23 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "ImportRecipeRequest": {
+        "description": "Mirrors `importRequestSchema` in src/app/api/recipes/import/route.ts.\n\n`HttpUrl` rejects empty strings and non-http(s) schemes; bad input\nsurfaces as 400 VALIDATION_ERROR via the global RequestValidationError\nhandler in main.py. Anything else (length caps, SSRF, etc.) is the\nimporter service's responsibility \u2014 pushing those checks here would\nduplicate the importer's own URL-validation module.",
+        "properties": {
+          "url": {
+            "format": "uri",
+            "maxLength": 2083,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "ImportRecipeRequest",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "emailOrUsername": {
@@ -4273,6 +4290,51 @@
         "summary": "Browse Recipes",
         "tags": [
           "recipes"
+        ]
+      }
+    },
+    "/v1/recipes/import": {
+      "post": {
+        "description": "Proxy a URL to the importer and return its full RecipeDraft response.\n\n`user` is required only as an auth gate \u2014 the importer call carries\nno per-user state and no DB write happens here. The family-scoped\npersistence step lives downstream in `POST /v1/posts`, which the\nfrontend invokes after the user reviews / edits the prefilled form.",
+        "operationId": "import_recipe_v1_recipes_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRecipeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Import Recipe",
+        "tags": [
+          "recipes-import"
         ]
       }
     },

@@ -46,6 +46,23 @@ class Settings(BaseSettings):
     # Token audience claim — clients should verify match.
     jwt_audience: str = "family-recipe-app"
 
+    # ----- Recipe URL importer (issue #185) -----
+    # Mirrors the Next-side env vars in src/lib/recipeImporter.ts so the
+    # FastAPI service can target the same Cloud Run instance during Phase
+    # 4 cutover. All optional — when `recipe_importer_url` is unset the
+    # /v1/recipes/import handler returns 503 SERVICE_UNAVAILABLE rather
+    # than 500, so misconfiguration surfaces clearly in dev.
+    recipe_importer_url: Optional[str] = None
+    recipe_importer_audience: Optional[str] = None  # defaults to URL
+    recipe_importer_service_account_email: str = "default"
+    # Test/dev escape hatch — pre-minted bearer for the importer call
+    # path. When set, skips the GCE metadata-server identity-token fetch.
+    recipe_importer_static_token: Optional[str] = None
+    # Total budget for the importer call. The importer's own SPEC caps at
+    # ~10s including headless; pad it slightly so we surface 504 GATEWAY_TIMEOUT
+    # only when the upstream definitively missed the deadline.
+    recipe_importer_timeout_seconds: float = 12.0
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @field_validator("database_url", "jwt_secret")

@@ -39,6 +39,13 @@ def mock_prisma(monkeypatch):
     monkeypatch.setattr("src.routers.v1.auth.prisma", mock)
     monkeypatch.setattr("src.routers.v1.notifications.prisma", mock)
     monkeypatch.setattr("src.routers.v1.feedback.prisma", mock)
+    # src.routers.v1.recipes (issue #185) doesn't touch prisma directly
+    # — auth happens via dependencies_v1 and the rest is a proxy to the
+    # importer service. The patch is still included so a future
+    # persistence change here surfaces missing test wiring at the
+    # AttributeError stage, not at "test passed but DB query ran".
+    # Note: no module-level `prisma` import in routers/v1/recipes.py,
+    # so setattr would fail. Skip the line until that changes.
     # The idempotency helper reads `prisma` directly from src.idempotency;
     # the feedback router goes through it, so without this patch the
     # X-Request-Id replay test would hit the real (unconnected) prisma

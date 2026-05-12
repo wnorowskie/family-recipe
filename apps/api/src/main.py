@@ -10,6 +10,7 @@ from .routers import auth, comments, family, health, me, posts, profile, reactio
 from .routers.v1 import auth as auth_v1
 from .routers.v1 import feedback as feedback_v1
 from .routers.v1 import notifications as notifications_v1
+from .routers.v1 import recipes as recipes_v1
 from .settings import settings, validate_settings
 
 
@@ -92,3 +93,9 @@ app.include_router(notifications_v1.router)
 # accepts anonymous submissions) until the Phase 4 cutover (#38) — there is
 # no behavioural overlap to alias.
 app.include_router(feedback_v1.router)
+# `/v1/recipes/import` (issue #185): bearer-auth-only proxy to the
+# standalone recipe-url-importer. No dual-mount: the legacy
+# `routers/recipes.py` already serves `/recipes` + `/v1/recipes` for
+# browse/search under cookie auth, and adding the importer there would
+# mix two auth modes on one router. See routers/v1/recipes.py docstring.
+app.include_router(recipes_v1.router)
