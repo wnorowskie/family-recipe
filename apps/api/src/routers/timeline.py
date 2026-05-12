@@ -48,6 +48,10 @@ async def get_timeline(
             include={"user": True, "post": True},
         )
 
+        # `_post_summary` stages raw storage keys here; we resolve them to
+        # signed URLs once per request after sorting/slicing so the resolver's
+        # cache deduplicates repeat keys (e.g. the same post showing up in a
+        # comment + reaction event in the same window).
         def _post_summary(post):
             """Extract only the fields we need from a post object."""
             if not post:
@@ -113,9 +117,14 @@ async def get_timeline(
             return mapping.get(entry_type, "shared")
 
         resolve_avatar = create_signed_url_resolver()
+        # Same resolver caches both avatar keys and post-photo keys.
+        resolve_photo = resolve_avatar
         items = []
         for entry in slice_items:
             actor = entry["actor"]
+            post = entry["post"]
+            if post is not None:
+                post = {**post, "mainPhotoUrl": await resolve_photo(post.get("mainPhotoUrl"))}
             item = {
                 "id": entry["id"],
                 "type": entry["type"],
@@ -125,7 +134,7 @@ async def get_timeline(
                     "name": actor.name,
                     "avatarUrl": await resolve_avatar(getattr(actor, "avatarStorageKey", None)),
                 },
-                "post": entry["post"],
+                "post": post,
                 "actionText": action_text(entry["type"]),
             }
             if "comment" in entry:

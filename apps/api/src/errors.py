@@ -74,6 +74,17 @@ def unsupported_file_type(message: str = "Unsupported file type") -> JSONRespons
     return error_response("UNSUPPORTED_FILE_TYPE", message, 400)
 
 
+def file_too_large(message: str = "File is too large") -> JSONResponse:
+    """400 — single uploaded file (or aggregate payload) exceeded the size cap.
+
+    Matches the Next handler in src/app/api/posts/route.ts which returns
+    `FILE_TOO_LARGE` at 400 (not 413) so the frontend keys off a single code.
+    Used for per-file caps (10MB posts / 5MB avatar) and the aggregate
+    request-size guard from the migration plan (50MB total per post).
+    """
+    return error_response("FILE_TOO_LARGE", message, 400)
+
+
 def invalid_tag(message: str = "One or more tags are not available") -> JSONResponse:
     """400 — one or more requested tag names did not resolve to a Tag row.
 

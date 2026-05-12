@@ -30,6 +30,16 @@ prisma_stub = types.ModuleType("prisma")
 prisma_stub.Prisma = _make_prisma_stub
 errors_stub = types.ModuleType("prisma.errors")
 errors_stub.PrismaError = Exception
+
+
+# Subclass mirrors prisma.errors.UniqueViolationError so tests that raise it
+# from a mocked AsyncMock side_effect get caught by the handler's
+# `except UniqueViolationError` clause and surfaced as 409 CONFLICT.
+class _UniqueViolationError(errors_stub.PrismaError):
+    pass
+
+
+errors_stub.UniqueViolationError = _UniqueViolationError
 models_stub = types.ModuleType("prisma.models")
 
 

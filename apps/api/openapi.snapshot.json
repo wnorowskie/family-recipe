@@ -179,6 +179,120 @@
         "title": "Body_update_post_v1_posts__post_id__put",
         "type": "object"
       },
+      "Body_update_profile_multipart_me_profile_patch": {
+        "properties": {
+          "avatar": {
+            "anyOf": [
+              {
+                "format": "binary",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar"
+          },
+          "currentPassword": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentpassword"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "removeAvatar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removeavatar"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "username"
+        ],
+        "title": "Body_update_profile_multipart_me_profile_patch",
+        "type": "object"
+      },
+      "Body_update_profile_multipart_v1_me_profile_patch": {
+        "properties": {
+          "avatar": {
+            "anyOf": [
+              {
+                "format": "binary",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar"
+          },
+          "currentPassword": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentpassword"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "removeAvatar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removeavatar"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "username"
+        ],
+        "title": "Body_update_profile_multipart_v1_me_profile_patch",
+        "type": "object"
+      },
       "CookedRequest": {
         "properties": {
           "note": {
@@ -1457,7 +1571,46 @@
       }
     },
     "/me/profile": {
+      "patch": {
+        "description": "Update the current user's profile, including optional avatar upload.\n\nMultipart-only (`multipart/form-data`) per parity with\n`src/app/api/me/profile/route.ts`. Field names are flat (not a `payload`\nJSON envelope) to match Next; the migration plan's payload-envelope\nshape is tracked as a follow-up under #188.\n\nBehavior:\n- Validates `name`, `email`, `username` via Pydantic's `UpdateProfileRequest`\n  (same constraints as Next's `updateProfileSchema`).\n- If `email` or `username` differ from the current values, requires a\n  matching `currentPassword` (mirrors Next's `requiresPassword` branch).\n- `avatar` file (\u22645MB, JPEG/PNG/WEBP) writes its storage key to the\n  `avatar_url` column. The canonical schema names this field\n  `avatarStorageKey`; the stale Python Prisma client still calls it\n  `avatarUrl`. We use the codegen name here (see #212 for the regen\n  ticket). The column holds an opaque storage key, not a URL, even\n  though the codegen attribute name is misleading.\n- `removeAvatar=true` clears the column.\n- On sensitive-field change (email or username), the session cookie is\n  cleared so the next request re-authenticates \u2014 matches Next's\n  `clearSessionCookie` call.\n- P2002 unique-constraint violations on email/username surface as\n  `409 CONFLICT` per the Next contract.",
+        "operationId": "update_profile_multipart_me_profile_patch",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_update_profile_multipart_me_profile_patch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Profile Multipart",
+        "tags": [
+          "me"
+        ]
+      },
       "put": {
+        "description": "Legacy JSON profile-update handler. Kept alive for Phase-2 clients.\n\nThe canonical Phase-3 endpoint is `update_profile_multipart` above\n(`PATCH /v1/me/profile`), which mirrors Next's contract (flat form\nfields, multipart body, optional avatar, sensitive-field-change\npassword check, 409 on duplicate). This PUT remains until Phase-4\ncutover removes the legacy non-`/v1/` routes (#38) \u2014 keep behaviour\nhere drift-free of the PATCH unless a deliberate parity change is\nbeing made on both sides.",
         "operationId": "update_profile_me_profile_put",
         "requestBody": {
           "content": {
@@ -1499,6 +1652,7 @@
     },
     "/posts": {
       "post": {
+        "description": "Create a post, optionally with up to MAX_PHOTO_COUNT photos.\n\nMultipart-only (`multipart/form-data`) per Next parity. A request with no\n`photos` parts is the no-media case and is fully supported. As of #187:\nphotos are run through `multipart_uploads.process_upload` (EXIF strip,\nresize to 2048px, JPEG/PNG/WEBP only, 10MB per file, 50MB aggregate);\nthe DB stores opaque storage keys in the `main_photo_url` and `url`\ncolumns. Note the field-name confusion: the canonical Prisma schema\nnames these `mainPhotoStorageKey` and `storageKey` (renamed from\n`mainPhotoUrl`/`url` via `@map`), but the stale Python codegen still\nsurfaces the old names. We use the codegen names here intentionally;\nregen is tracked in #212. URLs are resolved at response time via\n`_load_post_detail`.",
         "operationId": "create_post_posts_post",
         "requestBody": {
           "content": {
@@ -1656,6 +1810,7 @@
         ]
       },
       "put": {
+        "description": "Update a post (and optionally its photos).\n\nMultipart-only; a request with no `photos` parts is the no-media case.\nPhoto handling mirrors `create_post`: new files go through\n`multipart_uploads.process_upload`, the DB stores opaque storage keys,\nURLs are resolved at response time in `_load_post_detail`.\n\nThe `payload` JSON's `photoOrder` field controls which existing photos\nare kept and where new uploads are spliced in (`{type: \"existing\", id}`\nor `{type: \"new\", fileIndex}`). Existing photos that are *not* in\n`photoOrder` and not appended via the overflow loops below are deleted\nfrom storage at the end of the handler.",
         "operationId": "update_post_posts__post_id__put",
         "parameters": [
           {
@@ -3215,7 +3370,46 @@
       }
     },
     "/v1/me/profile": {
+      "patch": {
+        "description": "Update the current user's profile, including optional avatar upload.\n\nMultipart-only (`multipart/form-data`) per parity with\n`src/app/api/me/profile/route.ts`. Field names are flat (not a `payload`\nJSON envelope) to match Next; the migration plan's payload-envelope\nshape is tracked as a follow-up under #188.\n\nBehavior:\n- Validates `name`, `email`, `username` via Pydantic's `UpdateProfileRequest`\n  (same constraints as Next's `updateProfileSchema`).\n- If `email` or `username` differ from the current values, requires a\n  matching `currentPassword` (mirrors Next's `requiresPassword` branch).\n- `avatar` file (\u22645MB, JPEG/PNG/WEBP) writes its storage key to the\n  `avatar_url` column. The canonical schema names this field\n  `avatarStorageKey`; the stale Python Prisma client still calls it\n  `avatarUrl`. We use the codegen name here (see #212 for the regen\n  ticket). The column holds an opaque storage key, not a URL, even\n  though the codegen attribute name is misleading.\n- `removeAvatar=true` clears the column.\n- On sensitive-field change (email or username), the session cookie is\n  cleared so the next request re-authenticates \u2014 matches Next's\n  `clearSessionCookie` call.\n- P2002 unique-constraint violations on email/username surface as\n  `409 CONFLICT` per the Next contract.",
+        "operationId": "update_profile_multipart_v1_me_profile_patch",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_update_profile_multipart_v1_me_profile_patch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Profile Multipart",
+        "tags": [
+          "me"
+        ]
+      },
       "put": {
+        "description": "Legacy JSON profile-update handler. Kept alive for Phase-2 clients.\n\nThe canonical Phase-3 endpoint is `update_profile_multipart` above\n(`PATCH /v1/me/profile`), which mirrors Next's contract (flat form\nfields, multipart body, optional avatar, sensitive-field-change\npassword check, 409 on duplicate). This PUT remains until Phase-4\ncutover removes the legacy non-`/v1/` routes (#38) \u2014 keep behaviour\nhere drift-free of the PATCH unless a deliberate parity change is\nbeing made on both sides.",
         "operationId": "update_profile_v1_me_profile_put",
         "requestBody": {
           "content": {
@@ -3400,6 +3594,7 @@
     },
     "/v1/posts": {
       "post": {
+        "description": "Create a post, optionally with up to MAX_PHOTO_COUNT photos.\n\nMultipart-only (`multipart/form-data`) per Next parity. A request with no\n`photos` parts is the no-media case and is fully supported. As of #187:\nphotos are run through `multipart_uploads.process_upload` (EXIF strip,\nresize to 2048px, JPEG/PNG/WEBP only, 10MB per file, 50MB aggregate);\nthe DB stores opaque storage keys in the `main_photo_url` and `url`\ncolumns. Note the field-name confusion: the canonical Prisma schema\nnames these `mainPhotoStorageKey` and `storageKey` (renamed from\n`mainPhotoUrl`/`url` via `@map`), but the stale Python codegen still\nsurfaces the old names. We use the codegen names here intentionally;\nregen is tracked in #212. URLs are resolved at response time via\n`_load_post_detail`.",
         "operationId": "create_post_v1_posts_post",
         "requestBody": {
           "content": {
@@ -3557,6 +3752,7 @@
         ]
       },
       "put": {
+        "description": "Update a post (and optionally its photos).\n\nMultipart-only; a request with no `photos` parts is the no-media case.\nPhoto handling mirrors `create_post`: new files go through\n`multipart_uploads.process_upload`, the DB stores opaque storage keys,\nURLs are resolved at response time in `_load_post_detail`.\n\nThe `payload` JSON's `photoOrder` field controls which existing photos\nare kept and where new uploads are spliced in (`{type: \"existing\", id}`\nor `{type: \"new\", fileIndex}`). Existing photos that are *not* in\n`photoOrder` and not appended via the overflow loops below are deleted\nfrom storage at the end of the handler.",
         "operationId": "update_post_v1_posts__post_id__put",
         "parameters": [
           {
