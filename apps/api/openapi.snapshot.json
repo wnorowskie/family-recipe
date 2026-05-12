@@ -575,6 +575,48 @@
         "title": "ReactionSummary",
         "type": "object"
       },
+      "ResetPasswordRequest": {
+        "description": "Master-key-gated password reset \u2014 mirrors the Next handler at\n`src/app/api/auth/reset/route.ts`.\n\nNo email/token flow: the caller proves identity by supplying the family\nmaster key. Aligned with what's deployed today; a token-based flow is\ndeferred to a future ticket gated on email infrastructure.",
+        "properties": {
+          "email": {
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "masterKey": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Masterkey",
+            "type": "string"
+          },
+          "newPassword": {
+            "maxLength": 200,
+            "minLength": 8,
+            "title": "Newpassword",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "masterKey",
+          "newPassword"
+        ],
+        "title": "ResetPasswordRequest",
+        "type": "object"
+      },
+      "ResetPasswordResponse": {
+        "description": "Returned by /v1/auth/reset on success \u2014 mirrors the legacy Next\nhandler's `{ status: \"reset\" }` body so existing clients don't have to\nbranch during the Phase 3 \u2192 4 cutover.",
+        "properties": {
+          "status": {
+            "default": "reset",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "ResetPasswordResponse",
+        "type": "object"
+      },
       "SignupRequest": {
         "properties": {
           "email": {
@@ -2292,6 +2334,47 @@
           }
         },
         "summary": "Refresh",
+        "tags": [
+          "auth-v1"
+        ]
+      }
+    },
+    "/v1/auth/reset": {
+      "post": {
+        "operationId": "reset_v1_auth_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetPasswordResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset",
         "tags": [
           "auth-v1"
         ]

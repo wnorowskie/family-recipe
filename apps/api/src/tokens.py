@@ -37,6 +37,9 @@ REVOKED_LOGOUT = "logout"
 REVOKED_LOGOUT_ALL = "logout_all"
 REVOKED_REUSE_DETECTED = "reuse_detected"
 REVOKED_ADMIN = "admin"
+# Distinct from REVOKED_ADMIN so a successful self-service password reset is
+# greppable in audit logs separately from operator-driven revocations.
+REVOKED_PASSWORD_RESET = "password_reset"
 
 VALID_REVOKED_REASONS = {
     REVOKED_ROTATED,
@@ -44,6 +47,7 @@ VALID_REVOKED_REASONS = {
     REVOKED_LOGOUT_ALL,
     REVOKED_REUSE_DETECTED,
     REVOKED_ADMIN,
+    REVOKED_PASSWORD_RESET,
 }
 
 

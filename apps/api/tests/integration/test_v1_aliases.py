@@ -26,6 +26,11 @@ V1_ONLY_PATHS: frozenset[str] = frozenset(
     {
         "/v1/auth/refresh",
         "/v1/auth/session",
+        # /v1/auth/reset (issue #184) is master-key gated and owned by the
+        # token-flow router. The legacy auth.router never had `/auth/reset` —
+        # password reset only ever existed behind the Next route handler, so
+        # there is no unprefixed twin to alias.
+        "/v1/auth/reset",
         # /v1/notifications/* (issue #182) is Bearer-token only — never had a
         # cookie-auth Next twin behind FastAPI, so no unprefixed alias.
         "/v1/notifications",

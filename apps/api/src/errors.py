@@ -39,8 +39,8 @@ def unauthorized(message: str = "Unauthorized") -> JSONResponse:
     return error_response("UNAUTHORIZED", message, 401)
 
 
-def invalid_credentials() -> JSONResponse:
-    return error_response("INVALID_CREDENTIALS", "Invalid credentials", 401)
+def invalid_credentials(message: str = "Invalid credentials") -> JSONResponse:
+    return error_response("INVALID_CREDENTIALS", message, 401)
 
 
 def forbidden(message: str = "Forbidden") -> JSONResponse:
