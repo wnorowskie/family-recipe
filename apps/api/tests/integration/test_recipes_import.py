@@ -327,6 +327,29 @@ class TestUpstreamFailures:
         )
         assert_error_envelope(response, status_code=502, code="IMPORT_FAILED")
 
+    def test_upstream_2xx_shape_violation_surfaces_as_502(
+        self, client, mock_prisma, mock_user, mock_family_space, patch_importer
+    ):
+        """The client maps a 2xx-with-non-dict-body to a synthetic 502
+        (see recipe_importer.py rationale). The route then re-emits it
+        as IMPORT_FAILED at 502 — not the upstream's original 200 status
+        which would produce an incoherent `IMPORT_FAILED 200`."""
+        _seed_user_lookup(mock_prisma, mock_user, mock_family_space)
+        patch_importer(
+            side_effect=ImporterRequestError(
+                "Unexpected importer response shape",
+                502,
+                ["garbage", "array"],
+            )
+        )
+
+        response = client.post(
+            "/v1/recipes/import",
+            headers=_bearer_headers(mock_user.id, mock_family_space.id),
+            json={"url": "https://example.com/recipes/x"},
+        )
+        assert_error_envelope(response, status_code=502, code="IMPORT_FAILED")
+
     def test_upstream_408_passes_through_as_import_failed(
         self, client, mock_prisma, mock_user, mock_family_space, patch_importer
     ):

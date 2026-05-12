@@ -172,12 +172,15 @@ async def import_recipe_from_url(url: str) -> dict:
         raise ImporterRequestError(message, response.status_code, payload)
 
     if not isinstance(payload, dict):
-        # 2xx with a non-object body is a contract break by the
-        # importer; treat like an error rather than passing garbage
-        # through to the SPA.
+        # 2xx with a non-object body is a contract break by the upstream.
+        # Surface as a synthetic 502 BAD_GATEWAY rather than the original
+        # 2xx status — "upstream sent something we can't parse" is exactly
+        # what 502 means semantically. Returning the upstream 2xx here
+        # would propagate as IMPORT_FAILED 200 through the route handler,
+        # which is incoherent (review feedback on PR #208).
         raise ImporterRequestError(
             "Unexpected importer response shape",
-            response.status_code,
+            502,
             payload,
         )
 

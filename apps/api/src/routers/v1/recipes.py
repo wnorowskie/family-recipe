@@ -37,6 +37,11 @@ convention keeps the auth boundary clean.
     envelope is a closed `{code, message}` set per the migration plan
     (and the importer's `warnings` / `missing_fields` are reachable
     again on retry — they're not write-state we'd lose by re-querying).
+  - A 2xx response from the importer with a non-object body is mapped
+    to **502 BAD_GATEWAY** at the client layer (see
+    `recipe_importer.py`) — preserving the upstream 2xx status here
+    would route through as `IMPORT_FAILED 200`, an incoherent pairing
+    of a 200 HTTP code with an error envelope body.
 
 ## No rate-limiting (yet)
 

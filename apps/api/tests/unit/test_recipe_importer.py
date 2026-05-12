@@ -301,11 +301,17 @@ class TestErrorPaths:
         assert exc_info.value.status == 502
 
     @pytest.mark.asyncio
-    async def test_2xx_non_object_body_raises_request_error(
+    async def test_2xx_non_object_body_raises_with_synthetic_502(
         self, monkeypatch, configure_importer, install_transport
     ):
-        """A 200 with a non-dict body breaks the importer contract;
-        treat it as an error so garbage doesn't pass through to the SPA."""
+        """A 2xx with a non-dict body breaks the importer contract.
+
+        We synthesise a 502 BAD_GATEWAY rather than preserve the upstream
+        2xx status — propagating the original 200 would route through
+        the handler as `IMPORT_FAILED 200`, which is incoherent (a 200
+        HTTP response with an error envelope body). 502 is the right
+        signal for "upstream sent something unparseable."
+        """
         monkeypatch.setattr(
             recipe_importer.settings, "recipe_importer_static_token", "tok"
         )
@@ -317,8 +323,8 @@ class TestErrorPaths:
 
         with pytest.raises(ImporterRequestError) as exc_info:
             await import_recipe_from_url("https://example.com/recipe")
-        # Status preserves the upstream 200 — the failure is shape, not status.
-        assert exc_info.value.status == 200
+        # Synthetic 502, NOT the upstream's 200 — see docstring.
+        assert exc_info.value.status == 502
         assert exc_info.value.payload == ["not", "an", "object"]
 
     @pytest.mark.asyncio
