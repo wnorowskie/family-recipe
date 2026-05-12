@@ -33,7 +33,7 @@ from prisma.errors import PrismaError
 from ...db import prisma
 from ...dependencies_v1 import get_current_user_v1
 from ...errors import forbidden, internal_error, rate_limited, validation_error
-from ...idempotency import replay_or_record
+from ...idempotency import IdempotencyKey, idempotency_key
 from ...permissions import is_owner_or_admin
 from ...rate_limit import feedback_limiter
 from ...schemas.auth import UserResponse
@@ -86,14 +86,15 @@ def _serialize_list_row(row: Any) -> dict:
 async def create_feedback(
     payload: CreateFeedbackRequest,
     user: UserResponse = Depends(get_current_user_v1),
-    x_request_id: Optional[str] = Header(default=None, alias="X-Request-Id"),
+    idem: IdempotencyKey = Depends(idempotency_key),
     user_agent: Optional[str] = Header(default=None, alias="User-Agent"),
 ):
     """Create a feedback submission.
 
     Rate-limited at 20/hour/user (migration plan § Rate Limits). Honours
-    `X-Request-Id` for at-most-once retry semantics; the 24h idempotency
-    window is shared with every other write endpoint via replay_or_record.
+    `X-Request-Id` for at-most-once retry semantics via the shared
+    `idempotency_key` dependency; the 24h replay window is shared with
+    every other write endpoint that takes the dependency.
 
     Rate-limit is checked BEFORE the idempotency lookup so a flood of
     replays from the same client can't bypass the limiter — the replay
@@ -123,7 +124,7 @@ async def create_feedback(
             logger.exception("feedback.create.prisma_error: %s", e)
             # Return a 500 tuple instead of re-raising so we keep the
             # structured log line that ties the failure to this handler.
-            # replay_or_record will NOT cache this (status_code >= 500
+            # idem.replay_or_record will NOT cache this (status_code >= 500
             # short-circuits the upsert — see src/idempotency.py docstring
             # "Server errors (5xx) are NOT cached"), so a subsequent retry
             # under the same X-Request-Id runs the handler fresh against a
@@ -136,9 +137,7 @@ async def create_feedback(
         )
         return {"feedback": _serialize_row(row)}, 201
 
-    body, status_code = await replay_or_record(
-        user_id=user.id, request_id=x_request_id, do=_do
-    )
+    body, status_code = await idem.replay_or_record(user_id=user.id, do=_do)
     return JSONResponse(content=body, status_code=status_code)
 
 
