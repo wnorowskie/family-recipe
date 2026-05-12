@@ -657,6 +657,49 @@ class TestV1Reset:
         find_kwargs = mock_prisma.user.find_unique.await_args.kwargs
         assert find_kwargs["where"] == {"email": "test@example.com"}
 
+    def test_reset_verifies_master_key_against_real_bcrypt_hash(
+        self, client, mock_prisma
+    ):
+        """End-to-end happy path using real bcrypt — not the monkey-patched
+        `verify_password` the other tests rely on.
+
+        Catches a regression where `verify_password` is swapped or its
+        signature changes: the other TestV1Reset cases stub the function
+        wholesale, so a broken bcrypt invocation would slip past them. This
+        case feeds a genuine bcrypt-hashed `family_space.masterKeyHash` and
+        exercises the real `src.security.verify_password` call chain.
+        """
+        from src.security import hash_password as real_hash_password
+
+        master_key_plaintext = "actual-family-master-key"
+        family = make_mock_family_space(
+            masterKeyHash=real_hash_password(master_key_plaintext)
+        )
+        user = make_mock_user(email=self._VALID_PAYLOAD["email"])
+        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.familyspace.find_first.return_value = family
+        mock_prisma.user.update = AsyncMock(return_value=user)
+        mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
+
+        # Right master key → 200, password rotated.
+        response = client.post(
+            "/v1/auth/reset",
+            json={**self._VALID_PAYLOAD, "masterKey": master_key_plaintext},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"status": "reset"}
+        mock_prisma.user.update.assert_awaited_once()
+
+        # Wrong master key against the same real hash → 401, no write.
+        mock_prisma.user.update.reset_mock()
+        response = client.post(
+            "/v1/auth/reset",
+            json={**self._VALID_PAYLOAD, "masterKey": "wrong-key"},
+        )
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "INVALID_CREDENTIALS"
+        mock_prisma.user.update.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # Concurrency: parallel /refresh calls don't double-issue
