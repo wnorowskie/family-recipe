@@ -17,6 +17,7 @@ MODEL_NAMES = [
     "refreshtoken",
     "idempotencykey",
     "notification",
+    "feedbacksubmission",
 ]
 
 

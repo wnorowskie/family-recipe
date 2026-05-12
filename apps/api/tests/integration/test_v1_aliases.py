@@ -36,6 +36,11 @@ V1_ONLY_PATHS: frozenset[str] = frozenset(
         "/v1/notifications",
         "/v1/notifications/mark-read",
         "/v1/notifications/unread-count",
+        # /v1/feedback (issue #183) is Bearer-token only. The legacy Next
+        # handler accepts anonymous submissions over cookie auth; v1 requires
+        # a member (see routers/v1/feedback.py module docstring), so the two
+        # are not a path-alias pair.
+        "/v1/feedback",
     }
 )
 
