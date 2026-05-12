@@ -147,9 +147,9 @@ class TestCreatePost:
         )
 
     def test_create_post_max_photos_exceeded_400(self, client, member_auth):
-        # Matches Next PATCH handler's TOO_MANY_PHOTOS (the Next POST handler
-        # uses BAD_REQUEST, but TOO_MANY_PHOTOS is what the frontend keys off
-        # — see src/app/api/posts/[postId]/route.ts).
+        # Matches Next POST + PATCH handlers' TOO_MANY_PHOTOS canonical code
+        # (see src/app/api/posts/route.ts and src/app/api/posts/[postId]/route.ts;
+        # reconciled in #202).
         files = [("photos", (f"p{i}.jpg", b"data", "image/jpeg")) for i in range(MAX_PHOTO_COUNT + 1)]
         payload = {"title": "Too many"}
 

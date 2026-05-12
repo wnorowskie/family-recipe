@@ -175,7 +175,7 @@ describe('POST /api/posts', () => {
       expect(response.status).toBe(400);
 
       const data = await parseResponseJSON(response);
-      expect(data.error.code).toBe('BAD_REQUEST');
+      expect(data.error.code).toBe('VALIDATION_ERROR');
       expect(data.error.message).toContain('valid JSON');
     });
 
@@ -220,7 +220,7 @@ describe('POST /api/posts', () => {
       expect(response.status).toBe(400);
 
       const data = await parseResponseJSON(response);
-      expect(data.error.code).toBe('BAD_REQUEST');
+      expect(data.error.code).toBe('TOO_MANY_PHOTOS');
       expect(data.error.message).toContain('up to 10 photos');
     });
 

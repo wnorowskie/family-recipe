@@ -11,6 +11,7 @@ import { z } from 'zod';
 import {
   validationError,
   badRequestError,
+  tooManyPhotosError,
   unauthorizedError,
   invalidCredentialsError,
   forbiddenError,
@@ -33,7 +34,7 @@ describe('API Error Helpers', () => {
           'Custom not found message',
           404
         );
-        
+
         expect(response.status).toBe(404);
         const data = await response.json();
         expect(data.error.code).toBe(API_ERROR_CODES.NOT_FOUND);
@@ -46,7 +47,7 @@ describe('API Error Helpers', () => {
           'Access denied',
           403
         );
-        
+
         expect(response.status).toBe(403);
         const data = await response.json();
         expect(data.error.code).toBe(API_ERROR_CODES.FORBIDDEN);
@@ -59,7 +60,7 @@ describe('API Error Helpers', () => {
           'Resource conflict',
           409
         );
-        
+
         const data = await response.json();
         expect(data).toHaveProperty('error');
         expect(data.error).toHaveProperty('code');
@@ -72,7 +73,7 @@ describe('API Error Helpers', () => {
       it('should return 400 with VALIDATION_ERROR code', async () => {
         const response = validationError();
         expect(response.status).toBe(400);
-        
+
         const data = await response.json();
         expect(data.error.code).toBe(API_ERROR_CODES.VALIDATION_ERROR);
       });
@@ -80,21 +81,21 @@ describe('API Error Helpers', () => {
       it('should use default message when not provided', async () => {
         const response = validationError();
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Validation failed');
       });
 
       it('should use custom message when provided', async () => {
         const response = validationError('Custom validation error');
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Custom validation error');
       });
 
       it('should return correct response structure', async () => {
         const response = validationError('Test message');
         const data = await response.json();
-        
+
         expect(data).toHaveProperty('error');
         expect(data.error).toHaveProperty('code');
         expect(data.error).toHaveProperty('message');
@@ -105,7 +106,7 @@ describe('API Error Helpers', () => {
       it('should return 400 with BAD_REQUEST code', async () => {
         const response = badRequestError();
         expect(response.status).toBe(400);
-        
+
         const data = await response.json();
         expect(data.error.code).toBe(API_ERROR_CODES.BAD_REQUEST);
       });
@@ -113,15 +114,39 @@ describe('API Error Helpers', () => {
       it('should use default message when not provided', async () => {
         const response = badRequestError();
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Bad request');
       });
 
       it('should use custom message when provided', async () => {
         const response = badRequestError('Invalid input');
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Invalid input');
+      });
+    });
+
+    describe('tooManyPhotosError()', () => {
+      it('should return 400 with TOO_MANY_PHOTOS code', async () => {
+        const response = tooManyPhotosError();
+        expect(response.status).toBe(400);
+
+        const data = await response.json();
+        expect(data.error.code).toBe(API_ERROR_CODES.TOO_MANY_PHOTOS);
+      });
+
+      it('should use default message when not provided', async () => {
+        const response = tooManyPhotosError();
+        const data = await response.json();
+
+        expect(data.error.message).toBe('Too many photos');
+      });
+
+      it('should use custom message when provided', async () => {
+        const response = tooManyPhotosError('You can upload up to 10 photos');
+        const data = await response.json();
+
+        expect(data.error.message).toBe('You can upload up to 10 photos');
       });
     });
 
@@ -129,7 +154,7 @@ describe('API Error Helpers', () => {
       it('should return 401 with UNAUTHORIZED code', async () => {
         const response = unauthorizedError();
         expect(response.status).toBe(401);
-        
+
         const data = await response.json();
         expect(data.error.code).toBe(API_ERROR_CODES.UNAUTHORIZED);
       });
@@ -137,14 +162,14 @@ describe('API Error Helpers', () => {
       it('should use default message when not provided', async () => {
         const response = unauthorizedError();
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Not authenticated');
       });
 
       it('should use custom message when provided', async () => {
         const response = unauthorizedError('Please log in');
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Please log in');
       });
     });
@@ -153,7 +178,7 @@ describe('API Error Helpers', () => {
       it('should return 401 with INVALID_CREDENTIALS code', async () => {
         const response = invalidCredentialsError();
         expect(response.status).toBe(401);
-        
+
         const data = await response.json();
         expect(data.error.code).toBe(API_ERROR_CODES.INVALID_CREDENTIALS);
       });
@@ -161,14 +186,14 @@ describe('API Error Helpers', () => {
       it('should use default message when not provided', async () => {
         const response = invalidCredentialsError();
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Invalid credentials');
       });
 
       it('should use custom message when provided', async () => {
         const response = invalidCredentialsError('Wrong password');
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Wrong password');
       });
     });
@@ -177,7 +202,7 @@ describe('API Error Helpers', () => {
       it('should return 403 with FORBIDDEN code', async () => {
         const response = forbiddenError();
         expect(response.status).toBe(403);
-        
+
         const data = await response.json();
         expect(data.error.code).toBe(API_ERROR_CODES.FORBIDDEN);
       });
@@ -185,14 +210,14 @@ describe('API Error Helpers', () => {
       it('should use default message when not provided', async () => {
         const response = forbiddenError();
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Forbidden');
       });
 
       it('should use custom message when provided', async () => {
         const response = forbiddenError('Access denied');
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Access denied');
       });
     });
@@ -201,7 +226,7 @@ describe('API Error Helpers', () => {
       it('should return 404 with NOT_FOUND code', async () => {
         const response = notFoundError();
         expect(response.status).toBe(404);
-        
+
         const data = await response.json();
         expect(data.error.code).toBe(API_ERROR_CODES.NOT_FOUND);
       });
@@ -209,14 +234,14 @@ describe('API Error Helpers', () => {
       it('should use default message when not provided', async () => {
         const response = notFoundError();
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Resource not found');
       });
 
       it('should use custom message when provided', async () => {
         const response = notFoundError('Post not found');
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Post not found');
       });
     });
@@ -225,7 +250,7 @@ describe('API Error Helpers', () => {
       it('should return 409 with CONFLICT code', async () => {
         const response = conflictError();
         expect(response.status).toBe(409);
-        
+
         const data = await response.json();
         expect(data.error.code).toBe(API_ERROR_CODES.CONFLICT);
       });
@@ -233,14 +258,14 @@ describe('API Error Helpers', () => {
       it('should use default message when not provided', async () => {
         const response = conflictError();
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Resource conflict');
       });
 
       it('should use custom message when provided', async () => {
         const response = conflictError('Email already exists');
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Email already exists');
       });
     });
@@ -249,7 +274,7 @@ describe('API Error Helpers', () => {
       it('should return 500 with INTERNAL_ERROR code', async () => {
         const response = internalError();
         expect(response.status).toBe(500);
-        
+
         const data = await response.json();
         expect(data.error.code).toBe(API_ERROR_CODES.INTERNAL_ERROR);
       });
@@ -257,14 +282,14 @@ describe('API Error Helpers', () => {
       it('should use default message when not provided', async () => {
         const response = internalError();
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('An unexpected error occurred');
       });
 
       it('should use custom message when provided', async () => {
         const response = internalError('Database connection failed');
         const data = await response.json();
-        
+
         expect(data.error.message).toBe('Database connection failed');
       });
     });
@@ -603,10 +628,12 @@ describe('API Error Helpers', () => {
       it('should handle nested objects', () => {
         const nestedSchema = z.object({
           title: z.string(),
-          recipe: z.object({
-            ingredients: z.array(z.string()),
-            steps: z.array(z.string()),
-          }).optional(),
+          recipe: z
+            .object({
+              ingredients: z.array(z.string()),
+              steps: z.array(z.string()),
+            })
+            .optional(),
         });
 
         const body = {
@@ -677,6 +704,7 @@ describe('API Error Helpers', () => {
     it('should have all expected error codes', () => {
       expect(API_ERROR_CODES.VALIDATION_ERROR).toBe('VALIDATION_ERROR');
       expect(API_ERROR_CODES.BAD_REQUEST).toBe('BAD_REQUEST');
+      expect(API_ERROR_CODES.TOO_MANY_PHOTOS).toBe('TOO_MANY_PHOTOS');
       expect(API_ERROR_CODES.UNAUTHORIZED).toBe('UNAUTHORIZED');
       expect(API_ERROR_CODES.INVALID_CREDENTIALS).toBe('INVALID_CREDENTIALS');
       expect(API_ERROR_CODES.FORBIDDEN).toBe('FORBIDDEN');
@@ -709,7 +737,7 @@ describe('API Error Helpers', () => {
       if (!result.success) {
         const response = result.error;
         expect(response.status).toBe(400);
-        
+
         const data = await response.json();
         expect(data.error.code).toBe('VALIDATION_ERROR');
         expect(data.error.message).toBeTruthy();
@@ -719,19 +747,23 @@ describe('API Error Helpers', () => {
     it('should handle complete API error flow for not found', async () => {
       const response = notFoundError('Post with ID clh123 not found');
       expect(response.status).toBe(404);
-      
+
       const data = await response.json();
       expect(data.error.code).toBe('NOT_FOUND');
       expect(data.error.message).toBe('Post with ID clh123 not found');
     });
 
     it('should handle complete API error flow for forbidden', async () => {
-      const response = forbiddenError('You do not have permission to delete this post');
+      const response = forbiddenError(
+        'You do not have permission to delete this post'
+      );
       expect(response.status).toBe(403);
-      
+
       const data = await response.json();
       expect(data.error.code).toBe('FORBIDDEN');
-      expect(data.error.message).toBe('You do not have permission to delete this post');
+      expect(data.error.message).toBe(
+        'You do not have permission to delete this post'
+      );
     });
   });
 });
