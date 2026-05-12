@@ -29,6 +29,13 @@ VALID_ERROR_CODES = {
     "TOO_MANY_PHOTOS",
     "UNSUPPORTED_FILE_TYPE",
     "INVALID_TAG",
+    # /v1/recipes/import codes (issue #185) — IMPORT_FAILED re-emits the
+    # upstream importer status; SERVICE_UNAVAILABLE flags a misconfigured
+    # `RECIPE_IMPORTER_URL`; GATEWAY_TIMEOUT means the upstream call
+    # exceeded the per-request budget.
+    "IMPORT_FAILED",
+    "SERVICE_UNAVAILABLE",
+    "GATEWAY_TIMEOUT",
 }
 
 

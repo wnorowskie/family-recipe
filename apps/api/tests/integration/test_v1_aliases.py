@@ -41,6 +41,13 @@ V1_ONLY_PATHS: frozenset[str] = frozenset(
         # a member (see routers/v1/feedback.py module docstring), so the two
         # are not a path-alias pair.
         "/v1/feedback",
+        # /v1/recipes/import (issue #185) is Bearer-token only and is
+        # NOT a sibling of the unprefixed /recipes browse/search router
+        # — the legacy `routers/recipes.py` is cookie-auth and serves a
+        # different surface (GET list/detail). Adding the proxy there
+        # would force two auth modes onto one router; see
+        # routers/v1/recipes.py module docstring.
+        "/v1/recipes/import",
     }
 )
 
