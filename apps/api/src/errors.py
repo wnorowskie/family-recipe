@@ -83,5 +83,30 @@ def invalid_tag(message: str = "One or more tags are not available") -> JSONResp
     return error_response("INVALID_TAG", message, 400)
 
 
+def rate_limited(
+    message: str = "Too many requests. Please try again later.",
+    *,
+    retry_after_seconds: int | None = None,
+) -> JSONResponse:
+    """429 with the standard envelope plus a `Retry-After` header.
+
+    Per the migration plan (Rate Limits & Abuse Protections), every 429
+    must carry `Retry-After` in seconds. Callers compute the value via
+    the per-endpoint limiter (see src/rate_limit.py); a `None` here
+    means we couldn't, in which case we still return 429 but omit the
+    header rather than fabricate a value.
+    """
+    headers = (
+        {"Retry-After": str(retry_after_seconds)}
+        if retry_after_seconds is not None
+        else None
+    )
+    return JSONResponse(
+        status_code=429,
+        content={"error": {"code": "RATE_LIMITED", "message": message}},
+        headers=headers,
+    )
+
+
 def internal_error(message: str = "Internal server error") -> JSONResponse:
     return error_response("INTERNAL_ERROR", message, 500)

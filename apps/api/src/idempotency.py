@@ -39,6 +39,26 @@ active key set, not history) but no DELETE is ever issued. A periodic
 sweep can be added later if the active key set itself grows
 uncomfortably; the `(created_at)` index is in place for that.
 
+## Server errors (5xx) are NOT cached
+
+When `do()` returns a status code ≥ 500 we deliberately skip the upsert
+and let the next retry with the same `X-Request-Id` run the handler
+fresh. The idempotency contract is "same input → same output" for
+*deterministic* outcomes; a transient DB error or upstream timeout is
+neither. Caching a 500 for the 24h replay window would convert a
+recoverable failure into a sticky one — a legitimate client retry
+would replay the failure instead of getting a chance at success once
+the underlying issue (DB unreachable, GCS hiccup, etc.) clears.
+
+`4xx` responses ARE cached. Those reflect deterministic input/auth
+state — retrying with the same request id should keep returning the
+same client-error envelope, otherwise the SPA could "shake out" a
+validation rejection by hammering the same id.
+
+This means the cache stores only `{2xx, 4xx}`. The asymmetry is
+intentional and documented at the call site of every write endpoint
+that uses this helper.
+
 ## Concurrent-handler race (acknowledged limitation)
 
 The helper protects against duplicate `idempotency_keys` rows but does
@@ -100,6 +120,13 @@ async def replay_or_record(
             return existing.responseBody, existing.statusCode
 
     body, status_code = await do()
+
+    # Server errors (5xx) bypass the cache so a retry can hit a healthy
+    # backend. See the module docstring "Server errors (5xx) are NOT
+    # cached" — caching a transient failure for 24h would convert it
+    # into a sticky one for every retry under the same X-Request-Id.
+    if status_code >= 500:
+        return body, status_code
 
     # Upsert: a parallel duplicate may have raced ahead of us between the
     # find_unique and the create — whichever write lands first wins for the

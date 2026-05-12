@@ -209,6 +209,66 @@
         "title": "CookedRequest",
         "type": "object"
       },
+      "CreateFeedbackRequest": {
+        "properties": {
+          "category": {
+            "enum": [
+              "bug",
+              "suggestion"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "message": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Message",
+            "type": "string"
+          },
+          "pageUrl": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageurl"
+          }
+        },
+        "required": [
+          "category",
+          "message"
+        ],
+        "title": "CreateFeedbackRequest",
+        "type": "object"
+      },
+      "CreateFeedbackResponse": {
+        "properties": {
+          "feedback": {
+            "$ref": "#/components/schemas/FeedbackResponse"
+          }
+        },
+        "required": [
+          "feedback"
+        ],
+        "title": "CreateFeedbackResponse",
+        "type": "object"
+      },
       "FavoriteResponse": {
         "properties": {
           "favorited": {
@@ -220,6 +280,225 @@
           "favorited"
         ],
         "title": "FavoriteResponse",
+        "type": "object"
+      },
+      "FeedbackListItem": {
+        "description": "GET list rows include the resolved author display fields.\n\nMatches FeedbackListItem in src/lib/feedback.ts \u2014 the Next admin UI\nkeys off userName / userEmail when a feedback row has a userId.",
+        "properties": {
+          "category": {
+            "enum": [
+              "bug",
+              "suggestion"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "contactEmail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contactemail"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "familySpaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Familyspaceid"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "pageUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageurl"
+          },
+          "userAgent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Useragent"
+          },
+          "userEmail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Useremail"
+          },
+          "userId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Userid"
+          },
+          "userName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "message",
+          "createdAt"
+        ],
+        "title": "FeedbackListItem",
+        "type": "object"
+      },
+      "FeedbackListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FeedbackListItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "FeedbackListResponse",
+        "type": "object"
+      },
+      "FeedbackResponse": {
+        "description": "Single feedback row returned by POST and embedded in GET list items.",
+        "properties": {
+          "category": {
+            "enum": [
+              "bug",
+              "suggestion"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "contactEmail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contactemail"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "familySpaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Familyspaceid"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "pageUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageurl"
+          },
+          "userAgent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Useragent"
+          },
+          "userId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Userid"
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "message",
+          "createdAt"
+        ],
+        "title": "FeedbackResponse",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2568,6 +2847,173 @@
         "summary": "Remove Member",
         "tags": [
           "family"
+        ]
+      }
+    },
+    "/v1/feedback": {
+      "get": {
+        "description": "List feedback submissions \u2014 admin/owner only.\n\nFamily-scoped: by default also includes rows where `familySpaceId IS\nNULL` (anonymous submissions persisted by the legacy Next handler)\nso admins see the full backlog. Set `includeOrphaned=false` to\nrestrict to the caller's family only. Mirrors getFeedbackForFamily\nin src/lib/feedback.ts.",
+        "operationId": "list_feedback_v1_feedback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeOrphaned",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Includeorphaned",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Feedback",
+        "tags": [
+          "feedback"
+        ]
+      },
+      "post": {
+        "description": "Create a feedback submission.\n\nRate-limited at 20/hour/user (migration plan \u00a7 Rate Limits). Honours\n`X-Request-Id` for at-most-once retry semantics; the 24h idempotency\nwindow is shared with every other write endpoint via replay_or_record.\n\nRate-limit is checked BEFORE the idempotency lookup so a flood of\nreplays from the same client can't bypass the limiter \u2014 the replay\npath re-issues the original 201 only when the original call was\nactually allowed. A 429 on the first attempt is not idempotency-\ncached (we don't call `do`, so no row is recorded); subsequent\nretries hit the limiter again and stay 429 until the window resets.",
+        "operationId": "create_feedback_v1_feedback_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Request-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "User-Agent",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User-Agent"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateFeedbackResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Feedback",
+        "tags": [
+          "feedback"
         ]
       }
     },

@@ -8,6 +8,7 @@ from .db import connect_db, disconnect_db
 from .errors import ApiError, error_response, validation_error
 from .routers import auth, comments, family, health, me, posts, profile, reactions, recipes, tags, timeline
 from .routers.v1 import auth as auth_v1
+from .routers.v1 import feedback as feedback_v1
 from .routers.v1 import notifications as notifications_v1
 from .settings import settings, validate_settings
 
@@ -86,3 +87,8 @@ app.include_router(auth_v1.router)
 # when `USE_FASTAPI_AUTH` is on (and is therefore already sending access
 # tokens); a dual-mounted unprefixed cookie-auth alias would have no caller.
 app.include_router(notifications_v1.router)
+# `/v1/feedback` (issue #183): same rationale as notifications. The legacy
+# Next handler at src/app/api/feedback/route.ts stays alive (cookie auth,
+# accepts anonymous submissions) until the Phase 4 cutover (#38) — there is
+# no behavioural overlap to alias.
+app.include_router(feedback_v1.router)
