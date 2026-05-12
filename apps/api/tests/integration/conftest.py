@@ -39,6 +39,7 @@ def mock_prisma(monkeypatch):
     monkeypatch.setattr("src.routers.v1.auth.prisma", mock)
     monkeypatch.setattr("src.routers.v1.notifications.prisma", mock)
     monkeypatch.setattr("src.routers.v1.feedback.prisma", mock)
+    monkeypatch.setattr("src.routers.v1.me.prisma", mock)
     # src.routers.v1.recipes (issue #185) doesn't touch prisma directly
     # — auth happens via dependencies_v1 and the rest is a proxy to the
     # importer service. The patch is still included so a future
