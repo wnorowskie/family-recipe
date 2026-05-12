@@ -26,12 +26,18 @@ from ...cookies import (
 from ...db import prisma
 from ...dependencies_v1 import get_current_user_v1
 from ...errors import bad_request, forbidden, internal_error, invalid_credentials, unauthorized
-from ...schemas.auth import LoginRequest, SignupRequest, UserResponse
-from ...schemas.auth_v1 import AccessTokenResponse, AuthTokenResponse, MeResponse
+from ...schemas.auth import LoginRequest, ResetPasswordRequest, SignupRequest, UserResponse
+from ...schemas.auth_v1 import (
+    AccessTokenResponse,
+    AuthTokenResponse,
+    MeResponse,
+    ResetPasswordResponse,
+)
 from ...security import hash_password, verify_password
 from ...settings import settings
 from ...tokens import (
     REVOKED_LOGOUT,
+    REVOKED_PASSWORD_RESET,
     REVOKED_REUSE_DETECTED,
     REVOKED_ROTATED,
     constant_time_hash_eq,
@@ -403,6 +409,91 @@ async def refresh(
     except (jwt.PyJWTError, ValueError) as error:
         logger.exception("auth_v1.refresh.error: %s", error)
         return internal_error("Failed to refresh")
+
+
+# ---------------------------------------------------------------------------
+# POST /v1/auth/reset
+# ---------------------------------------------------------------------------
+# Master-key-gated password reset. Mirrors the Next handler at
+# `src/app/api/auth/reset/route.ts` — the caller proves identity by supplying
+# the family master key, and a successful call rotates the user's password.
+#
+# Differences from the Next handler:
+#   - Identity check uses `family_space.masterKeyHash` (matches /v1/auth/signup
+#     and /auth/signup in this repo) instead of `getEnvMasterKeyHash()`. The
+#     two values are kept in sync by `ensureFamilySpace()` on boot, so the
+#     verification result is identical in normal operation.
+#   - Instead of clearing the legacy `session` cookie, we revoke all active
+#     refresh-token rows for the user — the v1-era equivalent of "log out
+#     everywhere", and what the ticket calls for. Caller's own session is
+#     terminated; they must log in again with the new password.
+#
+# Rate limiting is intentionally deferred to issue #175, which will add a
+# limiter to every /v1/auth/* endpoint at once. The legacy /api/auth/reset
+# handler is still rate-limited and remains the production path until Phase 4.
+@router.post("/reset", response_model=ResetPasswordResponse)
+async def reset(payload: ResetPasswordRequest):
+    try:
+        email = payload.email.strip()
+        user = await prisma.user.find_unique(where={"email": email})
+
+        # Identical error on user-not-found and bad-master-key — the Next
+        # handler does this on purpose to prevent email enumeration via the
+        # reset endpoint.
+        if not user:
+            logger.info("auth_v1.reset.invalid_credentials: user not found")
+            return invalid_credentials("Invalid email or master key")
+
+        family_space = await prisma.familyspace.find_first()
+        if not family_space:
+            # Production should never hit this — the family space is created
+            # at signup time. A bare DB without one is a config error, not a
+            # caller error; surface as 500 to match other auth handlers.
+            return internal_error(
+                "No family space found. Please contact the administrator."
+            )
+
+        if not verify_password(payload.masterKey, family_space.masterKeyHash):
+            logger.info("auth_v1.reset.invalid_credentials: bad master key")
+            return invalid_credentials("Invalid email or master key")
+
+        new_hash = hash_password(payload.newPassword)
+        await prisma.user.update(
+            where={"id": user.id},
+            data={"passwordHash": new_hash},
+        )
+
+        # Revoke every active refresh-token chain for this user. Any device
+        # still holding a session must re-authenticate with the new password.
+        # Best-effort: a Prisma failure here does NOT roll back the password
+        # change — the user already proved control of the account, and the
+        # subsequent /v1/auth/refresh call will fail on the new password hash
+        # mismatch anyway. We log loudly so an orphaned session is debuggable.
+        try:
+            await prisma.refreshtoken.update_many(
+                where={"userId": user.id, "revokedAt": None},
+                data={
+                    "revokedAt": datetime.now(timezone.utc),
+                    "revokedReason": REVOKED_PASSWORD_RESET,
+                },
+            )
+        except PrismaError as error:
+            logger.exception(
+                "auth_v1.reset.refresh_revoke_failed userId=%s: %s",
+                user.id,
+                error,
+            )
+
+        logger.info("auth_v1.reset.success userId=%s", user.id)
+        return ResetPasswordResponse(status="reset")
+    except PrismaError as error:
+        logger.exception("auth_v1.reset.prisma_error: %s", error)
+        return internal_error("Unable to reset password")
+    except ValueError as error:
+        # bcrypt rejecting an over-long password lands here. JWT errors are
+        # impossible on this path (no token mint), so we narrow accordingly.
+        logger.exception("auth_v1.reset.error: %s", error)
+        return internal_error("Unable to reset password")
 
 
 # ---------------------------------------------------------------------------

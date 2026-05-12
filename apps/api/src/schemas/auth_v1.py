@@ -5,15 +5,17 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from .auth import LoginRequest, SignupRequest, UserResponse
+from .auth import LoginRequest, ResetPasswordRequest, SignupRequest, UserResponse
 
 __all__ = [
     "LoginRequest",
+    "ResetPasswordRequest",
     "SignupRequest",
     "UserResponse",
     "AccessTokenResponse",
     "AuthTokenResponse",
     "MeResponse",
+    "ResetPasswordResponse",
 ]
 
 
@@ -31,3 +33,10 @@ class AuthTokenResponse(BaseModel):
 
 class MeResponse(BaseModel):
     user: UserResponse
+
+
+class ResetPasswordResponse(BaseModel):
+    """Returned by /v1/auth/reset on success — mirrors the legacy Next
+    handler's `{ status: "reset" }` body so existing clients don't have to
+    branch during the Phase 3 → 4 cutover."""
+    status: str = "reset"

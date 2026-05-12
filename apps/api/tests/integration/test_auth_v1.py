@@ -474,6 +474,234 @@ class TestV1Logout:
 
 
 # ---------------------------------------------------------------------------
+# POST /v1/auth/reset — master-key-gated password reset (issue #184)
+# ---------------------------------------------------------------------------
+
+
+class TestV1Reset:
+    """Mirrors the contract of the Next handler at
+    `src/app/api/auth/reset/route.ts`. Identity is proven via the family
+    master key (no email / token flow yet)."""
+
+    _VALID_PAYLOAD = {
+        "email": "test@example.com",
+        "masterKey": "the-family-key",
+        "newPassword": "new-password-123",
+    }
+
+    def test_reset_success_updates_password_and_revokes_refresh_tokens(
+        self, client, mock_prisma, monkeypatch
+    ):
+        family = make_mock_family_space()
+        user = make_mock_user(email=self._VALID_PAYLOAD["email"])
+        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.familyspace.find_first.return_value = family
+        mock_prisma.user.update = AsyncMock(return_value=user)
+        mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
+        monkeypatch.setattr("src.routers.v1.auth.verify_password", lambda *_: True)
+        monkeypatch.setattr(
+            "src.routers.v1.auth.hash_password", lambda _: "$2b$10$new-hash"
+        )
+
+        response = client.post("/v1/auth/reset", json=self._VALID_PAYLOAD)
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "reset"}
+
+        # Password actually rotated.
+        mock_prisma.user.update.assert_awaited_once()
+        update_kwargs = mock_prisma.user.update.await_args.kwargs
+        assert update_kwargs["where"] == {"id": user.id}
+        assert update_kwargs["data"] == {"passwordHash": "$2b$10$new-hash"}
+
+        # Refresh-token chain revoked with the right reason.
+        mock_prisma.refreshtoken.update_many.assert_awaited_once()
+        revoke_kwargs = mock_prisma.refreshtoken.update_many.await_args.kwargs
+        assert revoke_kwargs["where"] == {"userId": user.id, "revokedAt": None}
+        assert revoke_kwargs["data"]["revokedReason"] == tokens.REVOKED_PASSWORD_RESET
+
+    def test_reset_unknown_email_returns_401_without_db_writes(
+        self, client, mock_prisma, monkeypatch
+    ):
+        # Enumeration guard: missing user yields the same 401 / message as a
+        # bad master key, and password/refresh-token state is untouched.
+        mock_prisma.user.find_unique.return_value = None
+        mock_prisma.user.update = AsyncMock(return_value=None)
+        mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
+
+        response = client.post("/v1/auth/reset", json=self._VALID_PAYLOAD)
+
+        assert response.status_code == 401
+        body = response.json()
+        assert body["error"]["code"] == "INVALID_CREDENTIALS"
+        assert body["error"]["message"] == "Invalid email or master key"
+        mock_prisma.user.update.assert_not_called()
+        mock_prisma.refreshtoken.update_many.assert_not_called()
+
+    def test_reset_bad_master_key_returns_401_without_db_writes(
+        self, client, mock_prisma, monkeypatch
+    ):
+        family = make_mock_family_space()
+        user = make_mock_user(email=self._VALID_PAYLOAD["email"])
+        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.familyspace.find_first.return_value = family
+        mock_prisma.user.update = AsyncMock(return_value=None)
+        mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
+        monkeypatch.setattr("src.routers.v1.auth.verify_password", lambda *_: False)
+
+        response = client.post("/v1/auth/reset", json=self._VALID_PAYLOAD)
+
+        assert response.status_code == 401
+        body = response.json()
+        assert body["error"]["code"] == "INVALID_CREDENTIALS"
+        # Same exact message as the unknown-email branch — the two cases must
+        # be indistinguishable to the caller.
+        assert body["error"]["message"] == "Invalid email or master key"
+        mock_prisma.user.update.assert_not_called()
+        mock_prisma.refreshtoken.update_many.assert_not_called()
+
+    def test_reset_short_password_returns_400_validation_error(self, client):
+        # newPassword < 8 chars trips the Pydantic min_length validator and
+        # gets normalized to the project's standard 400 envelope by the
+        # RequestValidationError handler in main.py.
+        response = client.post(
+            "/v1/auth/reset",
+            json={**self._VALID_PAYLOAD, "newPassword": "short"},
+        )
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+    def test_reset_missing_field_returns_400_validation_error(self, client):
+        response = client.post(
+            "/v1/auth/reset",
+            json={"email": "test@example.com", "masterKey": "k"},
+        )
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+    def test_reset_no_family_space_returns_500(self, client, mock_prisma):
+        user = make_mock_user(email=self._VALID_PAYLOAD["email"])
+        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.familyspace.find_first.return_value = None
+
+        response = client.post("/v1/auth/reset", json=self._VALID_PAYLOAD)
+
+        assert response.status_code == 500
+        assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+
+    def test_reset_succeeds_even_if_refresh_revoke_fails(
+        self, client, mock_prisma, monkeypatch
+    ):
+        # The refresh-token revoke is best-effort — a Prisma error there must
+        # not roll back the (already-completed) password change. See the
+        # handler's inner try/except.
+        from prisma.errors import PrismaError
+
+        family = make_mock_family_space()
+        user = make_mock_user(email=self._VALID_PAYLOAD["email"])
+        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.familyspace.find_first.return_value = family
+        mock_prisma.user.update = AsyncMock(return_value=user)
+        mock_prisma.refreshtoken.update_many = AsyncMock(
+            side_effect=PrismaError("revoke failed")
+        )
+        monkeypatch.setattr("src.routers.v1.auth.verify_password", lambda *_: True)
+        monkeypatch.setattr(
+            "src.routers.v1.auth.hash_password", lambda _: "$2b$10$new-hash"
+        )
+
+        response = client.post("/v1/auth/reset", json=self._VALID_PAYLOAD)
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "reset"}
+        mock_prisma.user.update.assert_awaited_once()
+
+    def test_reset_user_update_prisma_error_returns_500(
+        self, client, mock_prisma, monkeypatch
+    ):
+        from prisma.errors import PrismaError
+
+        family = make_mock_family_space()
+        user = make_mock_user(email=self._VALID_PAYLOAD["email"])
+        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.familyspace.find_first.return_value = family
+        mock_prisma.user.update = AsyncMock(side_effect=PrismaError("boom"))
+        monkeypatch.setattr("src.routers.v1.auth.verify_password", lambda *_: True)
+
+        response = client.post("/v1/auth/reset", json=self._VALID_PAYLOAD)
+
+        assert response.status_code == 500
+        assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+
+    def test_reset_trims_email_whitespace_before_lookup(
+        self, client, mock_prisma, monkeypatch
+    ):
+        # Tolerate leading/trailing whitespace exactly like the Next handler.
+        family = make_mock_family_space()
+        user = make_mock_user(email="test@example.com")
+        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.familyspace.find_first.return_value = family
+        mock_prisma.user.update = AsyncMock(return_value=user)
+        mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
+        monkeypatch.setattr("src.routers.v1.auth.verify_password", lambda *_: True)
+        monkeypatch.setattr(
+            "src.routers.v1.auth.hash_password", lambda _: "$2b$10$new-hash"
+        )
+
+        response = client.post(
+            "/v1/auth/reset",
+            json={**self._VALID_PAYLOAD, "email": "  test@example.com  "},
+        )
+
+        assert response.status_code == 200
+        find_kwargs = mock_prisma.user.find_unique.await_args.kwargs
+        assert find_kwargs["where"] == {"email": "test@example.com"}
+
+    def test_reset_verifies_master_key_against_real_bcrypt_hash(
+        self, client, mock_prisma
+    ):
+        """End-to-end happy path using real bcrypt — not the monkey-patched
+        `verify_password` the other tests rely on.
+
+        Catches a regression where `verify_password` is swapped or its
+        signature changes: the other TestV1Reset cases stub the function
+        wholesale, so a broken bcrypt invocation would slip past them. This
+        case feeds a genuine bcrypt-hashed `family_space.masterKeyHash` and
+        exercises the real `src.security.verify_password` call chain.
+        """
+        from src.security import hash_password as real_hash_password
+
+        master_key_plaintext = "actual-family-master-key"
+        family = make_mock_family_space(
+            masterKeyHash=real_hash_password(master_key_plaintext)
+        )
+        user = make_mock_user(email=self._VALID_PAYLOAD["email"])
+        mock_prisma.user.find_unique.return_value = user
+        mock_prisma.familyspace.find_first.return_value = family
+        mock_prisma.user.update = AsyncMock(return_value=user)
+        mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
+
+        # Right master key → 200, password rotated.
+        response = client.post(
+            "/v1/auth/reset",
+            json={**self._VALID_PAYLOAD, "masterKey": master_key_plaintext},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"status": "reset"}
+        mock_prisma.user.update.assert_awaited_once()
+
+        # Wrong master key against the same real hash → 401, no write.
+        mock_prisma.user.update.reset_mock()
+        response = client.post(
+            "/v1/auth/reset",
+            json={**self._VALID_PAYLOAD, "masterKey": "wrong-key"},
+        )
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "INVALID_CREDENTIALS"
+        mock_prisma.user.update.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # Concurrency: parallel /refresh calls don't double-issue
 # ---------------------------------------------------------------------------
 
