@@ -220,3 +220,132 @@ async def test_naive_created_at_from_prisma_is_treated_as_utc(mock_prisma):
     assert body == {"created": 99}
     assert status == 201
     assert counter.calls == 0, "fresh naive-utc row must replay"
+
+
+# ---------------------------------------------------------------------------
+# Depends(idempotency_key) wrapper — issue #194
+#
+# The dependency is a thin layer over replay_or_record. We test the
+# routing/binding seam end-to-end via TestClient (one route registered with
+# Depends(idempotency_key) replays correctly; missing header runs once)
+# rather than re-asserting the underlying semantics — those are covered by
+# the existing tests above against `replay_or_record` directly.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_idempotency_key_dependency_returns_request_id_from_header():
+    """Direct call to the dependency function: header maps onto the dataclass."""
+    key = await idempotency.idempotency_key(x_request_id="req-XYZ")
+    assert isinstance(key, idempotency.IdempotencyKey)
+    assert key.request_id == "req-XYZ"
+
+
+@pytest.mark.asyncio
+async def test_idempotency_key_dependency_missing_header_yields_none():
+    key = await idempotency.idempotency_key(x_request_id=None)
+    assert key.request_id is None
+
+
+@pytest.mark.asyncio
+async def test_idempotency_key_method_delegates_to_replay_or_record(mock_prisma):
+    """`IdempotencyKey.replay_or_record` must share the store with the module
+    function — calling either should hit the same find_unique / upsert calls
+    against the same (user_id, request_id) composite key."""
+    handler, counter = await _do_once_factory()
+    key = idempotency.IdempotencyKey(request_id="req-via-dep")
+
+    body, status = await key.replay_or_record(user_id="u1", do=handler)
+
+    assert (body, status) == ({"created": 1}, 201)
+    assert counter.calls == 1
+    # Confirms the dependency went through the same composite-key path.
+    mock_prisma.idempotencykey.upsert.assert_awaited_once()
+    upsert_where = mock_prisma.idempotencykey.upsert.await_args.kwargs["where"]
+    assert upsert_where == {"userId_requestId": {"userId": "u1", "requestId": "req-via-dep"}}
+
+
+@pytest.mark.asyncio
+async def test_idempotency_key_method_no_request_id_skips_store(mock_prisma):
+    """Missing header → dependency yields request_id=None → handler runs,
+    store is untouched. Mirrors test_no_request_id_runs_handler_and_skips_store
+    against the dependency call style."""
+    handler, counter = await _do_once_factory()
+    key = idempotency.IdempotencyKey(request_id=None)
+
+    body, status = await key.replay_or_record(user_id="u1", do=handler)
+
+    assert (body, status) == ({"created": 1}, 201)
+    assert counter.calls == 1
+    mock_prisma.idempotencykey.find_unique.assert_not_awaited()
+    mock_prisma.idempotencykey.upsert.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_idempotency_key_dependency_replays_under_fastapi_routing(mock_prisma):
+    """End-to-end: register a route with Depends(idempotency_key), hit it twice
+    with the same X-Request-Id, second call replays without re-running the
+    handler. This is the actual route-handler integration shape that #194
+    introduces and that real consumers (feedback.py et al) take."""
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+    counter = SimpleNamespace(calls=0)
+
+    @app.post("/probe")
+    async def probe(idem: idempotency.IdempotencyKey = Depends(idempotency.idempotency_key)):
+        async def _do():
+            counter.calls += 1
+            return ({"n": counter.calls}, 201)
+        body, status = await idem.replay_or_record(user_id="u1", do=_do)
+        return {"body": body, "status": status}
+
+    client = TestClient(app)
+
+    # First call: cache miss, handler runs, store gets upserted.
+    resp1 = client.post("/probe", headers={"X-Request-Id": "rid-1"})
+    assert resp1.status_code == 200
+    assert resp1.json() == {"body": {"n": 1}, "status": 201}
+    assert counter.calls == 1
+
+    # Simulate the stored row landing — same shape as the existing replay test.
+    stored = SimpleNamespace(
+        responseBody={"n": 1},
+        statusCode=201,
+        createdAt=datetime.now(timezone.utc),
+    )
+    mock_prisma.idempotencykey.find_unique = AsyncMock(return_value=stored)
+
+    # Second call with same header: replayed; handler does not run again.
+    resp2 = client.post("/probe", headers={"X-Request-Id": "rid-1"})
+    assert resp2.status_code == 200
+    assert resp2.json() == {"body": {"n": 1}, "status": 201}
+    assert counter.calls == 1, "handler must not run on dependency-driven replay"
+
+
+@pytest.mark.asyncio
+async def test_idempotency_key_dependency_missing_header_runs_handler(mock_prisma):
+    """Opt-in semantics survive the dependency layer: no X-Request-Id → no store hit."""
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+    counter = SimpleNamespace(calls=0)
+
+    @app.post("/probe")
+    async def probe(idem: idempotency.IdempotencyKey = Depends(idempotency.idempotency_key)):
+        async def _do():
+            counter.calls += 1
+            return ({"n": counter.calls}, 201)
+        body, status = await idem.replay_or_record(user_id="u1", do=_do)
+        return {"body": body, "status": status}
+
+    client = TestClient(app)
+    resp = client.post("/probe")  # no X-Request-Id
+
+    assert resp.status_code == 200
+    assert resp.json() == {"body": {"n": 1}, "status": 201}
+    assert counter.calls == 1
+    mock_prisma.idempotencykey.find_unique.assert_not_awaited()
+    mock_prisma.idempotencykey.upsert.assert_not_awaited()

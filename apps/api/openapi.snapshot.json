@@ -2938,25 +2938,9 @@
         ]
       },
       "post": {
-        "description": "Create a feedback submission.\n\nRate-limited at 20/hour/user (migration plan \u00a7 Rate Limits). Honours\n`X-Request-Id` for at-most-once retry semantics; the 24h idempotency\nwindow is shared with every other write endpoint via replay_or_record.\n\nRate-limit is checked BEFORE the idempotency lookup so a flood of\nreplays from the same client can't bypass the limiter \u2014 the replay\npath re-issues the original 201 only when the original call was\nactually allowed. A 429 on the first attempt is not idempotency-\ncached (we don't call `do`, so no row is recorded); subsequent\nretries hit the limiter again and stay 429 until the window resets.",
+        "description": "Create a feedback submission.\n\nRate-limited at 20/hour/user (migration plan \u00a7 Rate Limits). Honours\n`X-Request-Id` for at-most-once retry semantics via the shared\n`idempotency_key` dependency; the 24h replay window is shared with\nevery other write endpoint that takes the dependency.\n\nRate-limit is checked BEFORE the idempotency lookup so a flood of\nreplays from the same client can't bypass the limiter \u2014 the replay\npath re-issues the original 201 only when the original call was\nactually allowed. A 429 on the first attempt is not idempotency-\ncached (we don't call `do`, so no row is recorded); subsequent\nretries hit the limiter again and stay 429 until the window resets.",
         "operationId": "create_feedback_v1_feedback_post",
         "parameters": [
-          {
-            "in": "header",
-            "name": "X-Request-Id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Request-Id"
-            }
-          },
           {
             "in": "header",
             "name": "User-Agent",
@@ -2971,6 +2955,22 @@
                 }
               ],
               "title": "User-Agent"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Request-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Request-Id"
             }
           }
         ],

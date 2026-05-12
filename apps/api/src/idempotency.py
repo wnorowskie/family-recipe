@@ -2,25 +2,34 @@
 
 Migration plan: docs/API_BACKEND_MIGRATION_PLAN.md#idempotency--retries
 
-Usage from a route handler:
+## Recommended usage — `Depends(idempotency_key)` (issue #194)
 
-    from fastapi import Header
-    from ..idempotency import replay_or_record
+Most route handlers should take the dependency, which pulls `X-Request-Id`
+from the request and exposes the same replay-or-record semantics through
+a one-liner:
+
+    from fastapi import Depends
+    from ..idempotency import IdempotencyKey, idempotency_key
 
     @router.post("/feedback", status_code=201)
     async def create_feedback(
         payload: CreateFeedbackRequest,
         user: UserResponse = Depends(get_current_user),
-        x_request_id: str | None = Header(default=None),
+        idem: IdempotencyKey = Depends(idempotency_key),
     ):
         async def _do():
             row = await prisma.feedbacksubmission.create(...)
             return _serialize(row), 201
 
-        body, status_code = await replay_or_record(
-            user_id=user.id, request_id=x_request_id, do=_do
-        )
+        body, status_code = await idem.replay_or_record(user_id=user.id, do=_do)
         return JSONResponse(content=body, status_code=status_code)
+
+## Underlying primitive — `replay_or_record(...)`
+
+The dependency is a thin layer over `replay_or_record`, which stays
+exported for tests and any non-route caller that already holds a parsed
+request id. Both call styles share the same store, replay window, and
+5xx-bypass behaviour.
 
 When `request_id` is None we just call `do()` and return its result —
 idempotency is opt-in per request, never enforced when the header is absent.
@@ -82,8 +91,11 @@ it for at-most-once semantics.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Tuple
+
+from fastapi import Header
 
 from .db import prisma
 
@@ -159,3 +171,43 @@ def _aware(dt: datetime) -> datetime:
     # Postgres returns naive UTC datetimes through the Python Prisma client;
     # promote to aware so the subtraction against now(tz=UTC) is well-defined.
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
+@dataclass(frozen=True)
+class IdempotencyKey:
+    """Per-request handle returned by the `idempotency_key` dependency.
+
+    Holds the parsed `X-Request-Id` (or `None` when the header is absent)
+    and exposes `replay_or_record` so route handlers don't need to thread
+    the raw header value through the call. The underlying behaviour is
+    identical to calling `replay_or_record` directly — see module docstring.
+    """
+
+    request_id: str | None
+
+    async def replay_or_record(
+        self,
+        *,
+        user_id: str,
+        do: Callable[[], Awaitable[Tuple[Any, int]]],
+    ) -> Tuple[Any, int]:
+        return await replay_or_record(
+            user_id=user_id, request_id=self.request_id, do=do
+        )
+
+
+async def idempotency_key(
+    x_request_id: str | None = Header(default=None, alias="X-Request-Id"),
+) -> IdempotencyKey:
+    """FastAPI dependency that pulls `X-Request-Id` and returns an `IdempotencyKey`.
+
+    Route usage:
+
+        idem: IdempotencyKey = Depends(idempotency_key)
+        body, status = await idem.replay_or_record(user_id=user.id, do=_do)
+
+    See the module docstring for full semantics. The dependency stays
+    opt-in: a missing header yields `IdempotencyKey(request_id=None)`,
+    which short-circuits to calling `do()` once and skipping the store.
+    """
+    return IdempotencyKey(request_id=x_request_id)
