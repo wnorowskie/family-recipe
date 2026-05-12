@@ -158,6 +158,29 @@ class TestV1Signup:
         assert settings.refresh_cookie_name in cookie_header
         assert settings.csrf_cookie_name in cookie_header
 
+    def test_signup_malformed_email_returns_400_validation_error(
+        self, client, mock_prisma
+    ):
+        # `EmailStr` enforces RFC shape at the validation boundary so a
+        # bogus address never reaches the user-lookup branch in the handler.
+        # Mirrors Next's `z.string().email()` rejection in `signupSchema`.
+        response = client.post(
+            "/v1/auth/signup",
+            json={
+                "name": "New User",
+                "email": "not-an-email",
+                "username": "newuser",
+                "password": "password123",
+                "familyMasterKey": "secret-key",
+                "rememberMe": False,
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+        # Bail-out before any DB work — proves we short-circuited at validation.
+        mock_prisma.user.find_first.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # /v1/auth/me — access-token bearer auth
@@ -570,6 +593,21 @@ class TestV1Reset:
         )
         assert response.status_code == 400
         assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+    def test_reset_malformed_email_returns_400_validation_error(
+        self, client, mock_prisma
+    ):
+        # Parity with Next's `z.string().email()` in resetPasswordSchema.
+        # Before #205, the FastAPI schema accepted any min-length-3 string and
+        # the bad email fell through to `find_unique` → INVALID_CREDENTIALS,
+        # which leaked the existence-or-not of malformed inputs as a 401.
+        response = client.post(
+            "/v1/auth/reset",
+            json={**self._VALID_PAYLOAD, "email": "not-an-email"},
+        )
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+        mock_prisma.user.find_unique.assert_not_called()
 
     def test_reset_missing_field_returns_400_validation_error(self, client):
         response = client.post(
