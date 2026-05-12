@@ -48,6 +48,13 @@ V1_ONLY_PATHS: frozenset[str] = frozenset(
         # would force two auth modes onto one router; see
         # routers/v1/recipes.py module docstring.
         "/v1/recipes/import",
+        # /v1/me/delete (issue #186) is Bearer-token only. The legacy
+        # cookie-auth twin lives at /api/me/delete in the Next monolith,
+        # not on this FastAPI service — the unprefixed FastAPI me
+        # router (routers/me.py) intentionally does NOT expose delete
+        # to avoid mounting a destructive endpoint behind two auth modes.
+        # See routers/v1/me.py module docstring.
+        "/v1/me/delete",
     }
 )
 

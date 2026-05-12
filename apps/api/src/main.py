@@ -9,6 +9,7 @@ from .errors import ApiError, error_response, validation_error
 from .routers import auth, comments, family, health, me, posts, profile, reactions, recipes, tags, timeline
 from .routers.v1 import auth as auth_v1
 from .routers.v1 import feedback as feedback_v1
+from .routers.v1 import me as me_v1
 from .routers.v1 import notifications as notifications_v1
 from .routers.v1 import recipes as recipes_v1
 from .settings import settings, validate_settings
@@ -99,3 +100,8 @@ app.include_router(feedback_v1.router)
 # browse/search under cookie auth, and adding the importer there would
 # mix two auth modes on one router. See routers/v1/recipes.py docstring.
 app.include_router(recipes_v1.router)
+# `/v1/me/delete` (issue #186): bearer-auth-only account delete. Same
+# rationale as feedback/notifications/recipes_v1 — the cookie-auth twin
+# at `routers/me.py` stays alive through Phase 4, and there is no
+# behavioural overlap to alias.
+app.include_router(me_v1.router)

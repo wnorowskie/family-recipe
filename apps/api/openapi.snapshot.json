@@ -269,6 +269,29 @@
         "title": "CreateFeedbackResponse",
         "type": "object"
       },
+      "DeleteAccountRequest": {
+        "description": "Self-service account-delete payload \u2014 mirrors\n`deleteAccountSchema` in src/lib/validation.ts.\n\nThe endpoint requires two confirmations even though the caller is\nalready authenticated: a fresh password proves possession of the\naccount (not just a stolen access token), and the literal string\n`DELETE` in `confirmation` is the same anti-fat-finger guard the\nNext handler uses. Both are validated up-front so the destructive\n`prisma.user.delete` call never runs on a malformed request.",
+        "properties": {
+          "confirmation": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Confirmation",
+            "type": "string"
+          },
+          "currentPassword": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Currentpassword",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "confirmation"
+        ],
+        "title": "DeleteAccountRequest",
+        "type": "object"
+      },
       "FavoriteResponse": {
         "properties": {
           "favorited": {
@@ -3056,6 +3079,46 @@
         "summary": "Healthcheck",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/v1/me/delete": {
+      "delete": {
+        "description": "Delete the authenticated caller's account.\n\nReturns 204 No Content on success \u2014 see module docstring for the\nintentional divergence from the Next handler's 200 body.",
+        "operationId": "delete_account_v1_me_delete_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Account",
+        "tags": [
+          "me-v1"
         ]
       }
     },

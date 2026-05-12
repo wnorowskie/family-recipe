@@ -18,6 +18,24 @@ class LoginRequest(BaseModel):
     rememberMe: bool = False
 
 
+class DeleteAccountRequest(BaseModel):
+    """Self-service account-delete payload — mirrors
+    `deleteAccountSchema` in src/lib/validation.ts.
+
+    The endpoint requires two confirmations even though the caller is
+    already authenticated: a fresh password proves possession of the
+    account (not just a stolen access token), and the literal string
+    `DELETE` in `confirmation` is the same anti-fat-finger guard the
+    Next handler uses. Both are validated up-front so the destructive
+    `prisma.user.delete` call never runs on a malformed request.
+    """
+    currentPassword: str = Field(min_length=1, max_length=200)
+    # Pydantic doesn't have z.string().transform — case-insensitivity
+    # is handled in the router so the schema stays declarative. Accept
+    # any case here; the handler upper-cases and trims before checking.
+    confirmation: str = Field(min_length=1, max_length=50)
+
+
 class ResetPasswordRequest(BaseModel):
     """Master-key-gated password reset — mirrors the Next handler at
     `src/app/api/auth/reset/route.ts`.
