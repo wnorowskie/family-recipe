@@ -8,6 +8,7 @@ from prisma.errors import PrismaError
 from ..db import prisma
 from ..dependencies import get_current_user
 from ..errors import (
+    file_too_large,
     forbidden,
     internal_error,
     invalid_tag,
@@ -16,17 +17,26 @@ from ..errors import (
     unsupported_file_type,
     validation_error,
 )
+from ..multipart_uploads import (
+    POSTS_MEDIA_MAX_BYTES,
+    ProcessedUpload,
+    UploadError,
+    process_upload,
+)
 from ..permissions import can_edit_post
 from ..schemas.auth import UserResponse
 from ..schemas.posts import CookedRequest, CreatePostRequest, FavoriteResponse, UpdatePostRequest
 from ..uploads import (
-    ALLOWED_MIME_TYPES,
     MAX_PHOTO_COUNT,
     create_signed_url_resolver,
     delete_uploads,
-    save_photo_file,
 )
 from ..utils import iso, is_cuid
+
+# Per the Phase 3 migration plan: aggregate cap on a single create/update-post
+# request after individual files have passed the per-file 10MB check. Without
+# this, a client could pin memory by uploading ten 9.9MB files in one POST.
+POSTS_TOTAL_REQUEST_MAX_BYTES = 50 * 1024 * 1024  # 50 MB
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 COURSE_VALUES = {"breakfast", "lunch", "dinner", "dessert", "snack", "other"}
@@ -99,6 +109,54 @@ def _build_recipe_data(recipe: Optional[Dict[str, Any]]) -> Optional[Dict[str, A
     }
 
 
+async def _process_photo_uploads(
+    files: List[UploadFile],
+) -> Tuple[List[ProcessedUpload], Optional[Any]]:
+    """Run each uploaded photo through `process_upload` and enforce the 50MB
+    aggregate request cap from the migration plan.
+
+    Returns `(processed_uploads, error_response)`. On success, `error_response`
+    is None and `processed_uploads` is one ProcessedUpload per input file. On
+    failure, `processed_uploads` is empty and `error_response` is a JSON
+    envelope ready to return from the handler (matches the Next error codes:
+    UNSUPPORTED_FILE_TYPE, FILE_TOO_LARGE).
+
+    Per-file size cap (POSTS_MEDIA_MAX_BYTES = 10MB) is enforced inside
+    process_upload via the `max_bytes` arg; the aggregate cap is enforced
+    here because process_upload only sees one file at a time. The aggregate
+    check uses the *processed* (EXIF-stripped, resized) byte counts, which is
+    the actual memory footprint we want to bound.
+    """
+    processed: List[ProcessedUpload] = []
+    total_bytes = 0
+    for upload in files:
+        try:
+            result = await process_upload(
+                upload,
+                max_bytes=POSTS_MEDIA_MAX_BYTES,
+                kind="post-media",
+            )
+        except UploadError as exc:
+            if exc.code == "UNSUPPORTED_FILE_TYPE":
+                return [], unsupported_file_type(exc.message)
+            if exc.code == "FILE_TOO_LARGE":
+                return [], file_too_large(exc.message)
+            if exc.code == "INVALID_IMAGE":
+                return [], validation_error(exc.message)
+            if exc.code == "STORAGE_UNAVAILABLE":
+                return [], internal_error(exc.message)
+            return [], validation_error(exc.message)
+
+        total_bytes += result.size_bytes
+        if total_bytes > POSTS_TOTAL_REQUEST_MAX_BYTES:
+            return [], file_too_large(
+                f"Total upload size exceeds the "
+                f"{POSTS_TOTAL_REQUEST_MAX_BYTES // (1024 * 1024)}MB per-request limit"
+            )
+        processed.append(result)
+    return processed, None
+
+
 async def _resolve_tags(tag_names: Optional[List[str]]) -> List[Dict[str, str]]:
     if not tag_names:
         return []
@@ -116,6 +174,20 @@ async def create_post(
     photos: List[UploadFile] = File(default_factory=list),
     user: UserResponse = Depends(get_current_user),
 ):
+    """Create a post, optionally with up to MAX_PHOTO_COUNT photos.
+
+    Multipart-only (`multipart/form-data`) per Next parity. A request with no
+    `photos` parts is the no-media case and is fully supported. As of #187:
+    photos are run through `multipart_uploads.process_upload` (EXIF strip,
+    resize to 2048px, JPEG/PNG/WEBP only, 10MB per file, 50MB aggregate);
+    the DB stores opaque storage keys in the `main_photo_url` and `url`
+    columns. Note the field-name confusion: the canonical Prisma schema
+    names these `mainPhotoStorageKey` and `storageKey` (renamed from
+    `mainPhotoUrl`/`url` via `@map`), but the stale Python codegen still
+    surfaces the old names. We use the codegen names here intentionally;
+    regen is tracked in #212. URLs are resolved at response time via
+    `_load_post_detail`.
+    """
     try:
         try:
             payload_data = json.loads(payload)
@@ -128,16 +200,17 @@ async def create_post(
 
         recipe_data = _build_recipe_data(post_payload.recipe.model_dump() if post_payload.recipe else None)
 
-        if len(photos) > MAX_PHOTO_COUNT:
+        # Filter out empty placeholder parts that some clients send when no
+        # files are attached (e.g. an empty `photos` field with filename "").
+        # Matches the `isFormDataFile`/`size > 0` filter on the Next side.
+        non_empty_photos = [f for f in photos if (f.filename or "") and (f.size or 0) > 0]
+
+        if len(non_empty_photos) > MAX_PHOTO_COUNT:
             return too_many_photos(f"You can upload up to {MAX_PHOTO_COUNT} photos")
 
-        saved_photos = []
-        for upload in photos:
-            if (upload.content_type or "") not in ALLOWED_MIME_TYPES:
-                return unsupported_file_type(
-                    "Only JPEG, PNG, WEBP, or GIF images are allowed"
-                )
-            saved_photos.append(await save_photo_file(upload))
+        saved_photos, upload_error = await _process_photo_uploads(non_empty_photos)
+        if upload_error is not None:
+            return upload_error
 
         created = await prisma.post.create(
             data={
@@ -147,10 +220,11 @@ async def create_post(
                 "caption": post_payload.caption,
                 "hasRecipeDetails": bool(recipe_data),
                 "recipeDetails": {"create": recipe_data} if recipe_data else None,
-                "mainPhotoUrl": saved_photos[0]["url"] if saved_photos else None,
+                "mainPhotoUrl": saved_photos[0].storage_key if saved_photos else None,
                 "photos": {
                     "create": [
-                        {"url": photo["url"], "sortOrder": idx} for idx, photo in enumerate(saved_photos)
+                        {"url": photo.storage_key, "sortOrder": idx}
+                        for idx, photo in enumerate(saved_photos)
                     ]
                 }
                 if saved_photos
@@ -167,7 +241,15 @@ async def create_post(
                 "tags": {"include": {"tag": True}},
             },
         )
-        return {"post": created}
+
+        # Re-hydrate via the same path GET /v1/posts/{id} uses so the response
+        # has resolved photo URLs and the standard nested shape — matches what
+        # Next does (`getPostDetail` after create) and avoids leaking raw
+        # storage keys back to the SPA.
+        hydrated = await _load_post_detail(created.id, user, 20, 0, 5, 0)
+        if hydrated is None:
+            return internal_error("Failed to load created post")
+        return hydrated
     except ValueError as exc:
         if str(exc) == "INVALID_TAG":
             return invalid_tag("One or more tags are not available")
@@ -317,6 +399,13 @@ async def _load_post_detail(
 
     courses_out = _parse_courses_from_recipe_details(post.recipeDetails) if hasattr(post, "recipeDetails") else []
 
+    # Same resolver caches both avatar and post-photo keys, so a key referenced
+    # in multiple places in one response only hits GCS once. The resolver also
+    # transparently passes legacy non-key values through (see
+    # `_looks_like_resolved_url` in src/uploads.py) so pre-#187 rows that
+    # stored resolved URLs continue to render until they're re-saved.
+    resolve_photo = resolve_avatar
+
     return {
         "post": {
             "id": post.id,
@@ -324,7 +413,7 @@ async def _load_post_detail(
             "caption": post.caption,
             "createdAt": iso(post.createdAt),
             "updatedAt": iso(post.updatedAt),
-            "mainPhotoUrl": post.mainPhotoUrl,
+            "mainPhotoUrl": await resolve_photo(post.mainPhotoUrl),
             "isFavorited": is_favorited,
             "author": {
                 "id": post.author.id,
@@ -336,7 +425,9 @@ async def _load_post_detail(
             "editor": {"id": post.editor.id, "name": post.editor.name} if post.editor else None,
             "lastEditNote": post.lastEditNote,
             "lastEditAt": iso(post.lastEditAt),
-            "photos": [{"id": p.id, "url": p.url} for p in photos_sorted],
+            "photos": [
+                {"id": p.id, "url": await resolve_photo(p.url)} for p in photos_sorted
+            ],
             "recipe": post.recipeDetails
             and {
                 "origin": post.recipeDetails.origin,
@@ -393,6 +484,19 @@ async def update_post(
     post_id: str = Path(..., min_length=1),
     user: UserResponse = Depends(get_current_user),
 ):
+    """Update a post (and optionally its photos).
+
+    Multipart-only; a request with no `photos` parts is the no-media case.
+    Photo handling mirrors `create_post`: new files go through
+    `multipart_uploads.process_upload`, the DB stores opaque storage keys,
+    URLs are resolved at response time in `_load_post_detail`.
+
+    The `payload` JSON's `photoOrder` field controls which existing photos
+    are kept and where new uploads are spliced in (`{type: "existing", id}`
+    or `{type: "new", fileIndex}`). Existing photos that are *not* in
+    `photoOrder` and not appended via the overflow loops below are deleted
+    from storage at the end of the handler.
+    """
     try:
         if not is_cuid(post_id):
             return not_found("Post not found")
@@ -421,11 +525,15 @@ async def update_post(
         if len(photo_order) > MAX_PHOTO_COUNT:
             return too_many_photos(f"You can include up to {MAX_PHOTO_COUNT} photos")
 
-        saved_photos = [await save_photo_file(upload) for upload in photos]
+        non_empty_photos = [f for f in photos if (f.filename or "") and (f.size or 0) > 0]
+        saved_photos, upload_error = await _process_photo_uploads(non_empty_photos)
+        if upload_error is not None:
+            return upload_error
 
         existing_map = {p.id: p for p in post.photos}
         used_existing: Set[str] = set()
-        resolved_photos: List[Tuple[str, str]] = []  # (url, source: existing_id or "new-idx")
+        # (storage_key, source: existing_id or "new-idx")
+        resolved_photos: List[Tuple[str, str]] = []
 
         for entry in photo_order:
             if not isinstance(entry, dict) or "type" not in entry:
@@ -448,7 +556,9 @@ async def update_post(
                 except (ValueError, TypeError):
                     continue
                 if 0 <= file_index < len(saved_photos):
-                    resolved_photos.append((saved_photos[file_index]["url"], f"new-{file_index}"))
+                    resolved_photos.append(
+                        (saved_photos[file_index].storage_key, f"new-{file_index}")
+                    )
 
         # Append any remaining existing photos not referenced until limit
         for p in post.photos:
@@ -459,13 +569,13 @@ async def update_post(
         for idx, photo in enumerate(saved_photos):
             key = f"new-{idx}"
             if all(src != key for _, src in resolved_photos) and len(resolved_photos) < MAX_PHOTO_COUNT:
-                resolved_photos.append((photo["url"], key))
+                resolved_photos.append((photo.storage_key, key))
 
         if len(resolved_photos) > MAX_PHOTO_COUNT:
             return too_many_photos(f"You can include up to {MAX_PHOTO_COUNT} photos")
 
         keep_existing_ids = {src for _, src in resolved_photos if not src.startswith("new-")}
-        removed_urls = [p.url for p in post.photos if p.id not in keep_existing_ids]
+        removed_storage_keys = [p.url for p in post.photos if p.id not in keep_existing_ids]
         change_note = None
         if update_payload.changeNote:
             change_note = update_payload.changeNote.strip() or None
@@ -491,6 +601,12 @@ async def update_post(
             "lastEditNote": change_note,
             "lastEditedBy": user.id,
             "lastEditAt": datetime.now(timezone.utc),
+            # `notIn: [""]` is the "match nothing" idiom for prisma-py — an
+            # empty list passed to `notIn` is interpreted as "no IDs are
+            # excluded," which would delete *every* existing PostPhoto on
+            # this post. The single-element placeholder list keeps the
+            # filter well-formed when `keep_existing_ids` is empty (i.e. the
+            # caller removed every photo). Do not "simplify" this to `[]`.
             "photos": {"deleteMany": {"id": {"notIn": list(keep_existing_ids) if keep_existing_ids else [""]}}},
         }
 
@@ -528,7 +644,7 @@ async def update_post(
                 },
             )
 
-        await delete_uploads(removed_urls)
+        await delete_uploads(removed_storage_keys)
         refreshed = await _load_post_detail(post_id, user, 20, 0, 5, 0)
         return refreshed or not_found("Post not found")
     except ValueError as exc:

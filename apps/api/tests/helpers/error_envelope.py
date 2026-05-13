@@ -28,6 +28,10 @@ VALID_ERROR_CODES = {
     # in src/app/api/posts/[postId]/route.ts and src/lib/uploads.ts).
     "TOO_MANY_PHOTOS",
     "UNSUPPORTED_FILE_TYPE",
+    # FILE_TOO_LARGE matches Next's `src/app/api/posts/route.ts` which uses
+    # a 400 (not 413) so the frontend keys off a single code for size + mime
+    # rejections. Added in #187 for the multipart-on-FastAPI work.
+    "FILE_TOO_LARGE",
     "INVALID_TAG",
     # /v1/recipes/import codes (issue #185) — IMPORT_FAILED re-emits the
     # upstream importer status; SERVICE_UNAVAILABLE flags a misconfigured

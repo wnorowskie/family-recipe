@@ -31,6 +31,13 @@ def _stub_prisma() -> None:
     errors_stub = types.ModuleType("prisma.errors")
     errors_stub.PrismaError = Exception  # type: ignore[attr-defined]
 
+    # `me.py`'s PATCH /v1/me/profile handler catches `UniqueViolationError`
+    # to map P2002 -> 409 CONFLICT; without a real symbol the import fails.
+    class _UniqueViolationError(errors_stub.PrismaError):  # type: ignore[attr-defined,misc]
+        pass
+
+    errors_stub.UniqueViolationError = _UniqueViolationError  # type: ignore[attr-defined]
+
     models_stub = types.ModuleType("prisma.models")
 
     # `recipes.py` does `cast(List[CookedEvent], ...)` at module load,

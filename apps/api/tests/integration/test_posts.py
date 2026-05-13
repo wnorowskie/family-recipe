@@ -10,6 +10,7 @@ from prisma.errors import PrismaError
 
 import pytest
 
+from src.multipart_uploads import ProcessedUpload
 from src.uploads import MAX_PHOTO_COUNT
 from tests.helpers.error_envelope import assert_error_envelope
 
@@ -30,12 +31,64 @@ def _make_recipe_payload():
     }
 
 
+def _stub_create_hydration(
+    mock_prisma,
+    *,
+    post_id: str,
+    title: str = "Hello",
+    caption: Optional[str] = "Hi",
+    main_photo_storage_key: Optional[str] = None,
+    photo_storage_keys: Optional[list] = None,
+    tags: Optional[list] = None,
+    author_id: str = "user_test_123",
+    recipe_details=None,
+):
+    """Wire up the mocks needed for `create_post` and `update_post` to call
+    `_load_post_detail` after the underlying `prisma.post.create`.
+
+    Post-#187 the create/update handlers re-hydrate via the same detail-load
+    used by `GET /v1/posts/{id}` so the response carries resolved photo URLs
+    and the standard nested shape (comments, cookedStats, reactions, etc.).
+    Tests that previously asserted against the raw create return value now
+    need the hydration path stubbed.
+    """
+    now = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    photo_keys = list(photo_storage_keys or [])
+    hydrated = SimpleNamespace(
+        id=post_id,
+        title=title,
+        caption=caption,
+        createdAt=now,
+        updatedAt=now,
+        mainPhotoUrl=main_photo_storage_key,
+        authorId=author_id,
+        author=SimpleNamespace(id=author_id, name="Alice", avatarStorageKey=None),
+        editor=None,
+        lastEditNote=None,
+        lastEditAt=None,
+        photos=[
+            SimpleNamespace(id=f"ph{i}", url=key, sortOrder=i)
+            for i, key in enumerate(photo_keys)
+        ],
+        recipeDetails=recipe_details,
+        tags=tags or [],
+    )
+    mock_prisma.post.find_first = AsyncMock(return_value=hydrated)
+    mock_prisma.comment.find_many = AsyncMock(return_value=[])
+    mock_prisma.cookedevent.find_many = AsyncMock(return_value=[])
+    mock_prisma.favorite.find_unique = AsyncMock(return_value=None)
+    mock_prisma.reaction.find_many = AsyncMock(return_value=[])
+
+
 class TestCreatePost:
     def test_create_text_post(self, client, mock_prisma, member_auth):
+        # Post-#187 `create_post` re-hydrates via `_load_post_detail` so the
+        # response shape matches GET /posts/{id} and mirrors Next's
+        # `getPostDetail` call. `_stub_create_hydration` wires up the
+        # find_first + cooked/comments/favorites mocks the hydration touches.
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
-        mock_prisma.post.create = AsyncMock(
-            return_value={"id": "post-1", "title": "Hello", "caption": "Hi", "photos": [], "recipeDetails": None, "tags": []}
-        )
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-1"))
+        _stub_create_hydration(mock_prisma, post_id="post-1", title="Hello", caption="Hi")
 
         payload = {"title": "Hello", "caption": "Hi"}
         response = client.post("/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
@@ -47,24 +100,27 @@ class TestCreatePost:
 
     def test_create_recipe_post(self, client, mock_prisma, member_auth):
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
-        mock_prisma.post.create = AsyncMock(
-            return_value={
-                "id": "post-2",
-                "title": "Pasta",
-                "caption": "Yum",
-                "photos": [],
-                "recipeDetails": {
-                    "origin": "Italy",
-                    "ingredients": json.dumps([{"name": "Tomato", "unit": "pcs", "quantity": 2}]),
-                    "steps": json.dumps([{"text": "Chop"}]),
-                    "totalTime": 30,
-                    "servings": 4,
-                    "courses": json.dumps(["dinner"]),
-                    "course": "dinner",
-                    "difficulty": "easy",
-                },
-                "tags": [],
-            }
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-2"))
+        # The hydrated detail response shape uses `recipe` (the friendlier
+        # key built by `_load_post_detail`), not the raw Prisma
+        # `recipeDetails`. The recipe-detail SimpleNamespace below feeds
+        # that shape so the test assertion targets the response-side key.
+        recipe = SimpleNamespace(
+            origin="Italy",
+            ingredients=json.dumps([{"name": "Tomato", "unit": "pcs", "quantity": 2}]),
+            steps=json.dumps([{"text": "Chop"}]),
+            totalTime=30,
+            servings=4,
+            courses=json.dumps(["dinner"]),
+            course="dinner",
+            difficulty="easy",
+        )
+        _stub_create_hydration(
+            mock_prisma,
+            post_id="post-2",
+            title="Pasta",
+            caption="Yum",
+            recipe_details=recipe,
         )
 
         payload = {"title": "Pasta", "caption": "Yum", "recipe": _make_recipe_payload()}
@@ -72,26 +128,35 @@ class TestCreatePost:
 
         assert response.status_code == 201, response.json()
         body = response.json()["post"]
-        assert body["recipeDetails"] is not None
-        assert json.loads(body["recipeDetails"]["courses"])[0] == "dinner"
+        assert body["recipe"] is not None
+        assert body["recipe"]["courses"][0] == "dinner"
 
     def test_create_post_with_photos(self, client, mock_prisma, member_auth, monkeypatch):
+        # Storage keys post-#187. Strings are intentionally short labels (not
+        # the `<ms-timestamp>-<uuid>.<ext>` shape `process_upload` actually
+        # generates) so they don't trip the gitleaks `generic-api-key` rule —
+        # the resolver and DB layer treat them as opaque, so the test value
+        # doesn't need to look real.
+        key_1, key_2 = "fixture-a.jpg", "fixture-b.jpg"
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
-        mock_prisma.post.create = AsyncMock(
-            return_value={
-                "id": "post-3",
-                "title": "Photo Post",
-                "caption": None,
-                "photos": [
-                    {"id": "ph1", "url": "https://cdn.test/p1.jpg", "sortOrder": 0},
-                    {"id": "ph2", "url": "https://cdn.test/p2.jpg", "sortOrder": 1},
-                ],
-                "mainPhotoUrl": "https://cdn.test/p1.jpg",
-                "recipeDetails": None,
-                "tags": [],
-            }
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-3"))
+        _stub_create_hydration(
+            mock_prisma,
+            post_id="post-3",
+            title="Photo Post",
+            caption=None,
+            main_photo_storage_key=key_1,
+            photo_storage_keys=[key_1, key_2],
         )
-        monkeypatch.setattr("src.routers.posts.save_photo_file", AsyncMock(side_effect=[{"url": "https://cdn.test/p1.jpg"}, {"url": "https://cdn.test/p2.jpg"}]))
+        monkeypatch.setattr(
+            "src.routers.posts.process_upload",
+            AsyncMock(
+                side_effect=[
+                    ProcessedUpload(storage_key=key_1, size_bytes=10, content_type="image/jpeg"),
+                    ProcessedUpload(storage_key=key_2, size_bytes=10, content_type="image/jpeg"),
+                ]
+            ),
+        )
 
         payload = {"title": "Photo Post"}
         files = [
@@ -102,33 +167,37 @@ class TestCreatePost:
 
         assert response.status_code == 201, response.json()
         body = response.json()["post"]
-        assert body["mainPhotoUrl"] == "https://cdn.test/p1.jpg"
+        # Without UPLOADS_BUCKET set in tests, the resolver returns
+        # `/uploads/<storage_key>` for keys (the local-disk path); the
+        # passthrough only fires for already-URL-like values.
+        assert body["mainPhotoUrl"] == f"/uploads/{key_1}"
         assert len(body["photos"]) == 2
+        assert body["photos"][0]["url"] == f"/uploads/{key_1}"
 
     def test_create_post_with_tags(self, client, mock_prisma, member_auth):
         mock_prisma.tag.find_many = AsyncMock(
             return_value=[SimpleNamespace(id="t1", name="spicy"), SimpleNamespace(id="t2", name="quick")]
         )
-        mock_prisma.post.create = AsyncMock(
-            return_value={
-                "id": "post-4",
-                "title": "Tagged",
-                "caption": None,
-                "photos": [],
-                "recipeDetails": None,
-                "tags": [
-                    {"tag": {"id": "t1", "name": "spicy"}},
-                    {"tag": {"id": "t2", "name": "quick"}},
-                ],
-            }
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-4"))
+        # Hydrated detail response surfaces tags as a flat name list (not
+        # the Prisma `{tag: {id, name}}` shape); update the assertion to
+        # match.
+        _stub_create_hydration(
+            mock_prisma,
+            post_id="post-4",
+            title="Tagged",
+            caption=None,
+            tags=[
+                SimpleNamespace(tag=SimpleNamespace(id="t1", name="spicy")),
+                SimpleNamespace(tag=SimpleNamespace(id="t2", name="quick")),
+            ],
         )
 
         payload = {"title": "Tagged", "recipe": {"tags": ["spicy", "quick"]}}
         response = client.post("/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 201, response.json()
-        tag_names = [t["tag"]["name"] for t in response.json()["post"]["tags"]]
-        assert tag_names == ["spicy", "quick"]
+        assert response.json()["post"]["tags"] == ["spicy", "quick"]
 
     def test_create_post_invalid_tag_400(self, client, mock_prisma, member_auth):
         # Matches Next handler at src/app/api/posts/route.ts: 400 INVALID_TAG
@@ -165,6 +234,9 @@ class TestCreatePost:
     def test_create_post_invalid_mime_type_400(self, client, mock_prisma, member_auth):
         # Matches Next handler's UNSUPPORTED_FILE_TYPE
         # (src/app/api/posts/route.ts catches savePhotoFile's throw).
+        # Post-#187 the message is generated by `process_upload` and lists
+        # the allowed mime types explicitly; the substring check is
+        # narrowed to a stable fragment.
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
         payload = {"title": "Bad mime"}
         files = [("photos", ("bad.txt", b"data", "text/plain"))]
@@ -175,7 +247,7 @@ class TestCreatePost:
             response,
             status_code=400,
             code="UNSUPPORTED_FILE_TYPE",
-            message_contains="only jpeg",
+            message_contains="image/jpeg",
         )
 
     def test_create_post_malformed_payload_json_400(self, client, member_auth):
@@ -199,25 +271,113 @@ class TestCreatePost:
 
         assert response.status_code == 401
 
-    def test_create_post_returns_post_shape(self, client, mock_prisma, member_auth):
+    def test_create_post_oversized_single_file_400(self, client, mock_prisma, member_auth, monkeypatch):
+        """Per-file size cap (POSTS_MEDIA_MAX_BYTES = 10MB) triggers a
+        `FILE_TOO_LARGE` 400 from `process_upload`. The mock raises
+        `UploadError` to simulate the cap hit so we don't have to assemble
+        an actual 10MB byte payload in the test body."""
+        from src.multipart_uploads import UploadError
+
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
-        mock_prisma.post.create = AsyncMock(
-            return_value={
-                "id": "post-5",
-                "title": "Shape",
-                "caption": None,
-                "photos": [],
-                "recipeDetails": None,
-                "tags": [],
-            }
+        monkeypatch.setattr(
+            "src.routers.posts.process_upload",
+            AsyncMock(side_effect=UploadError("FILE_TOO_LARGE", "File exceeds the 10MB limit for post-media")),
         )
+
+        payload = {"title": "Big"}
+        files = [("photos", ("big.jpg", b"d", "image/jpeg"))]
+        response = client.post(
+            "/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="FILE_TOO_LARGE",
+            message_contains="10MB",
+        )
+
+    def test_create_post_oversized_aggregate_request_400(self, client, mock_prisma, member_auth, monkeypatch):
+        """Aggregate-request cap (50MB total across all `photos` after
+        processing) — enforced in `_process_photo_uploads` by summing each
+        ProcessedUpload's `size_bytes`. We feed it three "files" whose
+        mocked processed sizes sum to >50MB and assert the rejection.
+
+        The cap is on *processed* bytes (post EXIF strip / resize), so this
+        also documents that the check fires after individual files have
+        already passed the per-file cap."""
+        mock_prisma.tag.find_many = AsyncMock(return_value=[])
+        twenty_mb = 20 * 1024 * 1024
+        monkeypatch.setattr(
+            "src.routers.posts.process_upload",
+            AsyncMock(
+                side_effect=[
+                    ProcessedUpload(storage_key="k1.jpg", size_bytes=twenty_mb, content_type="image/jpeg"),
+                    ProcessedUpload(storage_key="k2.jpg", size_bytes=twenty_mb, content_type="image/jpeg"),
+                    ProcessedUpload(storage_key="k3.jpg", size_bytes=twenty_mb, content_type="image/jpeg"),
+                ]
+            ),
+        )
+
+        payload = {"title": "Big stack"}
+        files = [("photos", (f"p{i}.jpg", b"d", "image/jpeg")) for i in range(3)]
+        response = client.post(
+            "/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="FILE_TOO_LARGE",
+            message_contains="50mb",
+        )
+
+    def test_create_post_max_files_boundary(self, client, mock_prisma, member_auth, monkeypatch):
+        """MAX_PHOTO_COUNT files exactly is accepted (boundary check —
+        anything <= the cap should succeed)."""
+        mock_prisma.tag.find_many = AsyncMock(return_value=[])
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-many"))
+        photo_keys = [f"key-{i}.jpg" for i in range(MAX_PHOTO_COUNT)]
+        _stub_create_hydration(
+            mock_prisma,
+            post_id="post-many",
+            title="Maxed",
+            main_photo_storage_key=photo_keys[0],
+            photo_storage_keys=photo_keys,
+        )
+        monkeypatch.setattr(
+            "src.routers.posts.process_upload",
+            AsyncMock(
+                side_effect=[
+                    ProcessedUpload(storage_key=key, size_bytes=10, content_type="image/jpeg")
+                    for key in photo_keys
+                ]
+            ),
+        )
+
+        payload = {"title": "Maxed"}
+        files = [("photos", (f"p{i}.jpg", b"d", "image/jpeg")) for i in range(MAX_PHOTO_COUNT)]
+        response = client.post(
+            "/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth
+        )
+
+        assert response.status_code == 201, response.json()
+        assert len(response.json()["post"]["photos"]) == MAX_PHOTO_COUNT
+
+    def test_create_post_returns_post_shape(self, client, mock_prisma, member_auth):
+        # Post-#187 the response is the hydrated detail shape, which uses
+        # `recipe` (computed) rather than the raw Prisma `recipeDetails`
+        # field — assert against the documented response keys.
+        mock_prisma.tag.find_many = AsyncMock(return_value=[])
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-5"))
+        _stub_create_hydration(mock_prisma, post_id="post-5", title="Shape", caption=None)
 
         payload = {"title": "Shape"}
         response = client.post("/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 201, response.json()
         post = response.json()["post"]
-        for key in ["id", "title", "photos", "recipeDetails", "tags"]:
+        for key in ["id", "title", "photos", "recipe", "tags", "comments", "cookedStats"]:
             assert key in post
 
 
@@ -542,7 +702,19 @@ class TestUpdatePost:
         mock_prisma.cookedevent.find_many = AsyncMock(return_value=[])
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        monkeypatch.setattr("src.routers.posts.save_photo_file", AsyncMock(side_effect=[{"url": updated_photos[0].url}, {"url": updated_photos[1].url}]))
+        # Post-#187: photo writes go through `multipart_uploads.process_upload`
+        # and the DB stores storage keys rather than resolved URLs. The mock
+        # returns `ProcessedUpload` dataclasses whose `storage_key` flows into
+        # the DB column via `_process_photo_uploads`.
+        monkeypatch.setattr(
+            "src.routers.posts.process_upload",
+            AsyncMock(
+                side_effect=[
+                    ProcessedUpload(storage_key=updated_photos[0].url, size_bytes=10, content_type="image/jpeg"),
+                    ProcessedUpload(storage_key=updated_photos[1].url, size_bytes=10, content_type="image/jpeg"),
+                ]
+            ),
+        )
         monkeypatch.setattr("src.routers.posts.delete_uploads", AsyncMock())
 
         payload = {

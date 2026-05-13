@@ -221,13 +221,15 @@ async def browse_recipes(
             posts = sorted_posts[offset : offset + limit]
 
         resolve_avatar = create_signed_url_resolver()
+        # Same resolver caches avatar + post-photo keys for this request.
+        resolve_photo = resolve_avatar
         items = []
         for post in posts:
             courses = _parse_courses_from_recipe_details(post.recipeDetails)
             item = {
                 "id": post.id,
                 "title": post.title,
-                "mainPhotoUrl": post.mainPhotoUrl,
+                "mainPhotoUrl": await resolve_photo(post.mainPhotoUrl),
                 "author": {
                     "id": post.author.id,
                     "name": post.author.name,
