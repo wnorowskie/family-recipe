@@ -20,7 +20,7 @@ def _make_post(idx: int = 1, **overrides) -> SimpleNamespace:
     data = {
         "id": overrides.get("id", f"post-{idx}"),
         "title": overrides.get("title", f"Favorite Dish {idx}"),
-        "mainPhotoUrl": overrides.get("mainPhotoUrl", f"https://cdn.test/favorite-{idx}.jpg"),
+        "mainPhotoStorageKey": overrides.get("mainPhotoStorageKey", f"https://cdn.test/favorite-{idx}.jpg"),
         "author": overrides.get("author", _make_author()),
     }
     data.update(overrides)
@@ -58,7 +58,7 @@ def test_me_favorites_success(client, mock_prisma, member_auth):
                 "post": {
                     "id": favorite.post.id,
                     "title": favorite.post.title,
-                    "mainPhotoUrl": favorite.post.mainPhotoUrl,
+                    "mainPhotoUrl": favorite.post.mainPhotoStorageKey,
                     "authorName": favorite.post.author.name,
                 },
             }
@@ -95,7 +95,7 @@ def test_me_favorites_shape_handles_missing_author(client, mock_prisma, member_a
     assert post_summary == {
         "id": favorite.post.id,
         "title": favorite.post.title,
-        "mainPhotoUrl": favorite.post.mainPhotoUrl,
+        "mainPhotoUrl": favorite.post.mainPhotoStorageKey,
         "authorName": None,
     }
 
@@ -117,6 +117,7 @@ def test_update_profile_success(client, mock_prisma, member_auth):
         name="New Name",
         email="new@example.com",
         username="newname",
+        avatarStorageKey=None,
     )
     mock_prisma.user.update = AsyncMock(return_value=updated_user)
 
@@ -186,6 +187,7 @@ def test_update_profile_returns_updated_user_shape(client, mock_prisma, member_a
         name="Tester",
         email="tester@example.com",
         username="tester",
+        avatarStorageKey=None,
     )
     mock_prisma.user.update = AsyncMock(return_value=updated_user)
 

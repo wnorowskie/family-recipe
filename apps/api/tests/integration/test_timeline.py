@@ -30,7 +30,7 @@ class TestTimelineRouter:
         return SimpleNamespace(
             id=post_id,
             title=title or f"Post {post_id}",
-            mainPhotoUrl=main_photo,
+            mainPhotoStorageKey=main_photo,
             familySpaceId="family_test_123",
             createdAt=created_at or self._ts(),
             author=author or self._actor(post_id),
@@ -40,7 +40,7 @@ class TestTimelineRouter:
         )
 
     def _post_summary(self, post_id: str = "post-s", title: str | None = None) -> SimpleNamespace:
-        return SimpleNamespace(id=post_id, title=title or f"Post {post_id}", mainPhotoUrl="https://cdn.test/post.jpg", familySpaceId="family_test_123")
+        return SimpleNamespace(id=post_id, title=title or f"Post {post_id}", mainPhotoStorageKey="https://cdn.test/post.jpg", familySpaceId="family_test_123")
 
     def _comment(
         self,

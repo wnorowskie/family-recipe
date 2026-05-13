@@ -16,7 +16,7 @@ def _make_post(idx: int = 1, **overrides) -> SimpleNamespace:
     data = {
         "id": overrides.get("id", f"post-{idx}"),
         "title": overrides.get("title", f"Family Dish {idx}"),
-        "mainPhotoUrl": overrides.get("mainPhotoUrl", f"https://cdn.test/post-{idx}.jpg"),
+        "mainPhotoStorageKey": overrides.get("mainPhotoStorageKey", f"https://cdn.test/post-{idx}.jpg"),
         "createdAt": overrides.get("createdAt", _NOW),
     }
     data.update(overrides)
@@ -44,7 +44,7 @@ def _make_favorite(idx: int = 1, **overrides) -> SimpleNamespace:
         SimpleNamespace(
             id=f"post-{idx}",
             title=f"Favorite {idx}",
-            mainPhotoUrl=f"https://cdn.test/favorite-{idx}.jpg",
+            mainPhotoStorageKey=f"https://cdn.test/favorite-{idx}.jpg",
             author=author,
         ),
     )
@@ -76,7 +76,7 @@ def test_my_posts_success(client, mock_prisma, member_auth):
             {
                 "id": post.id,
                 "title": post.title,
-                "mainPhotoUrl": post.mainPhotoUrl,
+                "mainPhotoUrl": post.mainPhotoStorageKey,
                 "createdAt": _NOW.isoformat(),
                 "cookedStats": {"timesCooked": 0, "averageRating": None},
             }
@@ -159,7 +159,7 @@ def test_my_cooked_success(client, mock_prisma, member_auth):
                 "post": {
                     "id": event.post.id,
                     "title": event.post.title,
-                    "mainPhotoUrl": event.post.mainPhotoUrl,
+                    "mainPhotoUrl": event.post.mainPhotoStorageKey,
                 },
             }
         ],
@@ -195,7 +195,7 @@ def test_my_cooked_includes_post(client, mock_prisma, member_auth):
     assert post_summary == {
         "id": event.post.id,
         "title": "Winter Stew",
-        "mainPhotoUrl": event.post.mainPhotoUrl,
+        "mainPhotoUrl": event.post.mainPhotoStorageKey,
     }
 
 
@@ -237,7 +237,7 @@ def test_my_favorites_success(client, mock_prisma, member_auth):
                 "post": {
                     "id": favorite.post.id,
                     "title": favorite.post.title,
-                    "mainPhotoUrl": favorite.post.mainPhotoUrl,
+                    "mainPhotoUrl": favorite.post.mainPhotoStorageKey,
                     "authorName": favorite.post.author.name,
                 },
             }
@@ -268,7 +268,7 @@ def test_my_favorites_includes_post(client, mock_prisma, member_auth):
         post=SimpleNamespace(
             id="post-55",
             title="Holiday Roast",
-            mainPhotoUrl="https://cdn.test/holiday.jpg",
+            mainPhotoStorageKey="https://cdn.test/holiday.jpg",
             author=SimpleNamespace(name="Grandma"),
         )
     )

@@ -52,7 +52,7 @@ async def my_posts(
             {
                 "id": p.id,
                 "title": p.title,
-                "mainPhotoUrl": p.mainPhotoUrl,
+                "mainPhotoUrl": p.mainPhotoStorageKey,
                 "createdAt": iso(p.createdAt),
                 "cookedStats": cooked_map.get(p.id, {"timesCooked": 0, "averageRating": None}),
             }
@@ -86,7 +86,7 @@ async def my_cooked(
                 "createdAt": iso(e.createdAt),
                 "rating": e.rating,
                 "note": e.note,
-                "post": {"id": e.post.id, "title": e.post.title, "mainPhotoUrl": e.post.mainPhotoUrl},
+                "post": {"id": e.post.id, "title": e.post.title, "mainPhotoUrl": e.post.mainPhotoStorageKey},
             }
             for e in events
         ]
@@ -122,7 +122,7 @@ async def my_favorites(
                 "post": {
                     "id": f.post.id,
                     "title": f.post.title,
-                    "mainPhotoUrl": f.post.mainPhotoUrl,
+                    "mainPhotoUrl": f.post.mainPhotoStorageKey,
                     "authorName": f.post.author.name if f.post.author else None,
                 },
             }
