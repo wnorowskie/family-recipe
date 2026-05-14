@@ -248,17 +248,20 @@ def test_change_password_success(client, mock_prisma, member_auth, prisma_user_w
     monkeypatch.setattr("src.routers.me.verify_password", fake_verify)
     monkeypatch.setattr("src.routers.me.hash_password", fake_hash)
 
-    response = client.put(
+    response = client.post(
         "/me/password",
         headers=member_auth,
         json={"currentPassword": "oldpass", "newPassword": "newpassword"},
     )
 
     assert response.status_code == 200
-    assert response.json() == {"message": "Password updated"}
+    # Response shape mirrors Next's `{ status: 'updated' }` (see #188).
+    assert response.json() == {"status": "updated"}
     assert captured["verified"] == ("oldpass", "stored")
     updated_data = mock_prisma.user.update.await_args.kwargs["data"]
     assert updated_data["passwordHash"] == "hashed:newpassword"
+    # Session cookie is cleared on success, matching Next's clearSessionCookie.
+    assert "session=" in response.headers.get("set-cookie", "")
 
 
 def test_change_password_wrong_current_400(client, mock_prisma, member_auth, prisma_user_with_membership, monkeypatch):
@@ -277,7 +280,7 @@ def test_change_password_wrong_current_400(client, mock_prisma, member_auth, pri
 
     monkeypatch.setattr("src.routers.me.verify_password", fake_verify)
 
-    response = client.put(
+    response = client.post(
         "/me/password",
         headers=member_auth,
         json={"currentPassword": "oldpass", "newPassword": "newpassword"},
@@ -289,7 +292,7 @@ def test_change_password_wrong_current_400(client, mock_prisma, member_auth, pri
 
 
 def test_change_password_too_short_400(client, member_auth):
-    response = client.put(
+    response = client.post(
         "/me/password",
         headers=member_auth,
         json={"currentPassword": "oldpass", "newPassword": "short"},
@@ -300,7 +303,7 @@ def test_change_password_too_short_400(client, member_auth):
 
 
 def test_change_password_missing_current_400(client, member_auth):
-    response = client.put(
+    response = client.post(
         "/me/password",
         headers=member_auth,
         json={"newPassword": "newpassword"},
@@ -311,7 +314,7 @@ def test_change_password_missing_current_400(client, member_auth):
 
 
 def test_change_password_missing_new_400(client, member_auth):
-    response = client.put(
+    response = client.post(
         "/me/password",
         headers=member_auth,
         json={"currentPassword": "oldpass"},
@@ -322,6 +325,6 @@ def test_change_password_missing_new_400(client, member_auth):
 
 
 def test_change_password_requires_auth(client):
-    response = client.put("/me/password", json={"currentPassword": "old", "newPassword": "newpassword"})
+    response = client.post("/me/password", json={"currentPassword": "old", "newPassword": "newpassword"})
 
     assert response.status_code == 401

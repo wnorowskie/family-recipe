@@ -259,8 +259,24 @@ async def update_profile(
         return internal_error("Failed to update profile")
 
 
-@router.put("/password")
-async def change_password(payload: dict, user: UserResponse = Depends(get_current_user)):
+@router.post("/password")
+async def change_password(
+    payload: dict,
+    response: Response,
+    user: UserResponse = Depends(get_current_user),
+):
+    """Change the current user's password.
+
+    `POST` (not `PUT`) and the `{ status: 'updated' }` response body mirror
+    Next's `src/app/api/me/password/route.ts` so the Phase-2 frontend can swap
+    to the FastAPI base URL in Phase 4 (#38) without an adapter shim — see
+    #188. On success the legacy `session` cookie is cleared, matching Next's
+    `clearSessionCookie` call, so the next request re-authenticates.
+
+    Body keys are `currentPassword` / `newPassword` — the live Next contract
+    and what `AccountSettingsForm` sends. (The migration plan's `nextPassword`
+    is stale and was never shipped on either side.)
+    """
     current_password = payload.get("currentPassword")
     new_password = payload.get("newPassword")
     if not isinstance(current_password, str) or not current_password:
@@ -277,7 +293,8 @@ async def change_password(payload: dict, user: UserResponse = Depends(get_curren
             where={"id": user.id},
             data={"passwordHash": hash_password(new_password)},
         )
-        return {"message": "Password updated"}
+        clear_session_cookie(response)
+        return {"status": "updated"}
     except PrismaError:
         return internal_error("Failed to update password")
     except (ValueError, TypeError, AttributeError, KeyError):
