@@ -180,13 +180,11 @@ async def create_post(
     `photos` parts is the no-media case and is fully supported. As of #187:
     photos are run through `multipart_uploads.process_upload` (EXIF strip,
     resize to 2048px, JPEG/PNG/WEBP only, 10MB per file, 50MB aggregate);
-    the DB stores opaque storage keys in the `main_photo_url` and `url`
-    columns. Note the field-name confusion: the canonical Prisma schema
-    names these `mainPhotoStorageKey` and `storageKey` (renamed from
-    `mainPhotoUrl`/`url` via `@map`), but the stale Python codegen still
-    surfaces the old names. We use the codegen names here intentionally;
-    regen is tracked in #212. URLs are resolved at response time via
-    `_load_post_detail`.
+    the DB stores opaque storage keys in `Post.mainPhotoStorageKey` and
+    `PostPhoto.storageKey` (Postgres columns `main_photo_url` and `url`,
+    mapped via `@map` in the Prisma schema — the legacy column names are
+    kept so existing rows resolve correctly). URLs are resolved at response
+    time via `_load_post_detail`.
     """
     try:
         try:
@@ -220,10 +218,10 @@ async def create_post(
                 "caption": post_payload.caption,
                 "hasRecipeDetails": bool(recipe_data),
                 "recipeDetails": {"create": recipe_data} if recipe_data else None,
-                "mainPhotoUrl": saved_photos[0].storage_key if saved_photos else None,
+                "mainPhotoStorageKey": saved_photos[0].storage_key if saved_photos else None,
                 "photos": {
                     "create": [
-                        {"url": photo.storage_key, "sortOrder": idx}
+                        {"storageKey": photo.storage_key, "sortOrder": idx}
                         for idx, photo in enumerate(saved_photos)
                     ]
                 }
@@ -326,7 +324,7 @@ async def _load_post_detail(
             {
                 "id": r.user.id,
                 "name": r.user.name,
-                "avatarUrl": await resolve_avatar(getattr(r.user, "avatarStorageKey", None)),
+                "avatarUrl": await resolve_avatar(r.user.avatarStorageKey),
             }
         )
         reaction_summary_map[r.emoji] = entry
@@ -354,7 +352,7 @@ async def _load_post_detail(
             {
                 "id": r.user.id,
                 "name": r.user.name,
-                "avatarUrl": await resolve_avatar(getattr(r.user, "avatarStorageKey", None)),
+                "avatarUrl": await resolve_avatar(r.user.avatarStorageKey),
             }
         )
 
@@ -364,12 +362,12 @@ async def _load_post_detail(
             {
                 "id": c.id,
                 "text": c.text,
-                "photoUrl": c.photoUrl,
+                "photoUrl": c.photoStorageKey,
                 "createdAt": iso(c.createdAt),
                 "author": {
                     "id": c.author.id,
                     "name": c.author.name,
-                    "avatarUrl": await resolve_avatar(getattr(c.author, "avatarStorageKey", None)),
+                    "avatarUrl": await resolve_avatar(c.author.avatarStorageKey),
                 }
                 if c.author
                 else None,
@@ -390,7 +388,7 @@ async def _load_post_detail(
                 "user": {
                     "id": e.user.id,
                     "name": e.user.name,
-                    "avatarUrl": await resolve_avatar(getattr(e.user, "avatarStorageKey", None)),
+                    "avatarUrl": await resolve_avatar(e.user.avatarStorageKey),
                 }
                 if e.user
                 else None,
@@ -413,12 +411,12 @@ async def _load_post_detail(
             "caption": post.caption,
             "createdAt": iso(post.createdAt),
             "updatedAt": iso(post.updatedAt),
-            "mainPhotoUrl": await resolve_photo(post.mainPhotoUrl),
+            "mainPhotoUrl": await resolve_photo(post.mainPhotoStorageKey),
             "isFavorited": is_favorited,
             "author": {
                 "id": post.author.id,
                 "name": post.author.name,
-                "avatarUrl": await resolve_avatar(getattr(post.author, "avatarStorageKey", None)),
+                "avatarUrl": await resolve_avatar(post.author.avatarStorageKey),
             }
             if post.author
             else None,
@@ -426,7 +424,7 @@ async def _load_post_detail(
             "lastEditNote": post.lastEditNote,
             "lastEditAt": iso(post.lastEditAt),
             "photos": [
-                {"id": p.id, "url": await resolve_photo(p.url)} for p in photos_sorted
+                {"id": p.id, "url": await resolve_photo(p.storageKey)} for p in photos_sorted
             ],
             "recipe": post.recipeDetails
             and {
@@ -546,7 +544,7 @@ async def update_post(
                     and existing_id not in used_existing
                 ):
                     used_existing.add(existing_id)
-                    resolved_photos.append((existing_map[existing_id].url, existing_id))
+                    resolved_photos.append((existing_map[existing_id].storageKey, existing_id))
             elif entry["type"] == "new":
                 file_index_raw = entry.get("fileIndex")
                 if not isinstance(file_index_raw, (str, int)):
@@ -563,7 +561,7 @@ async def update_post(
         # Append any remaining existing photos not referenced until limit
         for p in post.photos:
             if p.id not in used_existing and len(resolved_photos) < MAX_PHOTO_COUNT:
-                resolved_photos.append((p.url, p.id))
+                resolved_photos.append((p.storageKey, p.id))
 
         # Append any remaining new uploads not referenced until limit
         for idx, photo in enumerate(saved_photos):
@@ -575,7 +573,7 @@ async def update_post(
             return too_many_photos(f"You can include up to {MAX_PHOTO_COUNT} photos")
 
         keep_existing_ids = {src for _, src in resolved_photos if not src.startswith("new-")}
-        removed_storage_keys = [p.url for p in post.photos if p.id not in keep_existing_ids]
+        removed_storage_keys = [p.storageKey for p in post.photos if p.id not in keep_existing_ids]
         change_note = None
         if update_payload.changeNote:
             change_note = update_payload.changeNote.strip() or None
@@ -597,7 +595,7 @@ async def update_post(
             }
             if tags is not None
             else None,
-            "mainPhotoUrl": resolved_photos[0][0] if resolved_photos else None,
+            "mainPhotoStorageKey": resolved_photos[0][0] if resolved_photos else None,
             "lastEditNote": change_note,
             "lastEditedBy": user.id,
             "lastEditAt": datetime.now(timezone.utc),
@@ -631,7 +629,7 @@ async def update_post(
             for url, src in resolved_photos:
                 if src.startswith("new-"):
                     await tx.postphoto.create(
-                        data={"postId": post_id, "url": url, "sortOrder": sort_order}
+                        data={"postId": post_id, "storageKey": url, "sortOrder": sort_order}
                     )
                     sort_order += 1
 
@@ -674,7 +672,7 @@ async def delete_post(
             return forbidden("You do not have permission to delete this post")
 
         await prisma.post.delete(where={"id": post_id})
-        await delete_uploads([p.url for p in post.photos] + [c.photoUrl for c in post.comments])
+        await delete_uploads([p.storageKey for p in post.photos] + [c.photoStorageKey for c in post.comments])
         return {"message": "Post deleted"}
     except PrismaError:
         return internal_error("Failed to delete post")
@@ -768,7 +766,7 @@ async def log_cooked(
                     "user": {
                         "id": e.user.id,
                         "name": e.user.name,
-                        "avatarUrl": await resolve_avatar(getattr(e.user, "avatarStorageKey", None)),
+                        "avatarUrl": await resolve_avatar(e.user.avatarStorageKey),
                     }
                     if e.user
                     else None,
@@ -813,7 +811,7 @@ async def list_cooked(
                     "user": {
                         "id": e.user.id,
                         "name": e.user.name,
-                        "avatarUrl": await resolve_avatar(getattr(e.user, "avatarStorageKey", None)),
+                        "avatarUrl": await resolve_avatar(e.user.avatarStorageKey),
                     }
                     if e.user
                     else None,

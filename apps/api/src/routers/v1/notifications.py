@@ -116,12 +116,12 @@ async def list_notifications(
                 "actor": {
                     "id": actor.id,
                     "name": actor.name,
-                    "avatarUrl": await resolve_url(getattr(actor, "avatarStorageKey", None)),
+                    "avatarUrl": await resolve_url(actor.avatarStorageKey),
                 },
                 "post": {
                     "id": post.id,
                     "title": post.title,
-                    "mainPhotoUrl": await resolve_url(getattr(post, "mainPhotoStorageKey", None)),
+                    "mainPhotoUrl": await resolve_url(post.mainPhotoStorageKey),
                 },
                 "commentText": _metadata_get(metadata, "commentText"),
                 "cookedNote": _metadata_get(metadata, "note"),

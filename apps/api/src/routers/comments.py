@@ -89,7 +89,7 @@ async def list_comments(
                     {
                         "id": r.user.id,
                         "name": r.user.name,
-                        "avatarUrl": await resolve_avatar(getattr(r.user, "avatarStorageKey", None)),
+                        "avatarUrl": await resolve_avatar(r.user.avatarStorageKey),
                     }
                 )
 
@@ -99,12 +99,12 @@ async def list_comments(
                 {
                     "id": c.id,
                     "text": c.text,
-                    "photoUrl": c.photoUrl,
+                    "photoUrl": c.photoStorageKey,
                     "createdAt": iso(c.createdAt),
                     "author": {
                         "id": c.author.id,
                         "name": c.author.name,
-                        "avatarUrl": await resolve_avatar(getattr(c.author, "avatarStorageKey", None)),
+                        "avatarUrl": await resolve_avatar(c.author.avatarStorageKey),
                     }
                     if c.author
                     else None,
@@ -149,7 +149,7 @@ async def create_comment(
                 "postId": post_id,
                 "authorId": user.id,
                 "text": comment_payload.text,
-                "photoUrl": photo_url,
+                "photoStorageKey": photo_url,
             },
             include={"author": True},
         )
@@ -157,13 +157,13 @@ async def create_comment(
             "comment": {
                 "id": comment.id,
                 "text": comment.text,
-                "photoUrl": comment.photoUrl,
+                "photoUrl": comment.photoStorageKey,
                 "createdAt": iso(comment.createdAt),
                 "author": {
                     "id": comment.author.id,
                     "name": comment.author.name,
                     "avatarUrl": await get_signed_upload_url(
-                        getattr(comment.author, "avatarStorageKey", None)
+                        comment.author.avatarStorageKey
                     ),
                 }
                 if comment.author
@@ -201,7 +201,7 @@ async def delete_comment(
             return forbidden("You do not have permission to delete this comment")
 
         await prisma.comment.delete(where={"id": comment_id})
-        await delete_uploads([comment.photoUrl])
+        await delete_uploads([comment.photoStorageKey])
         return {"message": "Comment deleted"}
     except PrismaError:
         return internal_error("Failed to delete comment")

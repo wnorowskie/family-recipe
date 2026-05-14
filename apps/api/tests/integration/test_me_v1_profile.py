@@ -50,7 +50,7 @@ pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership
 
 def _updated_user(**overrides) -> SimpleNamespace:
     """The row returned by `prisma.user.update`. Mirrors the columns the
-    handler reads on the response side (id/name/email/username/avatarUrl).
+    handler reads on the response side (id/name/email/username/avatarStorageKey).
 
     Defaults match the fixture's mock_user so a "no actual change" PATCH
     round-trips with the same values.
@@ -60,7 +60,7 @@ def _updated_user(**overrides) -> SimpleNamespace:
         "name": "Test User",
         "email": "test@example.com",
         "username": "testuser",
-        "avatarUrl": None,
+        "avatarStorageKey": None,
     }
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -82,10 +82,10 @@ def test_patch_profile_no_changes_success(client, mock_prisma, member_auth):
     user = response.json()["user"]
     assert user["email"] == "test@example.com"
     assert user["avatarUrl"] is None
-    # `data` written to prisma must not include avatarUrl when no avatar
+    # `data` written to prisma must not include avatarStorageKey when no avatar
     # part was sent and removeAvatar wasn't set.
     written = mock_prisma.user.update.await_args.kwargs["data"]
-    assert "avatarUrl" not in written
+    assert "avatarStorageKey" not in written
 
 
 def test_patch_profile_with_avatar_writes_storage_key(client, mock_prisma, member_auth, monkeypatch):
@@ -93,7 +93,7 @@ def test_patch_profile_with_avatar_writes_storage_key(client, mock_prisma, membe
     storage_key is written to the column. The response surfaces the
     resolved URL (which in tests, with no UPLOADS_BUCKET, is the
     `/uploads/<key>` local-path passthrough)."""
-    mock_prisma.user.update = AsyncMock(return_value=_updated_user(avatarUrl="abc-123.jpg"))
+    mock_prisma.user.update = AsyncMock(return_value=_updated_user(avatarStorageKey="abc-123.jpg"))
 
     monkeypatch.setattr(
         "src.routers.me.process_upload",
@@ -113,7 +113,7 @@ def test_patch_profile_with_avatar_writes_storage_key(client, mock_prisma, membe
 
     assert response.status_code == 200, response.json()
     written = mock_prisma.user.update.await_args.kwargs["data"]
-    assert written.get("avatarUrl") == "abc-123.jpg"
+    assert written.get("avatarStorageKey") == "abc-123.jpg"
     # Local mode returns the `/uploads/<key>` form — see `get_signed_upload_url`
     assert response.json()["user"]["avatarUrl"] == "/uploads/abc-123.jpg"
 
@@ -289,8 +289,8 @@ def test_patch_profile_remove_avatar_clears_column(client, mock_prisma, member_a
 
     assert response.status_code == 200, response.json()
     written = mock_prisma.user.update.await_args.kwargs["data"]
-    assert "avatarUrl" in written
-    assert written["avatarUrl"] is None
+    assert "avatarStorageKey" in written
+    assert written["avatarStorageKey"] is None
 
 
 def test_patch_profile_invalid_email_400(client, member_auth):

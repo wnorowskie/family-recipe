@@ -60,14 +60,14 @@ def _stub_create_hydration(
         caption=caption,
         createdAt=now,
         updatedAt=now,
-        mainPhotoUrl=main_photo_storage_key,
+        mainPhotoStorageKey=main_photo_storage_key,
         authorId=author_id,
         author=SimpleNamespace(id=author_id, name="Alice", avatarStorageKey=None),
         editor=None,
         lastEditNote=None,
         lastEditAt=None,
         photos=[
-            SimpleNamespace(id=f"ph{i}", url=key, sortOrder=i)
+            SimpleNamespace(id=f"ph{i}", storageKey=key, sortOrder=i)
             for i, key in enumerate(photo_keys)
         ],
         recipeDetails=recipe_details,
@@ -390,7 +390,7 @@ class TestGetPostDetail:
             caption="Cap",
             createdAt=now,
             updatedAt=now,
-            mainPhotoUrl=None,
+            mainPhotoStorageKey=None,
             authorId=author_id,
             author=SimpleNamespace(id=author_id, name="Alice", avatarStorageKey=None),
             editor=None,
@@ -435,14 +435,14 @@ class TestGetPostDetail:
                 SimpleNamespace(
                     id="c1",
                     text="Nice",
-                    photoUrl=None,
+                    photoStorageKey=None,
                     createdAt=now,
                     author=SimpleNamespace(id="u1", name="Bob", avatarStorageKey=None),
                 ),
                 SimpleNamespace(
                     id="c2",
                     text="Great",
-                    photoUrl=None,
+                    photoStorageKey=None,
                     createdAt=now,
                     author=SimpleNamespace(id="u2", name="Ann", avatarStorageKey=None),
                 ),
@@ -520,8 +520,8 @@ class TestGetPostDetail:
         mock_prisma.post.find_first = AsyncMock(return_value=self._base_post())
         mock_prisma.comment.find_many = AsyncMock(
             return_value=[
-                SimpleNamespace(id="c1", text="A", photoUrl=None, createdAt=now, author=None),
-                SimpleNamespace(id="c2", text="B", photoUrl=None, createdAt=now, author=None),
+                SimpleNamespace(id="c1", text="A", photoStorageKey=None, createdAt=now, author=None),
+                SimpleNamespace(id="c2", text="B", photoStorageKey=None, createdAt=now, author=None),
             ]
         )
         mock_prisma.cookedevent.find_many = AsyncMock(return_value=[])
@@ -597,7 +597,7 @@ class TestUpdatePost:
             caption=caption,
             createdAt=now,
             updatedAt=now,
-            mainPhotoUrl=main_photo_url,
+            mainPhotoStorageKey=main_photo_url,
             authorId=author_id,
             author=SimpleNamespace(id=author_id, name="Alice", avatarStorageKey=None),
             editor=None,
@@ -609,7 +609,7 @@ class TestUpdatePost:
         )
 
     def _photo(self, photo_id: str, sort_order: int = 0):
-        return SimpleNamespace(id=photo_id, url=f"https://cdn.test/{photo_id}.jpg", sortOrder=sort_order)
+        return SimpleNamespace(id=photo_id, storageKey=f"https://cdn.test/{photo_id}.jpg", sortOrder=sort_order)
 
     def _recipe_details(self):
         return SimpleNamespace(
@@ -695,7 +695,7 @@ class TestUpdatePost:
     def test_update_post_add_photos(self, client, mock_prisma, member_auth, monkeypatch):
         initial = self._post(photos=[])
         updated_photos = [self._photo("ph_new_1", 0), self._photo("ph_new_2", 1)]
-        updated = self._post(photos=updated_photos, main_photo_url=updated_photos[0].url)
+        updated = self._post(photos=updated_photos, main_photo_url=updated_photos[0].storageKey)
 
         mock_prisma.post.find_first = AsyncMock(side_effect=[initial, updated])
         mock_prisma.comment.find_many = AsyncMock(return_value=[])
@@ -710,8 +710,8 @@ class TestUpdatePost:
             "src.routers.posts.process_upload",
             AsyncMock(
                 side_effect=[
-                    ProcessedUpload(storage_key=updated_photos[0].url, size_bytes=10, content_type="image/jpeg"),
-                    ProcessedUpload(storage_key=updated_photos[1].url, size_bytes=10, content_type="image/jpeg"),
+                    ProcessedUpload(storage_key=updated_photos[0].storageKey, size_bytes=10, content_type="image/jpeg"),
+                    ProcessedUpload(storage_key=updated_photos[1].storageKey, size_bytes=10, content_type="image/jpeg"),
                 ]
             ),
         )
@@ -736,13 +736,13 @@ class TestUpdatePost:
         assert response.status_code == 200, response.json()
         body = response.json()["post"]
         assert len(body["photos"]) == 2
-        assert body["mainPhotoUrl"] == updated_photos[0].url
+        assert body["mainPhotoUrl"] == updated_photos[0].storageKey
 
     def test_update_post_remove_photos(self, client, mock_prisma, member_auth, monkeypatch):
         existing_photos = [self._photo("ph1", 0), self._photo("ph2", 1)]
-        initial = self._post(photos=existing_photos, main_photo_url=existing_photos[0].url)
+        initial = self._post(photos=existing_photos, main_photo_url=existing_photos[0].storageKey)
         kept = self._photo("ph2", 0)
-        updated = self._post(photos=[kept], main_photo_url=kept.url)
+        updated = self._post(photos=[kept], main_photo_url=kept.storageKey)
 
         mock_prisma.post.find_first = AsyncMock(side_effect=[initial, updated])
         mock_prisma.comment.find_many = AsyncMock(return_value=[])
@@ -760,14 +760,14 @@ class TestUpdatePost:
         assert response.status_code == 200, response.json()
         photos = response.json()["post"]["photos"]
         assert len(photos) == 1
-        assert photos[0]["url"] == kept.url
-        delete_mock.assert_awaited_with([existing_photos[0].url])
+        assert photos[0]["url"] == kept.storageKey
+        delete_mock.assert_awaited_with([existing_photos[0].storageKey])
 
     def test_update_post_reorder_photos(self, client, mock_prisma, member_auth, monkeypatch):
         existing_photos = [self._photo("ph1", 0), self._photo("ph2", 1)]
-        initial = self._post(photos=existing_photos, main_photo_url=existing_photos[0].url)
+        initial = self._post(photos=existing_photos, main_photo_url=existing_photos[0].storageKey)
         reordered = [self._photo("ph2", 0), self._photo("ph1", 1)]
-        updated = self._post(photos=reordered, main_photo_url=reordered[0].url)
+        updated = self._post(photos=reordered, main_photo_url=reordered[0].storageKey)
 
         mock_prisma.post.find_first = AsyncMock(side_effect=[initial, updated])
         mock_prisma.comment.find_many = AsyncMock(return_value=[])
@@ -788,7 +788,7 @@ class TestUpdatePost:
         assert response.status_code == 200, response.json()
         photos = response.json()["post"]["photos"]
         assert [p["id"] for p in photos] == ["ph2", "ph1"]
-        assert response.json()["post"]["mainPhotoUrl"] == reordered[0].url
+        assert response.json()["post"]["mainPhotoUrl"] == reordered[0].storageKey
 
     def test_update_post_change_tags(self, client, mock_prisma, member_auth):
         initial = self._post(tags=[SimpleNamespace(tag=SimpleNamespace(id="old", name="old"))])
@@ -933,10 +933,10 @@ class TestDeletePost:
         )
 
     def _photo(self, photo_id: str):
-        return SimpleNamespace(id=photo_id, url=f"https://cdn.test/{photo_id}.jpg")
+        return SimpleNamespace(id=photo_id, storageKey=f"https://cdn.test/{photo_id}.jpg")
 
     def _comment(self, comment_id: str, photo_url: Optional[str] = None):
-        return SimpleNamespace(id=comment_id, photoUrl=photo_url)
+        return SimpleNamespace(id=comment_id, photoStorageKey=photo_url)
 
     def test_delete_post_author_can_delete(self, client, mock_prisma, member_auth, monkeypatch):
         photos = [self._photo("ph1"), self._photo("ph2")]

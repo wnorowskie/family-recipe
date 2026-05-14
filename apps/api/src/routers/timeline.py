@@ -56,7 +56,7 @@ async def get_timeline(
             """Extract only the fields we need from a post object."""
             if not post:
                 return None
-            return {"id": post.id, "title": post.title, "mainPhotoUrl": post.mainPhotoUrl}
+            return {"id": post.id, "title": post.title, "mainPhotoUrl": post.mainPhotoStorageKey}
 
         raw = []
         for event in post_events:
@@ -66,7 +66,7 @@ async def get_timeline(
                     "createdAt": event.createdAt,
                     "type": "post_created",
                     "actor": event.author,
-                    "post": {"id": event.id, "title": event.title, "mainPhotoUrl": event.mainPhotoUrl},
+                    "post": {"id": event.id, "title": event.title, "mainPhotoUrl": event.mainPhotoStorageKey},
                 }
             )
         for event in comment_events:
@@ -132,7 +132,7 @@ async def get_timeline(
                 "actor": {
                     "id": actor.id,
                     "name": actor.name,
-                    "avatarUrl": await resolve_avatar(getattr(actor, "avatarStorageKey", None)),
+                    "avatarUrl": await resolve_avatar(actor.avatarStorageKey),
                 },
                 "post": post,
                 "actionText": action_text(entry["type"]),

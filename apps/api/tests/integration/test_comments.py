@@ -19,7 +19,7 @@ class TestListComments:
         return SimpleNamespace(
             id=comment_id,
             text=text,
-            photoUrl=None,
+            photoStorageKey=None,
             createdAt=now,
             author=SimpleNamespace(id=author_id, name=f"User {author_id}", avatarStorageKey=None),
         )
@@ -95,7 +95,7 @@ class TestCreateComment:
         return SimpleNamespace(
             id=COMMENT_ID,
             text=text,
-            photoUrl=photo_url,
+            photoStorageKey=photo_url,
             createdAt=now,
             author=SimpleNamespace(id="user-1", name="Test User", avatarStorageKey=None),
         )
@@ -180,7 +180,7 @@ class TestDeleteComment:
         return SimpleNamespace(
             id=COMMENT_ID,
             authorId=author_id,
-            photoUrl=photo_url,
+            photoStorageKey=photo_url,
             post=SimpleNamespace(familySpaceId=family_space_id),
         )
 

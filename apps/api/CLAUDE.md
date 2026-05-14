@@ -15,11 +15,14 @@ When you change an endpoint here, check whether the equivalent in `src/app/api/`
 - The same JWT format and `session` cookie semantics
 - The same request/response shapes (the migration plan is explicit that the contract should not change during the cutover, except for the planned `/v1/` prefix and access/refresh-token split)
 
-The Python Prisma client is generated from the postgres schema:
+The Python Prisma client is generated from the postgres schema into the active Python environment's `site-packages` (no committed `prisma-client/` directory — it's gitignored). Use the **Python** CLI so the engine version matches what `prisma-client-py` (v0.15.0) expects; `npx prisma generate` will fail with a version-mismatch error against current Node Prisma releases:
 
 ```bash
-npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy
+# from apps/api/, with the project venv active
+python -m prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy
 ```
+
+After regenerating, handler code can import models directly (`from prisma.models import User` etc.) and reach all canonical fields — including the StorageKey columns renamed from the legacy `*Url` names. See [scripts/local-stack-up.sh](../../scripts/local-stack-up.sh) for the equivalent step in the local dev flow.
 
 ## Auth endpoint roles
 

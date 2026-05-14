@@ -40,7 +40,7 @@ def _make_post(**overrides) -> SimpleNamespace:
     data = {
         "id": "recipe-1",
         "title": "Tomato Soup",
-        "mainPhotoUrl": "https://cdn.test/recipe.jpg",
+        "mainPhotoStorageKey": "https://cdn.test/recipe.jpg",
         "author": _make_author(),
         "recipeDetails": _make_recipe_details(),
         "tags": [],

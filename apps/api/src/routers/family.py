@@ -29,7 +29,7 @@ async def list_members(user: UserResponse = Depends(get_current_user)):
                 "email": m.user.email,
                 "username": m.user.username,
                 "emailOrUsername": m.user.email,
-                "avatarUrl": await resolve_avatar(getattr(m.user, "avatarStorageKey", None)),
+                "avatarUrl": await resolve_avatar(m.user.avatarStorageKey),
                 "role": m.role,
                 "joinedAt": m.createdAt.isoformat(),
                 "postCount": len(m.user.posts) if m.user.posts else 0,

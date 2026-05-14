@@ -229,11 +229,11 @@ async def browse_recipes(
             item = {
                 "id": post.id,
                 "title": post.title,
-                "mainPhotoUrl": await resolve_photo(post.mainPhotoUrl),
+                "mainPhotoUrl": await resolve_photo(post.mainPhotoStorageKey),
                 "author": {
                     "id": post.author.id,
                     "name": post.author.name,
-                    "avatarUrl": await resolve_avatar(getattr(post.author, "avatarStorageKey", None)),
+                    "avatarUrl": await resolve_avatar(post.author.avatarStorageKey),
                 },
                 "courses": courses,
                 "primaryCourse": courses[0] if courses else post.recipeDetails.course if getattr(post.recipeDetails, "course", None) else None,

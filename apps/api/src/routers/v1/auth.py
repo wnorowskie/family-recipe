@@ -105,7 +105,7 @@ async def _persist_refresh_and_set_cookies(
 
 
 async def _build_user_response(user, membership) -> UserResponse:
-    avatar_url = await get_signed_upload_url(getattr(user, "avatarStorageKey", None))
+    avatar_url = await get_signed_upload_url(user.avatarStorageKey)
     return UserResponse(
         id=user.id,
         name=user.name,

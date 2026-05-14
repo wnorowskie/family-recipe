@@ -45,7 +45,7 @@ async def get_current_user_v1(
         raise _unauthorized()
 
     membership = user.memberships[0]
-    avatar_url = await get_signed_upload_url(getattr(user, "avatarStorageKey", None))
+    avatar_url = await get_signed_upload_url(user.avatarStorageKey)
     return UserResponse(
         id=user.id,
         name=user.name,

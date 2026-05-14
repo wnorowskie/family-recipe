@@ -55,7 +55,7 @@ async def my_favorites(limit: int = 20, offset: int = 0, user: UserResponse = De
                 "post": {
                     "id": fav.post.id,
                     "title": fav.post.title,
-                    "mainPhotoUrl": await resolve_photo(fav.post.mainPhotoUrl),
+                    "mainPhotoUrl": await resolve_photo(fav.post.mainPhotoStorageKey),
                     "authorName": fav.post.author.name if fav.post.author else None,
                 },
             }
@@ -94,11 +94,11 @@ async def update_profile_multipart(
     - If `email` or `username` differ from the current values, requires a
       matching `currentPassword` (mirrors Next's `requiresPassword` branch).
     - `avatar` file (≤5MB, JPEG/PNG/WEBP) writes its storage key to the
-      `avatar_url` column. The canonical schema names this field
-      `avatarStorageKey`; the stale Python Prisma client still calls it
-      `avatarUrl`. We use the codegen name here (see #212 for the regen
-      ticket). The column holds an opaque storage key, not a URL, even
-      though the codegen attribute name is misleading.
+      `avatarStorageKey` column (Postgres column `avatar_url`, mapped via
+      `@map` in the Prisma schema). The DB stores an opaque storage key,
+      not a URL — the legacy column name is kept for compatibility with
+      Next-era rows that still hold pre-migration values, but the Prisma
+      attribute is canonical.
     - `removeAvatar=true` clears the column.
     - On sensitive-field change (email or username), the session cookie is
       cleared so the next request re-authenticates — matches Next's
@@ -164,13 +164,7 @@ async def update_profile_multipart(
         "username": validated.username.strip(),
     }
     if avatar_should_write:
-        # The canonical schema names this column `avatarStorageKey`, but the
-        # Python Prisma client at apps/api/prisma-client/ is generated from a
-        # stale schema where it's still `avatarUrl`. We follow the stale
-        # codegen here intentionally — regenerating the client is its own
-        # multi-router reconciliation (tracked in #212). Once that lands,
-        # this line becomes `data["avatarStorageKey"] = avatar_new_value`.
-        data["avatarUrl"] = avatar_new_value
+        data["avatarStorageKey"] = avatar_new_value
 
     try:
         updated = await prisma.user.update(where={"id": user.id}, data=data)
@@ -184,7 +178,7 @@ async def update_profile_multipart(
         # Next handler's `clearSessionCookie(response)` call.
         clear_session_cookie(response)
 
-    avatar_url = await get_signed_upload_url(getattr(updated, "avatarUrl", None))
+    avatar_url = await get_signed_upload_url(updated.avatarStorageKey)
     return {
         "user": {
             "id": updated.id,
@@ -256,12 +250,7 @@ async def update_profile(
                 "email": updated.email,
                 "username": updated.username,
                 "emailOrUsername": updated.email,
-                # Pre-#187 this read `avatarStorageKey` which never existed on
-                # the Python client — the codegen exposes the column as
-                # `avatarUrl`, so the `getattr` default always returned None
-                # and the avatar always rendered as absent. Fixed in passing
-                # while we're touching the file.
-                "avatarUrl": await get_signed_upload_url(getattr(updated, "avatarUrl", None)),
+                "avatarUrl": await get_signed_upload_url(updated.avatarStorageKey),
             }
         }
     except PrismaError:
