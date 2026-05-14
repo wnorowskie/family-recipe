@@ -163,7 +163,7 @@ async def create_comment(
                     "id": comment.author.id,
                     "name": comment.author.name,
                     "avatarUrl": await get_signed_upload_url(
-                        getattr(comment.author, "avatarStorageKey", None)
+                        comment.author.avatarStorageKey
                     ),
                 }
                 if comment.author
