@@ -21,7 +21,7 @@ from ..multipart_uploads import (
     process_upload,
 )
 from ..schemas.auth import UserResponse
-from ..schemas.me import UpdateProfileRequest
+from ..schemas.me import ChangePasswordRequest, UpdateProfileRequest
 from ..security import clear_session_cookie, hash_password, verify_password
 from ..uploads import create_signed_url_resolver, get_signed_upload_url
 from ..utils import iso
@@ -261,7 +261,7 @@ async def update_profile(
 
 @router.post("/password")
 async def change_password(
-    payload: dict,
+    payload: ChangePasswordRequest,
     response: Response,
     user: UserResponse = Depends(get_current_user),
 ):
@@ -275,23 +275,18 @@ async def change_password(
 
     Body keys are `currentPassword` / `newPassword` — the live Next contract
     and what `AccountSettingsForm` sends. (The migration plan's `nextPassword`
-    is stale and was never shipped on either side.)
+    is stale and was never shipped on either side.) Body shape is validated
+    via `ChangePasswordRequest`; missing/short fields surface as the standard
+    `VALIDATION_ERROR` envelope through `_validation_error_handler` (#216).
     """
-    current_password = payload.get("currentPassword")
-    new_password = payload.get("newPassword")
-    if not isinstance(current_password, str) or not current_password:
-        return bad_request("Current password is required")
-    if not isinstance(new_password, str) or len(new_password) < 8:
-        return bad_request("New password must be at least 8 characters")
-
     try:
         record = await prisma.user.find_unique(where={"id": user.id})
-        if not record or not verify_password(current_password, record.passwordHash):
+        if not record or not verify_password(payload.currentPassword, record.passwordHash):
             return bad_request("Current password is incorrect")
 
         await prisma.user.update(
             where={"id": user.id},
-            data={"passwordHash": hash_password(new_password)},
+            data={"passwordHash": hash_password(payload.newPassword)},
         )
         clear_session_cookie(response)
         return {"status": "updated"}

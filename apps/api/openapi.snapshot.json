@@ -293,6 +293,29 @@
         "title": "Body_update_profile_multipart_v1_me_profile_patch",
         "type": "object"
       },
+      "ChangePasswordRequest": {
+        "description": "Self-service password-change payload \u2014 mirrors\n`changePasswordSchema` in `src/lib/validation.ts`.\n\nReplaces the hand-rolled `payload: dict` + `isinstance` checks that\npreviously kept the request body out of the OpenAPI snapshot (#216).\nThe \"current password is incorrect\" branch stays in the handler \u2014 that\nis a bcrypt verify failure, not a schema validation failure.",
+        "properties": {
+          "currentPassword": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Currentpassword",
+            "type": "string"
+          },
+          "newPassword": {
+            "maxLength": 200,
+            "minLength": 8,
+            "title": "Newpassword",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "title": "ChangePasswordRequest",
+        "type": "object"
+      },
       "CookedRequest": {
         "properties": {
           "note": {
@@ -1531,15 +1554,13 @@
     },
     "/me/password": {
       "post": {
-        "description": "Change the current user's password.\n\n`POST` (not `PUT`) and the `{ status: 'updated' }` response body mirror\nNext's `src/app/api/me/password/route.ts` so the Phase-2 frontend can swap\nto the FastAPI base URL in Phase 4 (#38) without an adapter shim \u2014 see\n#188. On success the legacy `session` cookie is cleared, matching Next's\n`clearSessionCookie` call, so the next request re-authenticates.\n\nBody keys are `currentPassword` / `newPassword` \u2014 the live Next contract\nand what `AccountSettingsForm` sends. (The migration plan's `nextPassword`\nis stale and was never shipped on either side.)",
+        "description": "Change the current user's password.\n\n`POST` (not `PUT`) and the `{ status: 'updated' }` response body mirror\nNext's `src/app/api/me/password/route.ts` so the Phase-2 frontend can swap\nto the FastAPI base URL in Phase 4 (#38) without an adapter shim \u2014 see\n#188. On success the legacy `session` cookie is cleared, matching Next's\n`clearSessionCookie` call, so the next request re-authenticates.\n\nBody keys are `currentPassword` / `newPassword` \u2014 the live Next contract\nand what `AccountSettingsForm` sends. (The migration plan's `nextPassword`\nis stale and was never shipped on either side.) Body shape is validated\nvia `ChangePasswordRequest`; missing/short fields surface as the standard\n`VALIDATION_ERROR` envelope through `_validation_error_handler` (#216).",
         "operationId": "change_password_me_password_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "title": "Payload",
-                "type": "object"
+                "$ref": "#/components/schemas/ChangePasswordRequest"
               }
             }
           },
@@ -3331,15 +3352,13 @@
     },
     "/v1/me/password": {
       "post": {
-        "description": "Change the current user's password.\n\n`POST` (not `PUT`) and the `{ status: 'updated' }` response body mirror\nNext's `src/app/api/me/password/route.ts` so the Phase-2 frontend can swap\nto the FastAPI base URL in Phase 4 (#38) without an adapter shim \u2014 see\n#188. On success the legacy `session` cookie is cleared, matching Next's\n`clearSessionCookie` call, so the next request re-authenticates.\n\nBody keys are `currentPassword` / `newPassword` \u2014 the live Next contract\nand what `AccountSettingsForm` sends. (The migration plan's `nextPassword`\nis stale and was never shipped on either side.)",
+        "description": "Change the current user's password.\n\n`POST` (not `PUT`) and the `{ status: 'updated' }` response body mirror\nNext's `src/app/api/me/password/route.ts` so the Phase-2 frontend can swap\nto the FastAPI base URL in Phase 4 (#38) without an adapter shim \u2014 see\n#188. On success the legacy `session` cookie is cleared, matching Next's\n`clearSessionCookie` call, so the next request re-authenticates.\n\nBody keys are `currentPassword` / `newPassword` \u2014 the live Next contract\nand what `AccountSettingsForm` sends. (The migration plan's `nextPassword`\nis stale and was never shipped on either side.) Body shape is validated\nvia `ChangePasswordRequest`; missing/short fields surface as the standard\n`VALIDATION_ERROR` envelope through `_validation_error_handler` (#216).",
         "operationId": "change_password_v1_me_password_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "title": "Payload",
-                "type": "object"
+                "$ref": "#/components/schemas/ChangePasswordRequest"
               }
             }
           },
