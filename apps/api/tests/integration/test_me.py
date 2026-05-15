@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from tests.helpers.error_envelope import assert_error_envelope
+
 
 pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership")
 
@@ -298,8 +300,9 @@ def test_change_password_too_short_400(client, member_auth):
         json={"currentPassword": "oldpass", "newPassword": "short"},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["message"] == "New password must be at least 8 characters"
+    # Schema-level rejection now flows through `_validation_error_handler`
+    # rather than the legacy hand-rolled `bad_request` (see #216).
+    assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
 
 
 def test_change_password_missing_current_400(client, member_auth):
@@ -309,8 +312,7 @@ def test_change_password_missing_current_400(client, member_auth):
         json={"newPassword": "newpassword"},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["message"] == "Current password is required"
+    assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
 
 
 def test_change_password_missing_new_400(client, member_auth):
@@ -320,8 +322,7 @@ def test_change_password_missing_new_400(client, member_auth):
         json={"currentPassword": "oldpass"},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["message"] == "New password must be at least 8 characters"
+    assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
 
 
 def test_change_password_requires_auth(client):

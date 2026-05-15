@@ -33,3 +33,21 @@ class UpdateProfileRequest(BaseModel):
         max_length=30,
         pattern=r"^[a-zA-Z0-9_]+$",
     )
+
+
+class ChangePasswordRequest(BaseModel):
+    """Self-service password-change payload — mirrors
+    `changePasswordSchema` in `src/lib/validation.ts`.
+
+    Replaces the hand-rolled `payload: dict` + `isinstance` checks that
+    previously kept the request body out of the OpenAPI snapshot (#216).
+    The "current password is incorrect" branch stays in the handler — that
+    is a bcrypt verify failure, not a schema validation failure.
+    """
+
+    # `min_length=1` mirrors Next's `z.string().min(1)` on currentPassword.
+    # The 200 cap is a defensive upper bound, not a parity field; bcrypt
+    # itself truncates at 72 bytes so anything beyond that is wasted input.
+    currentPassword: str = Field(min_length=1, max_length=200)
+    # `min_length=8` mirrors Next's `z.string().min(8)` on newPassword.
+    newPassword: str = Field(min_length=8, max_length=200)
