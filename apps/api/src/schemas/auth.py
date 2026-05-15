@@ -4,7 +4,10 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class SignupRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
+    # Constraints mirror `signupSchema` in src/lib/validation.ts field-for-field
+    # so a frontend client sees identical validation regardless of which backend
+    # it points at — see #188 (payload key alignment).
+    name: str = Field(min_length=1, max_length=100)
     # `EmailStr` enforces RFC-shape parity with Next's `z.string().email()`
     # in src/lib/validation.ts, so malformed addresses fail at the validation
     # boundary (400 VALIDATION_ERROR) instead of reaching the DB lookup.
@@ -13,8 +16,14 @@ class SignupRequest(BaseModel):
     # tolerating whitespace, and domain-case-insensitivity is RFC-correct.
     email: EmailStr = Field(max_length=200)
     username: str = Field(min_length=3, max_length=30, pattern=r"^[a-zA-Z0-9_]+$")
-    password: str = Field(min_length=6, max_length=200)
-    familyMasterKey: str = Field(min_length=6, max_length=200)
+    # `min_length=8` mirrors Next's `z.string().min(8)`. The Next side has no
+    # explicit max; the 200 cap here is a defensive bound, not a parity field.
+    password: str = Field(min_length=8, max_length=200)
+    # Next's `z.string().min(1)` — the master key is verified by bcrypt compare
+    # against the env hash, so length is not a security boundary here; a too-short
+    # key simply fails the compare. Accepting it at the validation layer matches
+    # Next so the error surfaces as "Invalid Family Master Key", not a 400.
+    familyMasterKey: str = Field(min_length=1, max_length=200)
     rememberMe: bool = False
 
 

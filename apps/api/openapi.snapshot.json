@@ -1060,19 +1060,19 @@
           },
           "familyMasterKey": {
             "maxLength": 200,
-            "minLength": 6,
+            "minLength": 1,
             "title": "Familymasterkey",
             "type": "string"
           },
           "name": {
-            "maxLength": 200,
+            "maxLength": 100,
             "minLength": 1,
             "title": "Name",
             "type": "string"
           },
           "password": {
             "maxLength": 200,
-            "minLength": 6,
+            "minLength": 8,
             "title": "Password",
             "type": "string"
           },
@@ -1530,8 +1530,9 @@
       }
     },
     "/me/password": {
-      "put": {
-        "operationId": "change_password_me_password_put",
+      "post": {
+        "description": "Change the current user's password.\n\n`POST` (not `PUT`) and the `{ status: 'updated' }` response body mirror\nNext's `src/app/api/me/password/route.ts` so the Phase-2 frontend can swap\nto the FastAPI base URL in Phase 4 (#38) without an adapter shim \u2014 see\n#188. On success the legacy `session` cookie is cleared, matching Next's\n`clearSessionCookie` call, so the next request re-authenticates.\n\nBody keys are `currentPassword` / `newPassword` \u2014 the live Next contract\nand what `AccountSettingsForm` sends. (The migration plan's `nextPassword`\nis stale and was never shipped on either side.)",
+        "operationId": "change_password_me_password_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3329,8 +3330,9 @@
       }
     },
     "/v1/me/password": {
-      "put": {
-        "operationId": "change_password_v1_me_password_put",
+      "post": {
+        "description": "Change the current user's password.\n\n`POST` (not `PUT`) and the `{ status: 'updated' }` response body mirror\nNext's `src/app/api/me/password/route.ts` so the Phase-2 frontend can swap\nto the FastAPI base URL in Phase 4 (#38) without an adapter shim \u2014 see\n#188. On success the legacy `session` cookie is cleared, matching Next's\n`clearSessionCookie` call, so the next request re-authenticates.\n\nBody keys are `currentPassword` / `newPassword` \u2014 the live Next contract\nand what `AccountSettingsForm` sends. (The migration plan's `nextPassword`\nis stale and was never shipped on either side.)",
+        "operationId": "change_password_v1_me_password_post",
         "requestBody": {
           "content": {
             "application/json": {
