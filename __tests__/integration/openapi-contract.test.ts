@@ -35,8 +35,6 @@ type HttpMethod = 'get' | 'post' | 'patch' | 'put' | 'delete';
 interface FrontendCall {
   method: HttpMethod;
   path: string;
-  // Concrete-path stand-ins for `{post_id}` etc. used to find the operation.
-  // The snapshot uses templated paths; we look them up directly.
   body?: unknown;
   query?: Record<string, unknown>;
   // Where this call lives in src/. Failure messages cite this so the diff is
@@ -100,6 +98,11 @@ const FRONTEND_CALLS: readonly FrontendCall[] = [
     path: '/v1/notifications',
     query: { limit: 20, offset: 0 },
     callSite: 'src/components/notifications/NotificationsFeed.tsx',
+  },
+  {
+    method: 'get',
+    path: '/v1/notifications/unread-count',
+    callSite: 'src/components/navigation/NotificationBell.tsx',
   },
   {
     method: 'post',
@@ -190,9 +193,12 @@ function refToBody(
   schemaRef: AnySchemaObject | undefined
 ): AnySchemaObject | null {
   if (!schemaRef) return null;
-  if (typeof schemaRef.$ref === 'string') {
+  // Local `$ref: "#/components/..."` values need to be prefixed with the
+  // registered snapshot $id so AJV can resolve them against the in-memory
+  // schema rather than treating them as document-relative.
+  if (typeof schemaRef.$ref === 'string' && schemaRef.$ref.startsWith('#')) {
     return {
-      $ref: `family-recipe-openapi${schemaRef.$ref.replace(/^#/, '#')}`,
+      $ref: `family-recipe-openapi${schemaRef.$ref}`,
     } as AnySchemaObject;
   }
   return schemaRef;
