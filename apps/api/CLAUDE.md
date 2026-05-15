@@ -63,6 +63,8 @@ python scripts/dump_openapi.py > openapi.snapshot.json
 
 The script stubs `prisma` in-process (no client generation or DB needed) and writes deterministic, sort-key JSON. Reviewers should treat snapshot diffs as the contract changelog.
 
+The Next side validates its `/v1/*` requests against this snapshot via [\_\_tests\_\_/integration/openapi-contract.test.ts](../../__tests__/integration/openapi-contract.test.ts). When the frontend adds a new `/v1/*` call, append an entry to the `FRONTEND_CALLS` manifest in that file so the contract test guards it.
+
 ## Verification
 
 Before opening a PR that touches this service, run the [FastAPI playbook](../../docs/verification/fastapi.md) — includes the curl+cookie loop, contract parity check against the Next mirror, and the local quality gates.
