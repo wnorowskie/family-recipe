@@ -12,24 +12,44 @@ from src.utils import is_cuid, iso
 
 class TestIsCuid:
     def test_valid_cuid(self):
-        """is_cuid should return True for valid CUIDs."""
-        # CUIDs are 25+ lowercase alphanumeric characters
+        """is_cuid should return True for valid CUIDs (leading 'c', exactly 25 chars)."""
         valid_cuids = [
             "cjld2cjxh0000qzrmn831i7rn",
             "cjld2cyuq0000t3rmniod1foy",
             "cm1234567890abcdefghijklm",
-            "abcdefghijklmnopqrstuvwxy",
         ]
         for cuid in valid_cuids:
             assert is_cuid(cuid) is True, f"Expected {cuid} to be valid"
 
-    def test_invalid_cuid_too_short(self):
-        """is_cuid should return False for strings shorter than 25 chars."""
+    def test_invalid_cuid_wrong_length(self):
+        """is_cuid should return False for strings that aren't exactly 25 chars.
+
+        Prisma always emits 25-char CUIDs, so this regex is intentionally
+        stricter than Zod's `z.string().cuid()` (which accepts any `c` + 8+
+        non-whitespace, non-hyphen chars). Over-rejecting weird-but-Zod-legal
+        shapes is fine here because every call site uses is_cuid as a 404
+        guard before a prisma.*.find_unique — the rejection outcome is the
+        same, just one step earlier.
+        """
         assert is_cuid("abc123") is False
         assert is_cuid("cjld2cjxh0000qzrmn831i7r") is False  # 24 chars
+        # Zod would accept this 27-char `c…` string; we reject it because
+        # no Prisma-issued CUID is ever >25 chars.
+        assert is_cuid("cabcdefghijklmnopqrstuvwxyz") is False
+
+    def test_invalid_cuid_no_leading_c(self):
+        """is_cuid should return False when the first char isn't 'c'."""
+        # 25 chars but starts with a digit.
+        assert is_cuid("0abcdefghijklmnopqrstuvwx") is False
+        # 25 chars but starts with a non-'c' letter.
+        assert is_cuid("abcdefghijklmnopqrstuvwxy") is False
 
     def test_invalid_cuid_uppercase(self):
-        """is_cuid should return False for uppercase characters."""
+        """is_cuid should return False for uppercase characters.
+
+        Stricter than Zod (whose cuid regex is case-insensitive via /i);
+        justified because Prisma's `@default(cuid())` always emits lowercase.
+        """
         assert is_cuid("CJLD2CJXH0000QZRMN831I7RN") is False
         assert is_cuid("cjld2cjxh0000qzrmn831i7rN") is False  # mixed case
 

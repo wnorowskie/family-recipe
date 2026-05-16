@@ -12,7 +12,7 @@ from src.settings import settings
 pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership")
 
 _NOW = datetime(2024, 1, 1, tzinfo=timezone.utc)
-_VALID_CUID = "cl0123456789abcdefghijklmn"
+_VALID_CUID = "cl0123456789abcdefghijklm"
 
 
 def _make_user(idx: int = 1, **overrides) -> SimpleNamespace:
