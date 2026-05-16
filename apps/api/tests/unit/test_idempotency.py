@@ -624,6 +624,52 @@ async def test_cancellation_during_handler_still_deletes_claim(mock_prisma):
 
 
 @pytest.mark.asyncio
+async def test_cancellation_during_stale_takeover_still_deletes_claim(mock_prisma):
+    """Same guarantee as the winner path, but for _take_over_stale:
+    if the task is cancelled while the handler runs inside a stale takeover,
+    asyncio.shield() must ensure the DELETE lands before the task tears down.
+    """
+    handler_started = asyncio.Event()
+
+    async def slow_handler():
+        handler_started.set()
+        await asyncio.sleep(10)  # will be cancelled before this resolves
+        return ({}, 201)
+
+    stale = _row(
+        status_code=201,
+        body={"created": "stale"},
+        created_at=datetime.now(timezone.utc) - idempotency.REPLAY_WINDOW - timedelta(seconds=1),
+        row_id="stale-cancel",
+    )
+    # First query_first: losing claim INSERT (None).
+    # Second query_first: stale takeover UPDATE succeeds (returns refreshed id).
+    mock_prisma.query_first = AsyncMock(
+        side_effect=[None, {"id": "stale-cancel"}]
+    )
+    mock_prisma.execute_raw = AsyncMock(return_value=1)
+    _install_existing_row(mock_prisma, stale)
+
+    task = asyncio.create_task(
+        idempotency.replay_or_record(
+            user_id="u1", request_id="req-stale-cancel", do=slow_handler
+        )
+    )
+
+    await handler_started.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    # Despite cancellation, the DELETE must have been issued against the stale row.
+    assert mock_prisma.execute_raw.await_count == 1
+    sql, claim_id_arg = mock_prisma.execute_raw.await_args.args[:2]
+    assert sql.lstrip().startswith("DELETE")
+    assert claim_id_arg == "stale-cancel"
+
+
+@pytest.mark.asyncio
 async def test_idempotency_key_dependency_missing_header_runs_handler(mock_prisma):
     """Opt-in semantics survive the dependency layer: no X-Request-Id → no store hit."""
     from fastapi import Depends, FastAPI
