@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { apiClient, ApiError } from '@/lib/apiClient';
-import { isFastApiAuthEnabled } from '@/lib/featureFlags';
 
 interface NotificationBellProps {
   initialCount: number;
@@ -21,24 +20,11 @@ export default function NotificationBell({
   const [unreadCount, setUnreadCount] = useState<number>(initialCount);
 
   useEffect(() => {
-    const fastApiOn = isFastApiAuthEnabled();
-
     const refresh = async () => {
       try {
-        if (fastApiOn) {
-          const data = await apiClient.get<UnreadCountResponse>(
-            '/v1/notifications/unread-count'
-          );
-          setUnreadCount(
-            typeof data.unreadCount === 'number' ? data.unreadCount : 0
-          );
-          return;
-        }
-        const response = await fetch('/api/notifications/unread-count', {
-          cache: 'no-store',
-        });
-        if (!response.ok) return;
-        const data = (await response.json()) as UnreadCountResponse;
+        const data = await apiClient.get<UnreadCountResponse>(
+          '/v1/notifications/unread-count'
+        );
         setUnreadCount(
           typeof data.unreadCount === 'number' ? data.unreadCount : 0
         );
@@ -50,13 +36,7 @@ export default function NotificationBell({
       }
     };
 
-    // Flag-on layout intentionally renders with initialCount=0; refresh
-    // immediately so the badge reflects reality post-hydration. Flag-off
-    // layout SSR-prefetches via Prisma, so the immediate call is just an
-    // extra round-trip — the interval below is enough.
-    if (fastApiOn) {
-      refresh();
-    }
+    refresh();
     const interval = setInterval(refresh, 60000);
     return () => clearInterval(interval);
   }, []);

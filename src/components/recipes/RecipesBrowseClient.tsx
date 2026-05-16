@@ -6,6 +6,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { RecipeListItem } from '@/lib/recipes';
 
+import { apiClient, ApiError } from '@/lib/apiClient';
+
 interface TagGroupRecord {
   id: string;
   name: string;
@@ -186,24 +188,20 @@ export default function RecipesBrowseClient({
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/recipes?${queryString}`, {
-          credentials: 'include',
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          const data = await response.json().catch(() => null);
-          throw new Error(data?.error?.message ?? 'Failed to load recipes');
-        }
-        const data = await response.json();
+        const data = await apiClient.get<{
+          items: RecipeListItem[];
+          hasMore: boolean;
+          nextOffset: number;
+        }>(`/v1/recipes?${queryString}`, { signal: controller.signal });
         if (!isCurrent) return;
         setItems(data.items);
         setHasMore(data.hasMore);
         setNextOffset(data.nextOffset);
       } catch (err) {
         if (!isCurrent) return;
-        if ((err as Error).name !== 'AbortError') {
+        if ((err as { name?: string }).name !== 'AbortError') {
           setError(
-            err instanceof Error ? err.message : 'Failed to load recipes'
+            err instanceof ApiError ? err.message : 'Failed to load recipes'
           );
         }
       } finally {
@@ -228,20 +226,17 @@ export default function RecipesBrowseClient({
     try {
       const params = new URLSearchParams(queryString);
       params.set('offset', String(nextOffset));
-      const response = await fetch(`/api/recipes?${params.toString()}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Failed to load more recipes');
-      }
-      const data = await response.json();
+      const data = await apiClient.get<{
+        items: RecipeListItem[];
+        hasMore: boolean;
+        nextOffset: number;
+      }>(`/v1/recipes?${params.toString()}`);
       setItems((prev) => [...prev, ...data.items]);
       setHasMore(data.hasMore);
       setNextOffset(data.nextOffset);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Failed to load more recipes'
+        err instanceof ApiError ? err.message : 'Failed to load more recipes'
       );
     } finally {
       setIsLoadingMore(false);

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 
 import { apiClient, ApiError } from '@/lib/apiClient';
 import { type AuthUser, setSession } from '@/lib/authStore';
-import { isFastApiAuthEnabled } from '@/lib/featureFlags';
 
 interface AuthTokenResponse {
   accessToken: string;
@@ -30,47 +29,18 @@ export default function SignupPage() {
     setError('');
     setIsLoading(true);
 
-    if (isFastApiAuthEnabled()) {
-      try {
-        const data = await apiClient.post<AuthTokenResponse>(
-          '/v1/auth/signup',
-          { body: formData }
-        );
-        setSession(data.accessToken, data.user);
-        router.replace('/timeline');
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setError(err.message);
-        } else {
-          setError('Failed to connect to the server');
-        }
-        setIsLoading(false);
-      }
-      return;
-    }
-
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(formData),
+      const data = await apiClient.post<AuthTokenResponse>('/v1/auth/signup', {
+        body: formData,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error?.message || 'Something went wrong');
-        setIsLoading(false);
-        return;
-      }
-
-      // Success - force a hard reload to ensure cookie is sent with next request
-      window.location.href = '/timeline';
+      setSession(data.accessToken, data.user);
+      router.replace('/timeline');
     } catch (err) {
-      setError('Failed to connect to the server');
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Failed to connect to the server');
+      }
       setIsLoading(false);
     }
   };

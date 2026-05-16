@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { apiClient, ApiError } from '@/lib/apiClient';
 import { type AuthUser, setSession } from '@/lib/authStore';
-import { isFastApiAuthEnabled } from '@/lib/featureFlags';
 
 interface AuthTokenResponse {
   accessToken: string;
@@ -33,47 +32,18 @@ function LoginContent() {
       ? redirectParam
       : '/timeline';
 
-    if (isFastApiAuthEnabled()) {
-      try {
-        const data = await apiClient.post<AuthTokenResponse>('/v1/auth/login', {
-          body: formData,
-        });
-        setSession(data.accessToken, data.user);
-        router.replace(safeRedirect);
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setError(err.message);
-        } else {
-          setError('Failed to connect to the server');
-        }
-        setIsLoading(false);
-      }
-      return;
-    }
-
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(formData),
+      const data = await apiClient.post<AuthTokenResponse>('/v1/auth/login', {
+        body: formData,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error?.message || 'Something went wrong');
-        setIsLoading(false);
-        return;
-      }
-
-      // Success - use Next.js navigation so middleware re-runs with fresh cookies
+      setSession(data.accessToken, data.user);
       router.replace(safeRedirect);
-      router.refresh();
     } catch (err) {
-      setError('Failed to connect to the server');
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Failed to connect to the server');
+      }
       setIsLoading(false);
     }
   };

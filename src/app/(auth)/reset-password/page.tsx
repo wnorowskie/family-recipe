@@ -3,6 +3,8 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { apiClient, ApiError } from '@/lib/apiClient';
+
 export default function ResetPasswordPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -21,29 +23,17 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/reset', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        setError(data?.error?.message || 'Unable to reset password');
-        setIsLoading(false);
-        return;
-      }
-
+      await apiClient.post('/v1/auth/reset', { body: formData });
       setSuccess('Password updated. Please log in with your new password.');
       setFormData({ email: '', masterKey: '', newPassword: '' });
       setIsLoading(false);
       setTimeout(() => router.push('/login'), 1200);
     } catch (err) {
-      setError('Failed to connect to the server');
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Failed to connect to the server');
+      }
       setIsLoading(false);
     }
   };
