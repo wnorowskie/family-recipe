@@ -194,7 +194,13 @@ class TestIdempotency:
         self, client, mock_prisma, mock_user, mock_family_space
     ):
         """First call records; second call with same X-Request-Id returns the
-        cached body without re-running the handler."""
+        cached body without re-running the handler.
+
+        Helper now uses INSERT … ON CONFLICT (issue #196): the first call
+        wins the claim via `query_first`, runs the handler, then `execute_raw`
+        fills the row. The second call loses the claim (`query_first` → None)
+        and replays via `find_unique`.
+        """
         _seed_user_lookup(mock_prisma, mock_user, mock_family_space)
         created = _make_feedback_row(
             id="fb_idem_1",
@@ -203,17 +209,20 @@ class TestIdempotency:
         )
         mock_prisma.feedbacksubmission.create = AsyncMock(return_value=created)
 
-        # First call: no existing idempotency row.
-        mock_prisma.idempotencykey.find_unique = AsyncMock(return_value=None)
-        # Capture what gets upserted so the second call can replay it.
-        upserted: dict = {}
+        # First call: wins the claim. Capture what gets stored on the
+        # fill UPDATE so the second call can replay it.
+        mock_prisma.query_first = AsyncMock(return_value={"id": "claim-feedback"})
+        filled: dict = {}
 
-        async def _record_upsert(*, where, data):
-            upserted["statusCode"] = data["create"]["statusCode"]
-            upserted["responseBody"] = data["create"]["responseBody"]
-            return None
+        async def _record_fill(*args, **kwargs):
+            # _fill_claim's args: (sql, status_code, body_json, claim_id)
+            if args and args[0].lstrip().startswith("UPDATE"):
+                filled["statusCode"] = args[1]
+                filled["responseBodyJson"] = args[2]
+                filled["claimId"] = args[3]
+            return 1
 
-        mock_prisma.idempotencykey.upsert = AsyncMock(side_effect=_record_upsert)
+        mock_prisma.execute_raw = AsyncMock(side_effect=_record_fill)
 
         headers = _bearer_headers(mock_user.id, mock_family_space.id)
         headers["X-Request-Id"] = "req-abc-123"
@@ -223,14 +232,19 @@ class TestIdempotency:
             json={"category": "bug", "message": "first call should land"},
         )
         assert first.status_code == 201
+        assert filled.get("statusCode") == 201, "fill UPDATE must run on the winner path"
 
-        # Second call: idempotency lookup hits the (just-cached) row. We
-        # synthesise a fake row that mirrors what upsert recorded.
+        # Second call: loses the claim → finds the just-filled row → replays.
+        # The Prisma model returns the JSON body parsed (not as a string), so
+        # synthesise the row by re-parsing what the fill captured.
+        import json as _json
         cached_row = SimpleNamespace(
-            statusCode=upserted["statusCode"],
-            responseBody=upserted["responseBody"],
+            id=filled["claimId"],
+            statusCode=filled["statusCode"],
+            responseBody=_json.loads(filled["responseBodyJson"]),
             createdAt=datetime.now(timezone.utc),
         )
+        mock_prisma.query_first = AsyncMock(return_value=None)
         mock_prisma.idempotencykey.find_unique = AsyncMock(return_value=cached_row)
         # If the handler ran again, create would be called twice — assert it
         # is NOT.
