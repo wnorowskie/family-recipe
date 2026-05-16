@@ -17,7 +17,7 @@ from prisma.errors import PrismaError
 
 from ...db import prisma
 from ...dependencies_v1 import get_current_user_v1
-from ...errors import internal_error, validation_error
+from ...errors import internal_error
 from ...schemas.auth import UserResponse
 from ...schemas.notifications import (
     MarkNotificationsReadRequest,
@@ -159,8 +159,6 @@ async def mark_read(
     user: UserResponse = Depends(get_current_user_v1),
 ):
     ids = payload.ids
-    if ids is not None and any(not isinstance(i, str) or not i for i in ids):
-        return validation_error("Invalid notification ID")
 
     try:
         # Family scoping: even though `recipientId == user.id` is enough to
