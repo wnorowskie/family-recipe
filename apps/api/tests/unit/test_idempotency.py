@@ -29,9 +29,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from fastapi import HTTPException
 
 from src import idempotency
+from src.errors import ApiError
 
 
 # ---------------------------------------------------------------------------
@@ -473,13 +473,13 @@ async def test_loser_409s_when_poll_window_expires(mock_prisma, monkeypatch):
         # Should NEVER run — the loser path doesn't invoke the handler.
         raise AssertionError("handler must not run on the loser path")
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ApiError) as exc_info:
         await idempotency.replay_or_record(
             user_id="u1", request_id="rid-stuck", do=handler
         )
 
     assert exc_info.value.status_code == 409
-    assert exc_info.value.detail["code"] == "IDEMPOTENCY_IN_FLIGHT"
+    assert exc_info.value.code == "IDEMPOTENCY_IN_FLIGHT"
 
 
 # ---------------------------------------------------------------------------
@@ -612,3 +612,61 @@ async def test_idempotency_key_dependency_missing_header_runs_handler(mock_prism
     assert counter.calls == 1
     mock_prisma.query_first.assert_not_awaited()
     mock_prisma.execute_raw.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_in_flight_409_surfaces_as_standard_error_envelope(
+    mock_prisma, monkeypatch
+):
+    """End-to-end shape check: when the loser-409 path fires through a
+    real route, the response body must be `{error: {code, message}}` —
+    the documented envelope — not FastAPI's default `{detail: ...}`.
+
+    The helper raises `ApiError` (not `HTTPException`) precisely so the
+    global handler in src/main.py unwraps it into the standard envelope.
+    Without this end-to-end test the 409's response shape could silently
+    diverge from every other error in the API and only surface in SPA
+    bug reports (SPA keys off `error.code`)."""
+    from fastapi import Depends
+    from fastapi.testclient import TestClient
+
+    from src.main import app  # registered ApiError handler is on this app
+
+    counter = SimpleNamespace(calls=0)
+
+    @app.post("/_probe_in_flight")
+    async def probe(idem: idempotency.IdempotencyKey = Depends(idempotency.idempotency_key)):
+        async def _do():
+            counter.calls += 1
+            return ({"n": counter.calls}, 201)
+        body, status = await idem.replay_or_record(user_id="u1", do=_do)
+        return {"body": body, "status": status}
+
+    try:
+        # Force the loser-in-flight path: lose the claim, find an in-flight
+        # row, never let it fill. Tighten the poll so the test exits fast.
+        _install_losing_claim(mock_prisma)
+        _install_existing_row(
+            mock_prisma,
+            _row(
+                status_code=idempotency._IN_FLIGHT_STATUS,
+                body={},
+                row_id="in-flight-e2e",
+            ),
+        )
+        monkeypatch.setattr(idempotency, "_POLL_INTERVAL_S", 0.001)
+
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/_probe_in_flight", headers={"X-Request-Id": "rid-stuck"})
+
+        assert resp.status_code == 409
+        assert resp.json() == {
+            "error": {
+                "code": "IDEMPOTENCY_IN_FLIGHT",
+                "message": "A request with this X-Request-Id is still being processed. Retry shortly.",
+            }
+        }
+        assert counter.calls == 0, "handler must not run on the loser path"
+    finally:
+        # Remove the test-only route so the app stays clean for other tests.
+        app.router.routes = [r for r in app.router.routes if getattr(r, "path", None) != "/_probe_in_flight"]

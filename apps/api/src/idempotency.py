@@ -104,9 +104,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Tuple
 
-from fastapi import Header, HTTPException
+from fastapi import Header
 
 from .db import prisma
+from .errors import ApiError
 
 REPLAY_WINDOW = timedelta(hours=24)
 
@@ -140,7 +141,7 @@ async def replay_or_record(
     Returns the original `(body, status_code)` on replay; otherwise the result
     of the freshly-executed `do()`.
 
-    Raises `HTTPException(409, IDEMPOTENCY_IN_FLIGHT)` if a concurrent caller
+    Raises `ApiError(IDEMPOTENCY_IN_FLIGHT, 409)` if a concurrent caller
     has claimed the key and is still executing its handler when our short
     poll window expires. Callers can retry — by the time they do, the
     winner's row will be filled and the result will replay normally.
@@ -312,12 +313,14 @@ async def _wait_for_winner_or_conflict(
         if row.statusCode != _IN_FLIGHT_STATUS:
             return row.responseBody, row.statusCode
 
-    raise HTTPException(
+    # ApiError (not HTTPException) so the global handler emits the standard
+    # `{error: {code, message}}` envelope — see src/errors.py docstring. A
+    # raw HTTPException would surface as `{detail: {...}}`, breaking the
+    # SPA's `error.code` keying.
+    raise ApiError(
+        code="IDEMPOTENCY_IN_FLIGHT",
+        message="A request with this X-Request-Id is still being processed. Retry shortly.",
         status_code=409,
-        detail={
-            "code": "IDEMPOTENCY_IN_FLIGHT",
-            "message": "A request with this X-Request-Id is still being processed. Retry shortly.",
-        },
     )
 
 
