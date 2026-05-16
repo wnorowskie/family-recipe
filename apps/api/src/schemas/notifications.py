@@ -7,7 +7,9 @@ from __future__ import annotations
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from ..utils import is_cuid
 
 
 NotificationType = Literal["comment", "reaction_batch", "cooked"]
@@ -59,8 +61,21 @@ class NotificationsListResponse(BaseModel):
 
 class MarkNotificationsReadRequest(BaseModel):
     # Optional list of IDs to mark; omitted/empty = mark all unread for caller.
-    # Capped to mirror the Next.js Zod schema in src/lib/validation.ts.
+    # Cap + CUID shape mirror the Next.js Zod (`markNotificationsSchema` in
+    # src/lib/validation.ts) so both surfaces reject the same payloads at the
+    # schema boundary instead of relying on the recipientId/familySpaceId
+    # filter to silently zero-out junk IDs (issue #198).
     ids: Optional[List[str]] = Field(default=None, max_length=50)
+
+    @field_validator("ids")
+    @classmethod
+    def _ids_are_cuids(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return v
+        for entry in v:
+            if not isinstance(entry, str) or not is_cuid(entry):
+                raise ValueError("Invalid notification ID")
+        return v
 
 
 class MarkNotificationsReadResponse(BaseModel):

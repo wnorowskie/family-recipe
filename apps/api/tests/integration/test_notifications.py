@@ -262,15 +262,16 @@ class TestMarkRead:
         mock_prisma.notification.update_many = AsyncMock(return_value=None)
         mock_prisma.notification.count = AsyncMock(return_value=2)
 
+        ids = ["cknotif1234567890123456789", "cknotif9876543210987654321"]
         response = client.post(
             "/v1/notifications/mark-read",
-            json={"ids": ["n1", "n2"]},
+            json={"ids": ids},
             headers=_bearer_headers(mock_user.id, mock_family_space.id),
         )
         assert response.status_code == 200
         assert response.json()["unreadCount"] == 2
         call_kwargs = mock_prisma.notification.update_many.await_args.kwargs
-        assert call_kwargs["where"]["id"] == {"in": ["n1", "n2"]}
+        assert call_kwargs["where"]["id"] == {"in": ids}
         assert call_kwargs["where"]["recipientId"] == mock_user.id
 
     def test_cannot_mark_other_users_notifications(
@@ -286,7 +287,7 @@ class TestMarkRead:
 
         response = client.post(
             "/v1/notifications/mark-read",
-            json={"ids": ["someone_elses_id"]},
+            json={"ids": ["ckother1234567890123456789"]},
             headers=_bearer_headers(mock_user.id, mock_family_space.id),
         )
         assert response.status_code == 200
@@ -298,12 +299,37 @@ class TestMarkRead:
         self, client, mock_prisma, mock_user, mock_family_space
     ):
         _seed_user_lookup(mock_prisma, mock_user, mock_family_space)
+        # Use CUID-shape IDs so the cap (max_length=50) is what's tested,
+        # not the per-item CUID validator added in #198.
+        ids = [f"cknotif{i:018d}aaaaaa" for i in range(51)]
         response = client.post(
             "/v1/notifications/mark-read",
-            json={"ids": [f"id_{i}" for i in range(51)]},
+            json={"ids": ids},
             headers=_bearer_headers(mock_user.id, mock_family_space.id),
         )
         assert response.status_code in (400, 422)
+
+    def test_non_cuid_id_rejected_by_schema(
+        self, client, mock_prisma, mock_user, mock_family_space
+    ):
+        """#198 — FastAPI's mark-read previously accepted any non-empty
+        string and relied on the recipientId/familySpaceId filter to
+        silently no-op. Now matches Next's `z.string().cuid()` so junk
+        IDs are rejected at the schema boundary with the standard
+        VALIDATION_ERROR envelope, before any DB call."""
+        _seed_user_lookup(mock_prisma, mock_user, mock_family_space)
+        mock_prisma.notification.update_many = AsyncMock(return_value=None)
+
+        response = client.post(
+            "/v1/notifications/mark-read",
+            json={"ids": ["not-a-cuid"]},
+            headers=_bearer_headers(mock_user.id, mock_family_space.id),
+        )
+        assert response.status_code == 400
+        assert response.json() == {
+            "error": {"code": "VALIDATION_ERROR", "message": "Invalid input"}
+        }
+        mock_prisma.notification.update_many.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------
