@@ -262,7 +262,7 @@ class TestMarkRead:
         mock_prisma.notification.update_many = AsyncMock(return_value=None)
         mock_prisma.notification.count = AsyncMock(return_value=2)
 
-        ids = ["cknotif1234567890123456789", "cknotif9876543210987654321"]
+        ids = ["cknotif123456789012345678", "cknotif987654321098765432"]
         response = client.post(
             "/v1/notifications/mark-read",
             json={"ids": ids},
@@ -287,7 +287,7 @@ class TestMarkRead:
 
         response = client.post(
             "/v1/notifications/mark-read",
-            json={"ids": ["ckother1234567890123456789"]},
+            json={"ids": ["ckother123456789012345678"]},
             headers=_bearer_headers(mock_user.id, mock_family_space.id),
         )
         assert response.status_code == 200
@@ -301,7 +301,7 @@ class TestMarkRead:
         _seed_user_lookup(mock_prisma, mock_user, mock_family_space)
         # Use CUID-shape IDs so the cap (max_length=50) is what's tested,
         # not the per-item CUID validator added in #198.
-        ids = [f"cknotif{i:018d}aaaaaa" for i in range(51)]
+        ids = [f"cknotif{i:018d}" for i in range(51)]
         response = client.post(
             "/v1/notifications/mark-read",
             json={"ids": ids},

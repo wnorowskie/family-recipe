@@ -10,7 +10,7 @@ import pytest
 
 pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership")
 POST_ID = "ckpost1234567890123456789"
-COMMENT_ID = "ckcomment1234567890123456789"
+COMMENT_ID = "ckcomment1234567890123456"
 
 
 class TestListComments:
