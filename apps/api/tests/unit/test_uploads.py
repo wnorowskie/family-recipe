@@ -536,7 +536,7 @@ class TestDeleteUploads:
 
             with patch("src.uploads.get_gcp_access_token", return_value="token"):
                 with patch("src.gcs_client._encode_rfc3986", side_effect=lambda x: x):
-                    with patch("src.gcs_client.httpx.AsyncClient") as mock_client:
+                    with patch("src.uploads.httpx.AsyncClient") as mock_client:
                         mock_instance = AsyncMock()
                         mock_instance.delete = AsyncMock()
                         mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
