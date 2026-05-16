@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { hasRefreshTokenFromRequest } from './lib/session-core';
+import {
+  hasAnySessionFromRequest,
+  hasRefreshTokenFromRequest,
+} from './lib/session-core';
 
-// Phase 4.2: middleware checks refresh_token cookie presence only — no JWT
-// decode, Edge-runtime safe. Cookie-based Next session helpers stay alive
-// until Phase 4.4 cleanup.
+// Phase 4.2: when FastAPI auth is enabled the middleware checks
+// refresh_token presence only (no JWT decode, Edge-runtime safe).
+// When the flag is off the dual-mode helper is used so the legacy Next
+// session cookie keeps working until Phase 4.4 cleanup.
 
-export function proxy(request: NextRequest) {
-  const hasSession = hasRefreshTokenFromRequest(request);
+export async function proxy(request: NextRequest) {
+  const fastApiEnabled = process.env.NEXT_PUBLIC_USE_FASTAPI_AUTH === 'true';
+  const hasSession = fastApiEnabled
+    ? hasRefreshTokenFromRequest(request)
+    : await hasAnySessionFromRequest(request);
   const { pathname } = request.nextUrl;
 
   // Check if user is accessing auth pages (login, signup)
