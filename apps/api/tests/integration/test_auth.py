@@ -210,7 +210,7 @@ class TestAuthLogin:
     def test_login_invalid_payload(self, client):
         response = client.post(
             "/auth/login",
-            json={"emailOrUsername": "ab", "password": "123"},
+            json={"emailOrUsername": "user@example.com", "password": "123"},
         )
 
         assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
