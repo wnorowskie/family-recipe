@@ -1,6 +1,11 @@
 import { randomBytes } from 'crypto';
 import { expect, test } from '@playwright/test';
 
+// Posting a comment and reacting now call apiClient.post('/v1/...') and
+// apiClient.post('/v1/reactions'). Without NEXT_PUBLIC_API_BASE_URL set at
+// build time those requests land on same-origin Next.js (no /v1/ routes).
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
 /**
  * Smoke flow for #104 — comment + react on a seeded post as `claude-test`,
  * assert both land on the post detail page, and assert the resulting comment
@@ -16,6 +21,9 @@ import { expect, test } from '@playwright/test';
  * global-setup.ts; the notification assertion signs in as `e2e-author` via a
  * fresh context. Both users live in the same FamilySpace via
  * [prisma/seed.ts] `SEED_E2E=1` fixtures.
+ *
+ * Requires NEXT_PUBLIC_API_BASE_URL (FastAPI) — comment and reaction writes
+ * call /v1/posts/{id}/comments and /v1/reactions via apiClient.
  */
 
 test.use({ storageState: 'e2e/.auth/claude-test.json' });
@@ -32,6 +40,11 @@ test(
   'comment + reaction on a post persist and notify the author',
   { tag: ['@smoke'] },
   async ({ page, browser }) => {
+    test.skip(
+      !API_BASE_URL,
+      'NEXT_PUBLIC_API_BASE_URL must be set: comment/reaction writes call /v1/ endpoints which require FastAPI'
+    );
+
     const stamp = `${Date.now()}_${randomBytes(3).toString('hex')}`;
     const commentText = `E2E comment ${stamp}`;
 
