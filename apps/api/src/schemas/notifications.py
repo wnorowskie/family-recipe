@@ -73,7 +73,7 @@ class MarkNotificationsReadRequest(BaseModel):
         if v is None:
             return v
         for entry in v:
-            if not isinstance(entry, str) or not is_cuid(entry):
+            if not is_cuid(entry):
                 raise ValueError("Invalid notification ID")
         return v
 
