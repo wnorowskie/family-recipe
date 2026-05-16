@@ -1,6 +1,11 @@
 import { randomBytes } from 'crypto';
 import { expect, test } from '@playwright/test';
 
+// The "Save cooked event" button triggers apiClient.post('/v1/posts/.../cooked').
+// Without NEXT_PUBLIC_API_BASE_URL set at build time the call lands on
+// same-origin Next.js which has no /v1/ routes, so the dialog never closes.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
 /**
  * Smoke flow for #105 — log a cooked event against the seeded recipe via the
  * UI and assert it renders on the recipe detail page AND on /timeline. This
@@ -15,6 +20,9 @@ import { expect, test } from '@playwright/test';
  *
  * Each run appends a new cooked event — the note carries a unique stamp so
  * assertions can't collide with the seeded cooked event or prior runs.
+ *
+ * Requires NEXT_PUBLIC_API_BASE_URL (FastAPI) — the cooked event form calls
+ * /v1/posts/{id}/cooked via apiClient.
  */
 
 test.use({ storageState: 'e2e/.auth/claude-test.json' });
@@ -26,6 +34,11 @@ test(
   'logged cooked event renders on recipe detail and timeline',
   { tag: ['@smoke'] },
   async ({ page }) => {
+    test.skip(
+      !API_BASE_URL,
+      'NEXT_PUBLIC_API_BASE_URL must be set: cooked event form calls /v1/posts/{id}/cooked which requires FastAPI'
+    );
+
     const note = `E2E cooked note ${Date.now()}_${randomBytes(3).toString('hex')}`;
 
     await page.goto(`/posts/${RECIPE_POST_ID}`);

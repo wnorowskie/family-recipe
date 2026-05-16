@@ -110,6 +110,127 @@ const FRONTEND_CALLS: readonly FrontendCall[] = [
     body: {},
     callSite: 'src/components/notifications/NotificationsFeed.tsx',
   },
+  // Phase 4.1 — migrated from direct fetch('/api/...')
+  {
+    method: 'post',
+    path: '/v1/auth/reset',
+    body: {
+      email: 'alice@example.com',
+      masterKey: 'key',
+      newPassword: 'newpass123',
+    },
+    callSite: 'src/app/(auth)/reset-password/page.tsx',
+  },
+  {
+    method: 'get',
+    path: '/v1/auth/me',
+    callSite: 'src/components/feedback/FeedbackWidget.tsx',
+  },
+  {
+    method: 'post',
+    path: '/v1/feedback',
+    body: { category: 'bug', message: 'Something broke on the timeline page.' },
+    callSite: 'src/components/feedback/FeedbackWidget.tsx',
+  },
+  {
+    method: 'get',
+    path: '/v1/tags',
+    callSite: 'src/components/add/AddPostForm.tsx',
+  },
+  {
+    method: 'post',
+    path: '/v1/recipes/import',
+    body: { url: 'https://example.com/recipe' },
+    callSite: 'src/components/add/AddPostForm.tsx',
+  },
+  {
+    method: 'post',
+    path: '/v1/reactions',
+    body: {
+      targetType: 'post',
+      targetId: 'cuid0000000000000000000001',
+      emoji: '❤️',
+    },
+    callSite: 'src/components/post/PostDetailView.tsx',
+  },
+  {
+    method: 'post',
+    path: '/v1/posts/{post_id}/comments',
+    // multipart/form-data — body schema validation skipped
+    callSite: 'src/components/post/PostDetailView.tsx',
+  },
+  {
+    method: 'get',
+    path: '/v1/posts/{post_id}/comments',
+    query: { offset: 0, limit: 20 },
+    callSite: 'src/components/post/PostDetailView.tsx',
+  },
+  {
+    method: 'delete',
+    path: '/v1/comments/{comment_id}',
+    callSite: 'src/components/post/PostDetailView.tsx',
+  },
+  {
+    method: 'post',
+    path: '/v1/posts/{post_id}/cooked',
+    body: { rating: 5, note: 'Delicious!' },
+    callSite: 'src/components/post/PostDetailView.tsx',
+  },
+  {
+    method: 'get',
+    path: '/v1/posts/{post_id}/cooked',
+    query: { offset: 0, limit: 10 },
+    callSite: 'src/components/post/PostDetailView.tsx',
+  },
+  {
+    method: 'post',
+    path: '/v1/posts/{post_id}/favorite',
+    callSite: 'src/components/post/PostDetailView.tsx',
+  },
+  {
+    method: 'delete',
+    path: '/v1/posts/{post_id}/favorite',
+    callSite: 'src/components/post/PostDetailView.tsx',
+  },
+  {
+    method: 'delete',
+    path: '/v1/posts/{post_id}',
+    callSite: 'src/components/post/PostDetailView.tsx',
+  },
+  {
+    method: 'patch',
+    path: '/v1/me/profile',
+    // multipart/form-data — body schema validation skipped
+    callSite: 'src/components/profile/AccountSettingsForm.tsx',
+  },
+  {
+    method: 'post',
+    path: '/v1/me/password',
+    body: { currentPassword: 'oldpass', newPassword: 'newpass123' },
+    callSite: 'src/components/profile/AccountSettingsForm.tsx',
+  },
+  {
+    method: 'delete',
+    path: '/v1/me/delete',
+    body: { currentPassword: 'password123', confirmation: 'DELETE' },
+    callSite: 'src/components/profile/AccountSettingsForm.tsx',
+  },
+  {
+    method: 'delete',
+    path: '/v1/family/members/{user_id}',
+    callSite: 'src/components/family/FamilyMembersAdmin.tsx',
+  },
+  {
+    method: 'get',
+    path: '/v1/recipes',
+    query: { limit: 20, offset: 0 },
+    callSite: 'src/components/recipes/RecipesBrowseClient.tsx',
+  },
+  {
+    method: 'get',
+    path: '/v1/feedback',
+    callSite: 'src/components/profile/AdminFeedbackList.tsx',
+  },
 ];
 
 interface OpenApiSnapshot {

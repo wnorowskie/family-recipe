@@ -295,6 +295,6 @@ export const apiClient = {
     request<T>('PATCH', path, options),
   put: <T>(path: string, options?: RequestOptions) =>
     request<T>('PUT', path, options),
-  del: <T>(path: string, options?: Omit<RequestOptions, 'body'>) =>
+  del: <T>(path: string, options?: RequestOptions) =>
     request<T>('DELETE', path, options),
 };
