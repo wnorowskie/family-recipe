@@ -202,10 +202,10 @@ async def test_gcs_happy_path_writes_via_legacy_helpers(monkeypatch, tmp_path):
         captured.update(kwargs)
 
     monkeypatch.setattr(
-        multipart_uploads.legacy_uploads, "get_gcp_access_token", fake_get_token
+        multipart_uploads.gcs_client, "get_gcp_access_token", fake_get_token
     )
     monkeypatch.setattr(
-        multipart_uploads.legacy_uploads, "upload_to_gcs", fake_upload_to_gcs
+        multipart_uploads.gcs_client, "upload_to_gcs", fake_upload_to_gcs
     )
 
     upload = _make_upload(_jpeg_bytes(800, 600), "ok.jpg", "image/jpeg")
@@ -241,9 +241,9 @@ async def test_gcs_failure_in_dev_falls_back_to_local_write(monkeypatch, tmp_pat
         return "fake-token"
 
     monkeypatch.setattr(
-        multipart_uploads.legacy_uploads, "get_gcp_access_token", fake_get_token
+        multipart_uploads.gcs_client, "get_gcp_access_token", fake_get_token
     )
-    monkeypatch.setattr(multipart_uploads.legacy_uploads, "upload_to_gcs", boom)
+    monkeypatch.setattr(multipart_uploads.gcs_client, "upload_to_gcs", boom)
 
     upload = _make_upload(_jpeg_bytes(400, 400), "ok.jpg", "image/jpeg")
 
@@ -268,9 +268,9 @@ async def test_gcs_failure_in_production_raises_storage_unavailable(monkeypatch)
         return "fake-token"
 
     monkeypatch.setattr(
-        multipart_uploads.legacy_uploads, "get_gcp_access_token", fake_get_token
+        multipart_uploads.gcs_client, "get_gcp_access_token", fake_get_token
     )
-    monkeypatch.setattr(multipart_uploads.legacy_uploads, "upload_to_gcs", boom)
+    monkeypatch.setattr(multipart_uploads.gcs_client, "upload_to_gcs", boom)
 
     upload = _make_upload(_jpeg_bytes(400, 400), "ok.jpg", "image/jpeg")
 

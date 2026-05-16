@@ -35,7 +35,7 @@ import httpx
 from fastapi import UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from . import uploads as legacy_uploads
+from . import gcs_client
 from .settings import settings
 
 logger = logging.getLogger(__name__)
@@ -185,8 +185,8 @@ def _strip_exif_and_resize(raw: bytes, content_type: str) -> bytes:
 
 
 async def _store_in_gcs(filename: str, body: bytes, content_type: str) -> None:
-    access_token = await legacy_uploads.get_gcp_access_token()
-    await legacy_uploads.upload_to_gcs(
+    access_token = await gcs_client.get_gcp_access_token()
+    await gcs_client.upload_to_gcs(
         bucket=settings.uploads_bucket or "",
         object_key=filename,
         buffer=body,
