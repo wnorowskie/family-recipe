@@ -535,7 +535,8 @@ class TestDeleteUploads:
             mock_settings.uploads_bucket = "test-bucket"
 
             with patch("src.uploads.get_gcp_access_token", return_value="token"):
-                with patch("src.gcs_client._encode_rfc3986", side_effect=lambda x: x):
+                # Patch where each name is used (uploads.py), not where it's defined.
+                with patch("src.uploads._encode_rfc3986", side_effect=lambda x: x):
                     with patch("src.uploads.httpx.AsyncClient") as mock_client:
                         mock_instance = AsyncMock()
                         mock_instance.delete = AsyncMock()
