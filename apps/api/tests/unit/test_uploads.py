@@ -461,7 +461,7 @@ class TestSavePhotoFile:
         with patch("src.uploads.settings") as mock_settings:
             mock_settings.uploads_bucket = "test-bucket"
 
-            with patch("src.gcs_client.get_gcp_access_token", side_effect=Exception("GCP Error")):
+            with patch("src.uploads.get_gcp_access_token", side_effect=Exception("GCP Error")):
                 with patch.object(Path, "mkdir"):
                     with patch.object(Path, "write_bytes"):
                         result = await save_photo_file(mock_file)
@@ -555,7 +555,7 @@ class TestDeleteUploads:
         with patch("src.uploads.settings") as mock_settings:
             mock_settings.uploads_bucket = "test-bucket"
 
-            with patch("src.gcs_client.get_gcp_access_token", side_effect=Exception("GCP Error")):
+            with patch("src.uploads.get_gcp_access_token", side_effect=Exception("GCP Error")):
                 with patch.object(Path, "unlink") as mock_unlink:
                     await delete_uploads(["/uploads/test.jpg"])
 
