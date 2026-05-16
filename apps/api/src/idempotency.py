@@ -55,6 +55,14 @@ The Postgres unique constraint on `(user_id, request_id)` is what makes
 this safe — only one INSERT can succeed per key, regardless of how many
 concurrent retries arrive.
 
+If the winner's coroutine is cancelled mid-handler (e.g. Cloud Run SIGTERM
+on deploy), the `except BaseException` branch fires and calls
+`_delete_claim`. Because the outer task is already being cancelled, a bare
+`await _delete_claim(...)` would itself be immediately cancelled — leaving
+a `status_code = 0` sentinel in the table and locking that key for up to
+24h. To prevent this, the cleanup is wrapped in `asyncio.shield(...)` so
+the DELETE completes even though the outer coroutine is being torn down.
+
 ## TTL strategy: passive overwrite, not lazy delete
 
 Stale rows are not deleted. The replay window is enforced at *read* time:
@@ -159,7 +167,9 @@ async def replay_or_record(
     except BaseException:
         # Handler crashed before producing a result. Drop the claim so the
         # next retry can run fresh — same rationale as the 5xx skip path.
-        await _delete_claim(claim_id)
+        # asyncio.shield ensures the DELETE lands even when the outer task
+        # is being cancelled (e.g. Cloud Run SIGTERM mid-request).
+        await asyncio.shield(_delete_claim(claim_id))
         raise
 
     if status_code >= 500:
@@ -280,7 +290,7 @@ async def _take_over_stale(
     try:
         body, status_code = await do()
     except BaseException:
-        await _delete_claim(refreshed["id"])
+        await asyncio.shield(_delete_claim(refreshed["id"]))
         raise
 
     if status_code >= 500:
