@@ -41,6 +41,18 @@ def create_mock_prisma_client() -> MagicMock:
     mock = MagicMock()
     mock.connect = AsyncMock(return_value=None)
     mock.disconnect = AsyncMock(return_value=None)
+    # Connection-level raw helpers used by src/idempotency.py (issue #196).
+    # Defaults model the "first caller wins" path: query_first returns a
+    # claim row on every call (tests that exercise the loser path override
+    # this), execute_raw is a no-op affecting 1 row.
+    #
+    # NOTE for future test authors: this default means *every* test gets
+    # a phantom "winning claim" response from query_first, even tests that
+    # don't touch idempotency. If you ever write a test that needs to
+    # assert `mock.query_first.assert_not_awaited()`, override this default
+    # to `AsyncMock()` (no return_value) in your test setup first.
+    mock.query_first = AsyncMock(return_value={"id": "test-claim-id"})
+    mock.execute_raw = AsyncMock(return_value=1)
     for name in MODEL_NAMES:
         setattr(mock, name, _make_model_mock())
 
@@ -65,6 +77,14 @@ def create_mock_prisma_client() -> MagicMock:
 
 def reset_mock_prisma(mock_prisma: MagicMock) -> None:
     """Reset all mocked methods on the Prisma client."""
+    for raw_method in ("query_first", "execute_raw"):
+        method = getattr(mock_prisma, raw_method, None)
+        if method:
+            method.reset_mock(return_value=True, side_effect=True)
+    # Restore the "first caller wins" defaults so the next test starts
+    # from a clean baseline rather than the previous test's overrides.
+    mock_prisma.query_first.return_value = {"id": "test-claim-id"}
+    mock_prisma.execute_raw.return_value = 1
     for name in MODEL_NAMES:
         model_mock = getattr(mock_prisma, name, None)
         if not model_mock:
