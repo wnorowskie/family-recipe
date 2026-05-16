@@ -586,6 +586,44 @@ async def test_idempotency_key_dependency_replays_under_fastapi_routing(mock_pri
 
 
 @pytest.mark.asyncio
+async def test_cancellation_during_handler_still_deletes_claim(mock_prisma):
+    """If the winner task is cancelled mid-handler (e.g. Cloud Run SIGTERM),
+    the cleanup DELETE must still land — the claim must not be left stuck at
+    status_code=0 for 24h.
+
+    asyncio.shield() in the except BaseException block is what makes this
+    safe: the inner _delete_claim coroutine runs to completion even though
+    the outer task receives CancelledError.
+    """
+    handler_started = asyncio.Event()
+
+    async def slow_handler():
+        handler_started.set()
+        await asyncio.sleep(10)  # will be cancelled before this resolves
+        return ({}, 201)
+
+    _install_winning_claim(mock_prisma, claim_id="claim-cancel")
+
+    task = asyncio.create_task(
+        idempotency.replay_or_record(
+            user_id="u1", request_id="req-cancel", do=slow_handler
+        )
+    )
+
+    await handler_started.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    # Despite cancellation, the DELETE must have been issued.
+    assert mock_prisma.execute_raw.await_count == 1
+    sql, claim_id_arg = mock_prisma.execute_raw.await_args.args[:2]
+    assert sql.lstrip().startswith("DELETE")
+    assert claim_id_arg == "claim-cancel"
+
+
+@pytest.mark.asyncio
 async def test_idempotency_key_dependency_missing_header_runs_handler(mock_prisma):
     """Opt-in semantics survive the dependency layer: no X-Request-Id → no store hit."""
     from fastapi import Depends, FastAPI
