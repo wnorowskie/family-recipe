@@ -101,6 +101,20 @@ class TestV1Login:
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "INVALID_CREDENTIALS"
 
+    def test_login_two_char_username_falls_through_to_lookup(
+        self, client, mock_prisma
+    ):
+        # Mirrors Next's `loginSchema` (`z.string().min(1)`) — a 1- or 2-char
+        # input is accepted at validation and rejected at the DB lookup with
+        # 401 INVALID_CREDENTIALS, not 400 VALIDATION_ERROR. See #211.
+        mock_prisma.user.find_first.return_value = None
+        response = client.post(
+            "/v1/auth/login",
+            json={"emailOrUsername": "ab", "password": "password123"},
+        )
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "INVALID_CREDENTIALS"
+
     def test_login_remember_me_extends_cookie_max_age(
         self, client, mock_prisma, monkeypatch
     ):

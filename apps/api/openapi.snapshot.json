@@ -695,7 +695,7 @@
         "properties": {
           "emailOrUsername": {
             "maxLength": 200,
-            "minLength": 3,
+            "minLength": 1,
             "title": "Emailorusername",
             "type": "string"
           },

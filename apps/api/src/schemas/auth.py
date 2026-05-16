@@ -31,9 +31,10 @@ class LoginRequest(BaseModel):
     # Intentionally a plain `str`, not `EmailStr` — this field accepts
     # either an email OR a username (see `loginSchema.emailOrUsername` in
     # src/lib/validation.ts), and `EmailStr` would reject perfectly valid
-    # username logins. The `min_length=3` is a pre-existing divergence
-    # from Next's `z.string().min(1)`, tracked separately in #211.
-    emailOrUsername: str = Field(min_length=3, max_length=200)
+    # username logins. `min_length=1` mirrors Next's `z.string().min(1)`;
+    # a too-short value falls through to the `find_first` lookup and
+    # surfaces as 401 INVALID_CREDENTIALS, not 400 VALIDATION_ERROR.
+    emailOrUsername: str = Field(min_length=1, max_length=200)
     password: str = Field(min_length=6, max_length=200)
     rememberMe: bool = False
 
