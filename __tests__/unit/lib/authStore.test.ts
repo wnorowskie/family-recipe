@@ -98,7 +98,7 @@ describe('authStore', () => {
   it('refresh hook updates only the access token, preserving the user', async () => {
     setSession('old-token', fixtureUser);
     const fetchMock = jest.fn().mockImplementation((url: string) => {
-      if (url === '/v1/auth/refresh') {
+      if (url === '/api/auth/bootstrap') {
         return Promise.resolve(
           new Response(JSON.stringify({ accessToken: 'rotated-token' }), {
             status: 200,
@@ -155,7 +155,7 @@ describe('authStore', () => {
   it('refresh failure clears the session', async () => {
     setSession('old-token', fixtureUser);
     const fetchMock = jest.fn().mockImplementation((url: string) => {
-      if (url === '/v1/auth/refresh') {
+      if (url === '/api/auth/bootstrap') {
         return Promise.resolve(
           new Response(JSON.stringify({ error: { code: 'UNAUTHORIZED' } }), {
             status: 401,
