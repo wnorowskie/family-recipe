@@ -50,17 +50,7 @@ export async function getSessionFromRequest(
 
 // Phase 2 dual-mode session check for the Edge middleware. Returns true if
 // either a valid Next session JWT OR a FastAPI refresh_token cookie is
-// present. The refresh_token check is presence-only (no JWT decode) so the
-// helper stays Edge-runtime safe. Phase 4 removes the Next session branch
-// entirely once the FastAPI cutover completes.
-//
-// Trade-off: an attacker setting `Cookie: refresh_token=anything` will be
-// routed to /timeline instead of /login by the middleware. This is NOT an
-// auth bypass — every protected data route still authenticates the cookie
-// against FastAPI and 401s on a forgery. The only consequence is a worse
-// UX surface (the gate page render is wasted on a forged cookie). Acceptable
-// for V1 single-family scope; a future Edge-compatible verifier (e.g.
-// shared HMAC signature on the cookie) could tighten this.
+// present. Kept for any remaining dual-mode callers; Phase 4.4 removes this.
 const REFRESH_COOKIE_NAME = 'refresh_token';
 
 export async function hasAnySessionFromRequest(
@@ -68,6 +58,13 @@ export async function hasAnySessionFromRequest(
 ): Promise<boolean> {
   const session = await getSessionFromRequest(request);
   if (session !== null) return true;
-  const refreshCookie = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
-  return typeof refreshCookie === 'string' && refreshCookie.length > 0;
+  return hasRefreshTokenFromRequest(request);
+}
+
+// Phase 4.2: middleware uses this directly — presence-only check, no JWT
+// decode, Edge-runtime safe. Not an auth bypass: every protected data route
+// still validates the token against FastAPI and 401s on a forgery.
+export function hasRefreshTokenFromRequest(request: NextRequest): boolean {
+  const cookie = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+  return typeof cookie === 'string' && cookie.length > 0;
 }
