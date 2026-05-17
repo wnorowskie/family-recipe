@@ -11,11 +11,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
  * assert both land on the post detail page, and assert the resulting comment
  * notification surfaces for the post author (`e2e-author`) on /notifications.
  *
- * Covers the social loop from [docs/research/automated-testing.md]:
- * POST /api/posts/[postId]/comments, the `Reaction` polymorphism in
- * POST /api/reactions (toggle path in [src/app/api/reactions/route.ts]),
- * and the notification write-through in [src/lib/notifications.ts] (which
- * filters self-actions, hence the two-user seed).
+ * Covers the social loop: POST /v1/posts/{id}/comments, the Reaction
+ * polymorphism in POST /v1/reactions (toggle path), and the notification
+ * write-through in [src/lib/notifications.ts] (which filters self-actions,
+ * hence the two-user seed).
  *
  * The main flow uses the shared `claude-test` storageState from
  * global-setup.ts; the notification assertion signs in as `e2e-author` via a
@@ -67,7 +66,7 @@ test(
       exact: false,
     });
 
-    // POST /api/reactions is a toggle, not additive. A CI retry (retries: 1
+    // POST /v1/reactions is a toggle, not additive. A CI retry (retries: 1
     // in playwright.config) reuses the seeded DB — if a prior attempt left
     // 🔥 on, clicking again would toggle it OFF and the assertion below
     // would fail deterministically. Click only when the pill is absent so
@@ -93,16 +92,13 @@ test(
     // keeps the flow tight — the signup/login UI is exercised in auth.spec.
     const authorContext = await browser.newContext();
     try {
-      const loginResponse = await authorContext.request.post(
-        '/api/auth/login',
-        {
-          data: {
-            emailOrUsername: E2E_AUTHOR_USER,
-            password: E2E_AUTHOR_PASSWORD,
-            rememberMe: false,
-          },
-        }
-      );
+      const loginResponse = await authorContext.request.post('/v1/auth/login', {
+        data: {
+          emailOrUsername: E2E_AUTHOR_USER,
+          password: E2E_AUTHOR_PASSWORD,
+          rememberMe: false,
+        },
+      });
       expect(loginResponse.ok(), 'e2e-author login').toBeTruthy();
 
       const authorPage = await authorContext.newPage();

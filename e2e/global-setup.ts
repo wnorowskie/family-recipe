@@ -21,7 +21,7 @@ async function globalSetup(config: FullConfig) {
   const password = process.env.E2E_PASSWORD ?? 'claude-test-password';
 
   const context = await request.newContext({ baseURL });
-  const response = await context.post('/api/auth/login', {
+  const response = await context.post('/v1/auth/login', {
     data: { emailOrUsername: username, password, rememberMe: false },
   });
 
