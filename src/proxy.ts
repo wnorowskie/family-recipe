@@ -4,6 +4,7 @@ import {
   hasAnySessionFromRequest,
   hasRefreshTokenFromRequest,
 } from './lib/session-core';
+import { isFastApiAuthEnabled } from './lib/featureFlags';
 
 // Phase 4.2: when FastAPI auth is enabled the middleware checks
 // refresh_token presence only (no JWT decode, Edge-runtime safe).
@@ -11,8 +12,7 @@ import {
 // session cookie keeps working until Phase 4.4 cleanup.
 
 export async function proxy(request: NextRequest) {
-  const fastApiEnabled = process.env.NEXT_PUBLIC_USE_FASTAPI_AUTH === 'true';
-  const hasSession = fastApiEnabled
+  const hasSession = isFastApiAuthEnabled()
     ? hasRefreshTokenFromRequest(request)
     : await hasAnySessionFromRequest(request);
   const { pathname } = request.nextUrl;

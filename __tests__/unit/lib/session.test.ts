@@ -18,6 +18,7 @@ import {
   getCurrentUser,
   hasAnySessionFromRequest,
 } from '@/lib/session';
+import { hasRefreshTokenFromRequest } from '@/lib/session-core';
 import { verifyToken, JWTPayload } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
 import { getSignedUploadUrl } from '@/lib/uploads';
@@ -720,6 +721,42 @@ describe('Session Management', () => {
 
       const user = await getCurrentUser(request);
       expect(user).toBeNull();
+    });
+  });
+
+  describe('hasRefreshTokenFromRequest() — Phase 4.2 synchronous helper', () => {
+    it('returns false when refresh_token cookie is absent', () => {
+      const request = new NextRequest('http://localhost/timeline');
+      expect(hasRefreshTokenFromRequest(request)).toBe(false);
+    });
+
+    it('returns false when refresh_token cookie value is empty string', () => {
+      const request = new NextRequest('http://localhost/timeline', {
+        headers: { cookie: 'refresh_token=' },
+      });
+      expect(hasRefreshTokenFromRequest(request)).toBe(false);
+    });
+
+    it('returns true for a non-empty refresh_token cookie', () => {
+      const request = new NextRequest('http://localhost/timeline', {
+        headers: { cookie: 'refresh_token=opaque.jti.value' },
+      });
+      expect(hasRefreshTokenFromRequest(request)).toBe(true);
+    });
+
+    it('returns true regardless of other cookies being present', () => {
+      const request = new NextRequest('http://localhost/timeline', {
+        headers: { cookie: 'session=some-jwt; refresh_token=opaque' },
+      });
+      expect(hasRefreshTokenFromRequest(request)).toBe(true);
+    });
+
+    it('does not call verifyToken — no JWT decode on Edge path', () => {
+      const request = new NextRequest('http://localhost/timeline', {
+        headers: { cookie: 'refresh_token=opaque' },
+      });
+      hasRefreshTokenFromRequest(request);
+      expect(mockVerifyToken).not.toHaveBeenCalled();
     });
   });
 
