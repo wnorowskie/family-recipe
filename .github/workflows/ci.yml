@@ -187,19 +187,6 @@ jobs:
         name: Install Playwright system deps (cache hit)
         run: npx playwright install-deps chromium
       - if: needs.changes.outputs.next == 'true'
-        name: Probe Next.js debug-session endpoint (pre-test diagnostic)
-        run: |
-          # Build + start Next.js, wait for it, then probe our debug endpoint
-          # to verify the server can see NEXT_PUBLIC_API_BASE_URL and reach FastAPI.
-          npm run build
-          npm run start &
-          NEXT_PID=$!
-          until curl -sf http://localhost:3000/api/debug-session > /dev/null 2>&1; do sleep 0.5; done
-          echo "=== /api/debug-session response ==="
-          curl -s http://localhost:3000/api/debug-session
-          echo ""
-          kill $NEXT_PID 2>/dev/null || true
-      - if: needs.changes.outputs.next == 'true'
         name: Run Playwright smoke suite
         run: npm run test:e2e
       - if: failure() && needs.changes.outputs.next == 'true'
