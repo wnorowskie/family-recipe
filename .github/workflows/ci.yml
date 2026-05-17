@@ -156,7 +156,7 @@ jobs:
           cache-dependency-path: apps/api/requirements.txt
       - if: needs.changes.outputs.next == 'true'
         name: Install FastAPI dependencies
-        run: pip install -r apps/api/requirements.txt
+        run: pip install -r requirements.txt
         working-directory: apps/api
       - if: needs.changes.outputs.next == 'true'
         name: Generate Python Prisma client
