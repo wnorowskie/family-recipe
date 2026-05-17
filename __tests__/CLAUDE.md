@@ -5,8 +5,8 @@ Jest tests for the Next.js monolith. See [README.md](README.md) for the director
 ## Layout
 
 - `unit/lib/` — pure-function tests for [src/lib/](../src/lib/) modules
-- `unit/api/` — handler logic with the prisma mock
-- `integration/api/` — endpoint-level tests using [helpers/](integration/helpers/) (request builders + Prisma mock setup)
+- `unit/api/` — handler logic with the prisma mock (only `auth/bootstrap` remains after Phase 4.3)
+- `integration/` — OpenAPI contract test + helpers (request builders + Prisma mock setup)
 - `helpers/glob-default.js` — CommonJS shim required by jest's coverage reporter (the runtime uses ESM `glob` v11)
 
 ## Global mocks (in [jest.setup.js](../jest.setup.js))
@@ -21,18 +21,15 @@ Three things are mocked **for every test** before any test code runs — your te
 
 ## Writing a new test
 
+Route handler tests live under `unit/api/`. The only Next route handler still in `src/app/api/` is `auth/bootstrap/route.ts` (Phase 4.3 deleted the rest — see [docs/verification/next-api.md](../docs/verification/next-api.md)). New backend routes go in FastAPI — see [apps/api/CLAUDE.md](../apps/api/CLAUDE.md).
+
 ```ts
-import { POST } from '@/app/api/posts/route';
-import { prisma } from '@/lib/prisma';
-import { buildAuthedRequest } from '../helpers';
+import { POST } from '@/app/api/auth/bootstrap/route';
+import { buildRequest } from '../helpers';
 
-describe('POST /api/posts', () => {
-  beforeEach(() => {
-    (prisma.post as any).create = jest.fn().mockResolvedValue({ id: 'p1' });
-  });
-
-  it('rejects unauthenticated', async () => {
-    const res = await POST(buildAuthedRequest({ session: null }));
+describe('POST /api/auth/bootstrap', () => {
+  it('returns 401 when refresh fails', async () => {
+    const res = await POST(buildRequest({}));
     expect(res.status).toBe(401);
   });
 });
@@ -42,9 +39,7 @@ The integration helpers expose `buildAuthedRequest`, fixture users, and a Prisma
 
 ## Coverage
 
-`npm run test:coverage` enforces a 75% global threshold (branches/functions/lines/statements) per [jest.config.js](../jest.config.js). Coverage scope is `src/lib/**` and `src/app/api/**` — UI components are excluded. Routes' `route.ts` files are excluded from collection because they're tested via integration tests.
-
-If a unit test needs `path/to/route.ts` coverage, add an integration test instead of changing the collection rules.
+`npm run test:coverage` enforces a 75% global threshold (branches/functions/lines/statements) per [jest.config.js](../jest.config.js). Coverage scope is `src/lib/**` and `src/app/api/**` — UI components are excluded.
 
 ## Don't
 
