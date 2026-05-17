@@ -5,6 +5,8 @@ import { expect, test } from '@playwright/test';
 // apiClient.post('/v1/reactions'). Without NEXT_PUBLIC_API_BASE_URL set at
 // build time those requests land on same-origin Next.js (no /v1/ routes).
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const FASTAPI_BASE_URL =
+  process.env.FASTAPI_BASE_URL ?? 'http://localhost:8000';
 
 /**
  * Smoke flow for #104 — comment + react on a seeded post as `claude-test`,
@@ -92,13 +94,16 @@ test(
     // keeps the flow tight — the signup/login UI is exercised in auth.spec.
     const authorContext = await browser.newContext();
     try {
-      const loginResponse = await authorContext.request.post('/v1/auth/login', {
-        data: {
-          emailOrUsername: E2E_AUTHOR_USER,
-          password: E2E_AUTHOR_PASSWORD,
-          rememberMe: false,
-        },
-      });
+      const loginResponse = await authorContext.request.post(
+        `${FASTAPI_BASE_URL}/v1/auth/login`,
+        {
+          data: {
+            emailOrUsername: E2E_AUTHOR_USER,
+            password: E2E_AUTHOR_PASSWORD,
+            rememberMe: false,
+          },
+        }
+      );
       expect(loginResponse.ok(), 'e2e-author login').toBeTruthy();
 
       const authorPage = await authorContext.newPage();

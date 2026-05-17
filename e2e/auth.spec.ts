@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 
 const TEST_USER = process.env.E2E_USER ?? 'claude-test';
 const TEST_PASSWORD = process.env.E2E_PASSWORD ?? 'claude-test-password';
+const FASTAPI_BASE_URL =
+  process.env.FASTAPI_BASE_URL ?? 'http://localhost:8000';
 
 /**
  * PoC flow for #58. Proves three things in one pass:
@@ -15,13 +17,16 @@ test('login unlocks protected /timeline', async ({ page, context }) => {
   await page.goto('/timeline');
   await expect(page).toHaveURL(/\/login(\?|$)/);
 
-  const login = await context.request.post('/v1/auth/login', {
-    data: {
-      emailOrUsername: TEST_USER,
-      password: TEST_PASSWORD,
-      rememberMe: false,
-    },
-  });
+  const login = await context.request.post(
+    `${FASTAPI_BASE_URL}/v1/auth/login`,
+    {
+      data: {
+        emailOrUsername: TEST_USER,
+        password: TEST_PASSWORD,
+        rememberMe: false,
+      },
+    }
+  );
   expect(login.ok()).toBeTruthy();
 
   await page.goto('/timeline');
