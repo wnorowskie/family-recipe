@@ -38,12 +38,13 @@ test('login unlocks protected /timeline', async ({
 
   expect(login.ok()).toBeTruthy();
 
-  // Re-scope the refresh_token to the Next origin so the middleware sees it.
-  const refreshToken = extractCookieValue(
-    login.headers()['set-cookie'] ?? '',
-    'refresh_token'
-  );
+  // Re-scope both FastAPI cookies to the Next origin so the middleware and
+  // SSR fetchSessionUser see them on requests to localhost:3000.
+  const setCookieHeader = login.headers()['set-cookie'] ?? '';
+  const refreshToken = extractCookieValue(setCookieHeader, 'refresh_token');
+  const csrfToken = extractCookieValue(setCookieHeader, 'csrf_token');
   expect(refreshToken).toBeTruthy();
+  expect(csrfToken).toBeTruthy();
 
   const nextHostname = new URL(baseURL ?? 'http://localhost:3000').hostname;
   await context.addCookies([
@@ -53,6 +54,15 @@ test('login unlocks protected /timeline', async ({
       domain: nextHostname,
       path: '/',
       httpOnly: true,
+      secure: false,
+      sameSite: 'Lax',
+    },
+    {
+      name: 'csrf_token',
+      value: csrfToken!,
+      domain: nextHostname,
+      path: '/',
+      httpOnly: false,
       secure: false,
       sameSite: 'Lax',
     },

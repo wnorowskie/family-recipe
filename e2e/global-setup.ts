@@ -44,20 +44,26 @@ async function globalSetup(config: FullConfig) {
     );
   }
 
-  // Extract refresh_token from the FastAPI Set-Cookie header and re-scope it
-  // to the Next origin so the middleware's hasRefreshTokenFromRequest check
-  // passes when authenticated specs navigate Next pages.
-  const refreshToken = extractCookieValue(
-    response.headers()['set-cookie'] ?? '',
-    'refresh_token'
-  );
+  // Extract both cookies from the FastAPI login response and re-scope them
+  // to the Next origin. The middleware needs refresh_token (presence check);
+  // the SSR layout's fetchSessionUser needs csrf_token to call /v1/auth/session.
+  const setCookieHeader = response.headers()['set-cookie'] ?? '';
+  const refreshToken = extractCookieValue(setCookieHeader, 'refresh_token');
+  const csrfToken = extractCookieValue(setCookieHeader, 'csrf_token');
+
   if (!refreshToken) {
     throw new Error(
       'global-setup: FastAPI login succeeded but no refresh_token cookie in response.'
     );
   }
+  if (!csrfToken) {
+    throw new Error(
+      'global-setup: FastAPI login succeeded but no csrf_token cookie in response.'
+    );
+  }
 
   const nextOrigin = new URL(baseURL);
+  const domain = nextOrigin.hostname;
   const authDir = path.join(__dirname, '.auth');
   await mkdir(authDir, { recursive: true });
 
@@ -66,10 +72,21 @@ async function globalSetup(config: FullConfig) {
       {
         name: 'refresh_token',
         value: refreshToken,
-        domain: nextOrigin.hostname,
+        domain,
         path: '/',
         expires: -1,
         httpOnly: true,
+        secure: false,
+        sameSite: 'Lax' as const,
+      },
+      {
+        // Non-httpOnly — readable by Next SSR forwarding to FastAPI /v1/auth/session.
+        name: 'csrf_token',
+        value: csrfToken,
+        domain,
+        path: '/',
+        expires: -1,
+        httpOnly: false,
         secure: false,
         sameSite: 'Lax' as const,
       },

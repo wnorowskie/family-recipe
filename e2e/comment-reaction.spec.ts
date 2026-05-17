@@ -103,11 +103,11 @@ test(
     await apiCtx.dispose();
     expect(loginResponse.ok(), 'e2e-author login').toBeTruthy();
 
-    const refreshToken = extractCookieValue(
-      loginResponse.headers()['set-cookie'] ?? '',
-      'refresh_token'
-    );
+    const setCookieHeader = loginResponse.headers()['set-cookie'] ?? '';
+    const refreshToken = extractCookieValue(setCookieHeader, 'refresh_token');
+    const csrfToken = extractCookieValue(setCookieHeader, 'csrf_token');
     expect(refreshToken, 'e2e-author refresh_token').toBeTruthy();
+    expect(csrfToken, 'e2e-author csrf_token').toBeTruthy();
 
     const authorContext = await browser.newContext();
     await authorContext.addCookies([
@@ -117,6 +117,15 @@ test(
         domain: 'localhost',
         path: '/',
         httpOnly: true,
+        secure: false,
+        sameSite: 'Lax',
+      },
+      {
+        name: 'csrf_token',
+        value: csrfToken!,
+        domain: 'localhost',
+        path: '/',
+        httpOnly: false,
         secure: false,
         sameSite: 'Lax',
       },

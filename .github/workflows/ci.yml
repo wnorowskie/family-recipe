@@ -129,6 +129,11 @@ jobs:
       CLAUDE_TEST_USER: claude-test
       CLAUDE_TEST_PASSWORD: claude-test-password
       FASTAPI_BASE_URL: http://localhost:8000
+      # Next is built by the Playwright webServer block; NEXT_PUBLIC_* vars
+      # must be present at build time. FastAPI auth is always on in E2E so
+      # the layout uses the refresh-token session path (not the legacy JWT path).
+      NEXT_PUBLIC_USE_FASTAPI_AUTH: "true"
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
     steps:
       - if: needs.changes.outputs.next == 'true'
         uses: actions/checkout@v4
