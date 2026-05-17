@@ -187,6 +187,27 @@ jobs:
         name: Install Playwright system deps (cache hit)
         run: npx playwright install-deps chromium
       - if: needs.changes.outputs.next == 'true'
+        name: Smoke FastAPI session endpoint (pre-test diagnostic)
+        run: |
+          # Login to get cookies, then verify /v1/auth/session validates them.
+          # This mirrors what the Next.js SSR layout does on every page render.
+          LOGIN=$(curl -sf -X POST http://localhost:8000/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"emailOrUsername":"claude-test","password":"claude-test-password","rememberMe":false}' \
+            -c /tmp/e2e-cookies.txt -b /tmp/e2e-cookies.txt \
+            -D /tmp/e2e-login-headers.txt)
+          echo "Login status: $?"
+          echo "Login body: $LOGIN"
+          cat /tmp/e2e-login-headers.txt
+          REFRESH_TOKEN=$(grep -i 'refresh_token' /tmp/e2e-cookies.txt | awk '{print $NF}')
+          CSRF_TOKEN=$(grep -i 'csrf_token' /tmp/e2e-cookies.txt | awk '{print $NF}')
+          echo "refresh_token length: ${#REFRESH_TOKEN}"
+          echo "csrf_token length: ${#CSRF_TOKEN}"
+          SESSION=$(curl -sf http://localhost:8000/v1/auth/session \
+            -H "Cookie: refresh_token=${REFRESH_TOKEN}; csrf_token=${CSRF_TOKEN}" \
+            -H "X-CSRF-Token: ${CSRF_TOKEN}")
+          echo "Session response: $SESSION"
+      - if: needs.changes.outputs.next == 'true'
         name: Run Playwright smoke suite
         run: npm run test:e2e
       - if: failure() && needs.changes.outputs.next == 'true'
