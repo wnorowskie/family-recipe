@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { expect, test } from '@playwright/test';
+import { expect, request, test } from '@playwright/test';
 
 // Posting a comment and reacting now call apiClient.post('/v1/...') and
 // apiClient.post('/v1/reactions'). Without NEXT_PUBLIC_API_BASE_URL set at
@@ -90,22 +90,38 @@ test(
     ).toBeVisible();
 
     // Log in as the post author in a fresh context so we can inspect their
-    // notifications page. Using context.request rather than the UI login form
-    // keeps the flow tight — the signup/login UI is exercised in auth.spec.
-    const authorContext = await browser.newContext();
-    try {
-      const loginResponse = await authorContext.request.post(
-        `${FASTAPI_BASE_URL}/v1/auth/login`,
-        {
-          data: {
-            emailOrUsername: E2E_AUTHOR_USER,
-            password: E2E_AUTHOR_PASSWORD,
-            rememberMe: false,
-          },
-        }
-      );
-      expect(loginResponse.ok(), 'e2e-author login').toBeTruthy();
+    // notifications page. Login goes directly to FastAPI; the refresh_token
+    // is then injected into the browser context scoped to the Next origin.
+    const apiCtx = await request.newContext({ baseURL: FASTAPI_BASE_URL });
+    const loginResponse = await apiCtx.post('/v1/auth/login', {
+      data: {
+        emailOrUsername: E2E_AUTHOR_USER,
+        password: E2E_AUTHOR_PASSWORD,
+        rememberMe: false,
+      },
+    });
+    await apiCtx.dispose();
+    expect(loginResponse.ok(), 'e2e-author login').toBeTruthy();
 
+    const refreshToken = extractCookieValue(
+      loginResponse.headers()['set-cookie'] ?? '',
+      'refresh_token'
+    );
+    expect(refreshToken, 'e2e-author refresh_token').toBeTruthy();
+
+    const authorContext = await browser.newContext();
+    await authorContext.addCookies([
+      {
+        name: 'refresh_token',
+        value: refreshToken!,
+        domain: 'localhost',
+        path: '/',
+        httpOnly: true,
+        secure: false,
+        sameSite: 'Lax',
+      },
+    ]);
+    try {
       const authorPage = await authorContext.newPage();
       await authorPage.goto('/notifications');
       await expect(authorPage).toHaveURL(/\/notifications$/);
@@ -120,3 +136,17 @@ test(
     }
   }
 );
+
+function extractCookieValue(
+  setCookieHeader: string,
+  name: string
+): string | null {
+  for (const line of setCookieHeader.split('\n')) {
+    const [pair] = line.split(';');
+    const eqIdx = pair.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = pair.slice(0, eqIdx).trim();
+    if (key === name) return pair.slice(eqIdx + 1).trim();
+  }
+  return null;
+}

@@ -1,4 +1,4 @@
-import { mkdir } from 'fs/promises';
+import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import { request, type FullConfig } from '@playwright/test';
 
@@ -12,8 +12,11 @@ import { request, type FullConfig } from '@playwright/test';
  * unaffected — they just don't opt in.
  *
  * Login goes directly to FastAPI (/v1/auth/login) via FASTAPI_BASE_URL.
- * The Next server (baseURL) has no /v1/ routes — only auth/bootstrap exists
- * there and it requires an existing refresh cookie, not credentials.
+ * FastAPI sets the refresh_token cookie scoped to its own origin (e.g.
+ * localhost:8000). The middleware on Next (localhost:3000) checks for that
+ * same cookie name — so we extract the cookie value from the FastAPI response
+ * and inject it into the storage state scoped to the Next origin. This lets
+ * authenticated specs work without a cross-origin cookie dance in the browser.
  */
 async function globalSetup(config: FullConfig) {
   const baseURL =
@@ -29,8 +32,8 @@ async function globalSetup(config: FullConfig) {
   const username = process.env.E2E_USER ?? 'claude-test';
   const password = process.env.E2E_PASSWORD ?? 'claude-test-password';
 
-  const context = await request.newContext({ baseURL });
-  const response = await context.post(`${fastapiBaseURL}/v1/auth/login`, {
+  const context = await request.newContext({ baseURL: fastapiBaseURL });
+  const response = await context.post('/v1/auth/login', {
     data: { emailOrUsername: username, password, rememberMe: false },
   });
 
@@ -41,10 +44,59 @@ async function globalSetup(config: FullConfig) {
     );
   }
 
+  // Extract refresh_token from the FastAPI Set-Cookie header and re-scope it
+  // to the Next origin so the middleware's hasRefreshTokenFromRequest check
+  // passes when authenticated specs navigate Next pages.
+  const refreshToken = extractCookieValue(
+    response.headers()['set-cookie'] ?? '',
+    'refresh_token'
+  );
+  if (!refreshToken) {
+    throw new Error(
+      'global-setup: FastAPI login succeeded but no refresh_token cookie in response.'
+    );
+  }
+
+  const nextOrigin = new URL(baseURL);
   const authDir = path.join(__dirname, '.auth');
   await mkdir(authDir, { recursive: true });
-  await context.storageState({ path: path.join(authDir, 'claude-test.json') });
+
+  const storageState = {
+    cookies: [
+      {
+        name: 'refresh_token',
+        value: refreshToken,
+        domain: nextOrigin.hostname,
+        path: '/',
+        expires: -1,
+        httpOnly: true,
+        secure: false,
+        sameSite: 'Lax' as const,
+      },
+    ],
+    origins: [],
+  };
+
+  await writeFile(
+    path.join(authDir, 'claude-test.json'),
+    JSON.stringify(storageState, null, 2)
+  );
   await context.dispose();
+}
+
+function extractCookieValue(
+  setCookieHeader: string,
+  name: string
+): string | null {
+  // Set-Cookie headers may be concatenated with \n when multiple cookies are set.
+  for (const line of setCookieHeader.split('\n')) {
+    const [pair] = line.split(';');
+    const eqIdx = pair.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = pair.slice(0, eqIdx).trim();
+    if (key === name) return pair.slice(eqIdx + 1).trim();
+  }
+  return null;
 }
 
 export default globalSetup;
