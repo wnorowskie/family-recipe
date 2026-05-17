@@ -301,7 +301,7 @@ describe('apiClient', () => {
 
       expect(data).toEqual({ ok: true });
       expect(fetchMock).toHaveBeenCalledTimes(3);
-      expect(fetchMock.mock.calls[1][0]).toBe('/v1/auth/refresh');
+      expect(fetchMock.mock.calls[1][0]).toBe('/api/auth/bootstrap');
       expect(fetchMock.mock.calls[1][1]?.headers).toEqual(
         expect.objectContaining({ 'X-CSRF-Token': 'csrf-abc' })
       );
@@ -356,7 +356,7 @@ describe('apiClient', () => {
       setRefreshHooks({ onRefreshed: jest.fn(), onRefreshFailed: jest.fn() });
 
       fetchMock.mockImplementation((url: string) => {
-        if (url === '/v1/auth/refresh') {
+        if (url === '/api/auth/bootstrap') {
           return Promise.resolve(jsonResponse({ accessToken: 'new-token' }));
         }
         // Each non-refresh URL: first call 401, second call 200.
@@ -379,12 +379,12 @@ describe('apiClient', () => {
       expect(a).toEqual({ url: '/api/a' });
       expect(b).toEqual({ url: '/api/b' });
       const refreshCalls = fetchMock.mock.calls.filter(
-        ([url]) => url === '/v1/auth/refresh'
+        ([url]) => url === '/api/auth/bootstrap'
       );
       expect(refreshCalls).toHaveLength(1);
     });
 
-    it('does not attempt refresh when the failing request is /v1/auth/refresh itself', async () => {
+    it('does not attempt refresh when the failing request is /api/auth/bootstrap itself', async () => {
       setCookie('csrf_token=csrf-abc');
       const onRefreshed = jest.fn();
       const onRefreshFailed = jest.fn();
@@ -394,9 +394,11 @@ describe('apiClient', () => {
         jsonResponse({ error: { code: 'UNAUTHORIZED' } }, { status: 401 })
       );
 
-      await expect(apiClient.post('/v1/auth/refresh')).rejects.toMatchObject({
-        status: 401,
-      });
+      await expect(apiClient.post('/api/auth/bootstrap')).rejects.toMatchObject(
+        {
+          status: 401,
+        }
+      );
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(onRefreshed).not.toHaveBeenCalled();
       expect(onRefreshFailed).not.toHaveBeenCalled();

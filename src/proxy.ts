@@ -31,8 +31,12 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/notifications') ||
     pathname.startsWith('/posts');
 
-  // If user is logged in and trying to access auth pages, redirect to timeline
-  if (hasSession && isAuthPage) {
+  // If user is logged in and trying to access auth pages, redirect to timeline.
+  // Exception: if the SSR layout set ?_se=1 (session error), allow the login
+  // page through so the user can re-authenticate rather than looping between
+  // /timeline (layout fails) → /login (middleware redirects) → repeat.
+  const sessionError = request.nextUrl.searchParams.get('_se') === '1';
+  if (hasSession && isAuthPage && !sessionError) {
     return NextResponse.redirect(new URL('/timeline', request.url));
   }
 

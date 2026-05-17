@@ -1,141 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { hashPassword, verifyPassword } from '@/lib/auth';
-import { signupSchema } from '@/lib/validation';
-import { signToken } from '@/lib/jwt';
-import { setSessionCookie } from '@/lib/session';
-import { logError, logInfo, logWarn } from '@/lib/logger';
-import { signupLimiter, applyRateLimit } from '@/lib/rateLimit';
+
 import {
-  parseRequestBody,
-  badRequestError,
+  createErrorResponse,
   internalError,
+  API_ERROR_CODES,
 } from '@/lib/apiErrors';
-import { ensureFamilySpace, getEnvMasterKeyHash } from '@/lib/masterKey';
-import { getSignedUploadUrl } from '@/lib/uploads';
+
+// Thin proxy for FastAPI /v1/auth/signup. Same origin-scoping rationale as
+// /api/auth/login — FastAPI's Set-Cookie headers must land on the Next.js
+// origin so the SSR layout's cookie check sees them.
+export const runtime = 'nodejs';
+
+function getFastApiBaseUrl(): string | null {
+  const raw = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (!raw) return null;
+  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+}
 
 export async function POST(request: NextRequest) {
-  try {
-    // Apply rate limiting (3 per IP per hour)
-    const rateLimitResult = applyRateLimit(
-      signupLimiter,
-      signupLimiter.getIPKey(request)
-    );
-    if (rateLimitResult) {
-      return rateLimitResult;
-    }
-
-    // Validate input
-    const body = await request.json();
-    const bodyValidation = parseRequestBody(body, signupSchema);
-
-    if (!bodyValidation.success) {
-      return bodyValidation.error;
-    }
-
-    const { name, email, username, password, familyMasterKey, rememberMe } =
-      bodyValidation.data;
-
-    // Load master key hash from env and ensure FamilySpace exists/synced
-    const masterKeyHash = await getEnvMasterKeyHash();
-    const familySpace = await ensureFamilySpace(masterKeyHash);
-
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [{ email: email.trim() }, { username: username.trim() }],
-      },
-    });
-
-    if (existingUser) {
-      logWarn('auth.signup.user_exists', { email, username });
-      return badRequestError(
-        'A user with this email or username already exists'
-      );
-    }
-
-    // Verify the family master key (env-driven)
-    const isValidKey = await verifyPassword(familyMasterKey, masterKeyHash);
-
-    if (!isValidKey) {
-      logWarn('auth.signup.invalid_master_key', { email, username });
-      return badRequestError('Invalid Family Master Key');
-    }
-
-    // Hash the password
-    const passwordHash = await hashPassword(password);
-
-    // Check if this is the first user (becomes owner)
-    const existingMembersCount = await prisma.familyMembership.count({
-      where: { familySpaceId: familySpace.id },
-    });
-
-    const role = existingMembersCount === 0 ? 'owner' : 'member';
-
-    // Create user and membership in a transaction
-    const result = await prisma.$transaction(async (tx: typeof prisma) => {
-      const user = await tx.user.create({
-        data: {
-          name,
-          email: email.trim(),
-          username: username.trim(),
-          passwordHash,
-        },
-      });
-
-      const membership = await tx.familyMembership.create({
-        data: {
-          familySpaceId: familySpace.id,
-          userId: user.id,
-          role,
-        },
-      });
-
-      return { user, membership };
-    });
-
-    // Generate JWT
-    const token = await signToken(
-      {
-        userId: result.user.id,
-        familySpaceId: result.membership.familySpaceId,
-        role: result.membership.role,
-      },
-      rememberMe
-    );
-
-    logInfo('auth.signup.success', {
-      userId: result.user.id,
-      familySpaceId: result.membership.familySpaceId,
-      role: result.membership.role,
-      email: result.user.email,
-      username: result.user.username,
-    });
-
-    // Return user profile with session cookie
-    const avatarUrl = await getSignedUploadUrl(result.user.avatarStorageKey);
-
-    const response = NextResponse.json(
-      {
-        user: {
-          id: result.user.id,
-          name: result.user.name,
-          email: result.user.email,
-          username: result.user.username,
-          emailOrUsername: result.user.email, // backward compatibility
-          avatarUrl,
-          role: result.membership.role,
-          familySpaceId: result.membership.familySpaceId,
-        },
-      },
-      { status: 201 }
-    );
-
-    setSessionCookie(response, token, rememberMe);
-
-    return response;
-  } catch (error) {
-    logError('auth.signup.error', error);
-    return internalError();
+  const baseUrl = getFastApiBaseUrl();
+  if (!baseUrl) {
+    return internalError('API not configured');
   }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return createErrorResponse(
+      API_ERROR_CODES.VALIDATION_ERROR,
+      'Invalid JSON body',
+      400
+    );
+  }
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${baseUrl}/v1/auth/signup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return createErrorResponse(
+      API_ERROR_CODES.INTERNAL_ERROR,
+      'Upstream auth service failed',
+      502
+    );
+  }
+
+  let responseBody: unknown;
+  try {
+    responseBody = await upstream.json();
+  } catch {
+    return createErrorResponse(
+      API_ERROR_CODES.INTERNAL_ERROR,
+      'Invalid response from auth service',
+      502
+    );
+  }
+
+  const response = NextResponse.json(responseBody, { status: upstream.status });
+
+  for (const value of upstream.headers.getSetCookie()) {
+    response.headers.append('Set-Cookie', value);
+  }
+
+  return response;
 }

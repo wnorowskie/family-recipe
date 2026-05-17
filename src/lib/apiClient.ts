@@ -42,9 +42,13 @@ export function clearRefreshHooks(): void {
   refreshHooks = null;
 }
 
-const REFRESH_PATH = '/v1/auth/refresh';
+// /api/auth/bootstrap proxies /v1/auth/refresh through Next.js so the rotated
+// refresh cookie is scoped to the Next.js origin rather than the FastAPI origin.
+const REFRESH_PATH = '/api/auth/bootstrap';
 const AUTH_BYPASS_PATHS = new Set([
   REFRESH_PATH,
+  '/api/auth/login',
+  '/api/auth/logout',
   '/v1/auth/login',
   '/v1/auth/signup',
   '/v1/auth/logout',
@@ -86,7 +90,10 @@ async function tryRefresh(): Promise<boolean> {
 
   inflightRefresh = (async () => {
     try {
-      const response = await fetch(buildUrl(REFRESH_PATH), {
+      // REFRESH_PATH is a same-origin Next.js route handler — never prepend
+      // the FastAPI base URL, or the cookies would be forwarded to the wrong
+      // origin and the refreshed Set-Cookie would not reach the browser.
+      const response = await fetch(REFRESH_PATH, {
         method: 'POST',
         headers,
         credentials: 'include',

@@ -24,7 +24,10 @@ export default async function AppLayout({
     const result = await fetchSessionUser(cookieHeader);
 
     if (!result.ok) {
-      redirect('/login');
+      // Append _se=1 so the middleware doesn't redirect an authenticated user
+      // back to /timeline, which would create an infinite redirect loop when
+      // the upstream session call keeps failing (network error, misconfiguration).
+      redirect('/login?_se=1');
     }
 
     // Flag-on path: defer the unread-count fetch to <NotificationBell>'s

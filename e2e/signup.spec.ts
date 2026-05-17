@@ -55,8 +55,8 @@ test(
     await expect(page).toHaveURL(/\/timeline$/);
 
     const cookies = await context.cookies();
-    const session = cookies.find((c) => c.name === 'session');
-    // JWTs signed with jose always start with the base64-encoded header `eyJ`.
-    expect(session?.value).toMatch(/^eyJ/);
+    const refreshToken = cookies.find((c) => c.name === 'refresh_token');
+    // FastAPI mints a refresh token in the format "{jti}.{secret}".
+    expect(refreshToken?.value).toMatch(/^[^.]+\.[^.]+$/);
   }
 );
