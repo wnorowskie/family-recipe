@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
-import { apiClient } from '@/lib/apiClient';
 import {
   type AuthUser,
   clearSession,
@@ -22,6 +21,10 @@ interface BootstrapResponse {
 // component runs after hydration to call /api/auth/bootstrap, which performs
 // the single per-page rotating /v1/auth/refresh + /v1/auth/me round-trip and
 // propagates the rotated cookies back to the browser.
+//
+// Uses fetch directly (not apiClient) because /api/auth/bootstrap is a
+// same-origin Next.js route handler. apiClient prepends NEXT_PUBLIC_API_BASE_URL
+// which would send the request to FastAPI instead of Next.js.
 
 export default function AuthBootstrap({
   children,
@@ -37,8 +40,15 @@ export default function AuthBootstrap({
 
     if (getAccessToken() !== null) return;
 
-    apiClient
-      .post<BootstrapResponse>('/api/auth/bootstrap')
+    fetch('/api/auth/bootstrap', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`bootstrap ${res.status}`);
+        return res.json() as Promise<BootstrapResponse>;
+      })
       .then((data) => {
         setSession(data.accessToken, data.user);
       })
