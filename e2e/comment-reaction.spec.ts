@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto';
-import { expect, request, test } from '@playwright/test';
+import { request } from '@playwright/test';
+import { expect, test, loginAndInjectCookies } from './fixtures';
 
 // Posting a comment and reacting now call apiClient.post('/v1/...') and
 // apiClient.post('/v1/reactions'). Without NEXT_PUBLIC_API_BASE_URL set at
@@ -18,16 +19,14 @@ const FASTAPI_BASE_URL =
  * write-through in [src/lib/notifications.ts] (which filters self-actions,
  * hence the two-user seed).
  *
- * The main flow uses the shared `claude-test` storageState from
- * global-setup.ts; the notification assertion signs in as `e2e-author` via a
- * fresh context. Both users live in the same FamilySpace via
- * [prisma/seed.ts] `SEED_E2E=1` fixtures.
+ * Does a fresh login before each test (not storageState) so parallel runs
+ * don't race on token rotation via AuthBootstrap. The notification assertion
+ * signs in as `e2e-author` via a separate fresh context. Both users live in
+ * the same FamilySpace via [prisma/seed.ts] `SEED_E2E=1` fixtures.
  *
  * Requires NEXT_PUBLIC_API_BASE_URL (FastAPI) — comment and reaction writes
  * call /v1/posts/{id}/comments and /v1/reactions via apiClient.
  */
-
-test.use({ storageState: 'e2e/.auth/claude-test.json' });
 
 const POST_ID = 'ce2epost001';
 // Fresh emoji — the seed has ❤️ from claude-test, so clicking ❤️ would
@@ -40,10 +39,15 @@ const E2E_AUTHOR_PASSWORD = 'e2e-author-password';
 test(
   'comment + reaction on a post persist and notify the author',
   { tag: ['@smoke'] },
-  async ({ page, browser }) => {
+  async ({ page, context, browser }) => {
     test.skip(
       !API_BASE_URL,
       'NEXT_PUBLIC_API_BASE_URL must be set: comment/reaction writes call /v1/ endpoints which require FastAPI'
+    );
+    await loginAndInjectCookies(
+      context,
+      process.env.E2E_USER ?? 'claude-test',
+      process.env.E2E_PASSWORD ?? 'claude-test-password'
     );
 
     const stamp = `${Date.now()}_${randomBytes(3).toString('hex')}`;
@@ -146,11 +150,8 @@ test(
   }
 );
 
-function extractCookieValue(
-  setCookieHeader: string,
-  name: string
-): string | null {
-  for (const line of setCookieHeader.split('\n')) {
+function extractCookieValue(header: string, name: string): string | null {
+  for (const line of header.split('\n')) {
     const [pair] = line.split(';');
     const eqIdx = pair.indexOf('=');
     if (eqIdx === -1) continue;
