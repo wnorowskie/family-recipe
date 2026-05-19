@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import PostDetailView from '@/components/post/PostDetailView';
-import { getCurrentUser } from '@/lib/session';
+import { getCurrentUser, resolvePageUser } from '@/lib/session';
 import { getPostDetail } from '@/lib/posts';
 
 interface PostDetailPageProps {
@@ -12,20 +12,17 @@ interface PostDetailPageProps {
 
 export default async function PostDetailPage(props: PostDetailPageProps) {
   const params = await props.params;
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('session');
+  const fastApiUser = await resolvePageUser();
 
-  if (!sessionCookie) {
-    redirect('/login');
-  }
-
-  const mockRequest = {
-    cookies: {
-      get: () => sessionCookie,
-    },
-  } as any;
-
-  const user = await getCurrentUser(mockRequest);
+  const user =
+    fastApiUser ??
+    (await (async () => {
+      const cookieStore = await cookies();
+      const sessionCookie = cookieStore.get('session');
+      if (!sessionCookie) redirect('/login');
+      const mockRequest = { cookies: { get: () => sessionCookie } } as any;
+      return getCurrentUser(mockRequest);
+    })());
 
   if (!user) {
     redirect('/login');

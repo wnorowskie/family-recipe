@@ -1,24 +1,21 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import FamilyMembersAdmin from '@/components/family/FamilyMembersAdmin';
-import { getCurrentUser } from '@/lib/session';
+import { getCurrentUser, resolvePageUser } from '@/lib/session';
 import { getFamilyMembers } from '@/lib/family';
 
 export default async function FamilyMembersPage() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('session');
+  const fastApiUser = await resolvePageUser();
 
-  if (!sessionCookie) {
-    redirect('/login');
-  }
-
-  const mockRequest = {
-    cookies: {
-      get: () => sessionCookie,
-    },
-  } as any;
-
-  const user = await getCurrentUser(mockRequest);
+  const user =
+    fastApiUser ??
+    (await (async () => {
+      const cookieStore = await cookies();
+      const sessionCookie = cookieStore.get('session');
+      if (!sessionCookie) redirect('/login');
+      const mockRequest = { cookies: { get: () => sessionCookie } } as any;
+      return getCurrentUser(mockRequest);
+    })());
 
   if (!user) {
     redirect('/login');
@@ -30,7 +27,9 @@ export default async function FamilyMembersPage() {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-wide text-gray-500">Family space</p>
+        <p className="text-xs uppercase tracking-wide text-gray-500">
+          Family space
+        </p>
         <h2 className="text-2xl font-semibold text-gray-900">Members</h2>
         <p className="text-sm text-gray-500">
           {isAdminUser

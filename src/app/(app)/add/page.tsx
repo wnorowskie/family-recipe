@@ -3,23 +3,20 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import AddPostForm from '@/components/add/AddPostForm';
 import LogoutButton from '@/components/LogoutButton';
-import { getCurrentUser } from '@/lib/session';
+import { getCurrentUser, resolvePageUser } from '@/lib/session';
 
 export default async function AddPostPage() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('session');
+  const fastApiUser = await resolvePageUser();
 
-  if (!sessionCookie) {
-    redirect('/login');
-  }
-
-  const mockRequest = {
-    cookies: {
-      get: () => sessionCookie,
-    },
-  } as any;
-
-  const user = await getCurrentUser(mockRequest);
+  const user =
+    fastApiUser ??
+    (await (async () => {
+      const cookieStore = await cookies();
+      const sessionCookie = cookieStore.get('session');
+      if (!sessionCookie) redirect('/login');
+      const mockRequest = { cookies: { get: () => sessionCookie } } as any;
+      return getCurrentUser(mockRequest);
+    })());
 
   if (!user) {
     redirect('/login');
@@ -27,7 +24,6 @@ export default async function AddPostPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <div className="max-w-2xl mx-auto p-4 space-y-6">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">
