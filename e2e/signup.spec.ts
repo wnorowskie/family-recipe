@@ -33,7 +33,9 @@ test(
       'NEXT_PUBLIC_API_BASE_URL must be set: signup form calls /v1/auth/signup which requires FastAPI'
     );
 
-    const stamp = `${Date.now()}_${randomBytes(3).toString('hex')}`;
+    // username must be ≤ 30 chars (FastAPI SignupRequest.username max_length=30).
+    // "e2e_signup_" (11) + 7 timestamp digits + 6 hex = 24 chars.
+    const stamp = `${Date.now().toString().slice(-7)}${randomBytes(3).toString('hex')}`;
     const username = `e2e_signup_${stamp}`;
     const email = `e2e-signup-${stamp}@example.local`;
     const password = 'e2e-signup-password';
