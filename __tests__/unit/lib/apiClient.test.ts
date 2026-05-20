@@ -305,7 +305,7 @@ describe('apiClient', () => {
       expect(fetchMock.mock.calls[1][1]?.headers).toEqual(
         expect.objectContaining({ 'X-CSRF-Token': 'csrf-abc' })
       );
-      expect(onRefreshed).toHaveBeenCalledWith('new-token');
+      expect(onRefreshed).toHaveBeenCalledWith('new-token', undefined);
       expect(onRefreshFailed).not.toHaveBeenCalled();
     });
 
