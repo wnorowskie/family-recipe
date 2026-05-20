@@ -82,7 +82,9 @@ function readCookie(name: string): string | null {
 
 let inflightRefresh: Promise<boolean> | null = null;
 
-async function tryRefresh(): Promise<boolean> {
+// Exported so AuthBootstrap can join the same dedup promise instead of racing
+// with a concurrent tryRefresh() call that would rotate the same token twice.
+export async function tryRefresh(): Promise<boolean> {
   if (typeof document === 'undefined') {
     throw new Error('apiClient.tryRefresh must not run on the server');
   }

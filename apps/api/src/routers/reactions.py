@@ -1,3 +1,5 @@
+from typing import Any, Dict, List
+
 from fastapi import APIRouter, Depends, status
 from prisma.errors import PrismaError
 
@@ -6,16 +8,44 @@ from ..dependencies import get_current_user
 from ..errors import bad_request, internal_error, not_found
 from ..schemas.auth import UserResponse
 from ..schemas.reactions import ReactionRequest
+from ..uploads import create_signed_url_resolver
 from ..utils import is_cuid
 
 router = APIRouter(prefix="/reactions", tags=["reactions"])
 
 
+async def _build_reaction_summary(
+    target_type: str, target_id: str
+) -> List[Dict[str, Any]]:
+    rows = await prisma.reaction.find_many(
+        where={"targetType": target_type, "targetId": target_id},
+        order={"createdAt": "asc"},
+        include={"user": True},
+    )
+    resolve_avatar = create_signed_url_resolver()
+    summary: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        entry = summary.get(r.emoji) or {"emoji": r.emoji, "count": 0, "users": []}
+        entry["count"] += 1
+        entry["users"].append(
+            {
+                "id": r.user.id,
+                "name": r.user.name,
+                "avatarUrl": await resolve_avatar(r.user.avatarStorageKey),
+            }
+        )
+        summary[r.emoji] = entry
+    return list(summary.values())
+
+
 @router.post("", status_code=status.HTTP_200_OK)
-async def toggle_reaction(payload: ReactionRequest, user: UserResponse = Depends(get_current_user)):
+async def toggle_reaction(
+    payload: ReactionRequest, user: UserResponse = Depends(get_current_user)
+):
     try:
         if not is_cuid(payload.targetId):
             return not_found("Target not found")
+
         if payload.targetType == "post":
             target = await prisma.post.find_unique(where={"id": payload.targetId})
             if not target or target.familySpaceId != user.familySpaceId:
@@ -43,19 +73,20 @@ async def toggle_reaction(payload: ReactionRequest, user: UserResponse = Depends
 
         if existing:
             await prisma.reaction.delete(where={"id": existing.id})
-            return {"reacted": False}
+        else:
+            await prisma.reaction.create(
+                data={
+                    "targetType": payload.targetType,
+                    "targetId": payload.targetId,
+                    "userId": user.id,
+                    "emoji": payload.emoji,
+                    "postId": post_id,
+                    "commentId": comment_id,
+                }
+            )
 
-        await prisma.reaction.create(
-            data={
-                "targetType": payload.targetType,
-                "targetId": payload.targetId,
-                "userId": user.id,
-                "emoji": payload.emoji,
-                "postId": post_id,
-                "commentId": comment_id,
-            }
-        )
-        return {"reacted": True}
+        reactions = await _build_reaction_summary(payload.targetType, payload.targetId)
+        return {"reactions": reactions}
     except PrismaError:
         return internal_error("Failed to toggle reaction")
     except (ValueError, TypeError, AttributeError, KeyError):
