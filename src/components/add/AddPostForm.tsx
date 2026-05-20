@@ -1092,20 +1092,10 @@ export default function AddPostForm({
         formData.append('photos', photo.file);
       });
 
-      const endpoint = isEditMode ? `/api/posts/${postId}` : '/api/posts';
-      const response = await fetch(endpoint, {
-        method: isEditMode ? 'PUT' : 'POST',
-        body: formData,
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        const message =
-          data?.error?.message ||
-          (isEditMode ? 'Failed to update post' : 'Failed to create post');
-        throw new Error(message);
-      }
+      const endpoint = isEditMode ? `/v1/posts/${postId}` : '/v1/posts';
+      await (isEditMode
+        ? apiClient.put(endpoint, { body: formData })
+        : apiClient.post(endpoint, { body: formData }));
 
       if (isEditMode && postId) {
         setChangeNote('');

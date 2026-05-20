@@ -27,8 +27,12 @@ export function clearAccessTokenProvider(): void {
 // Phase 2 refresh-and-retry hooks. The auth store registers these at module
 // load (avoids an apiClient ↔ authStore import cycle). When unset, the retry
 // loop is a no-op and 401s propagate as before.
+//
+// `user` is included in onRefreshed so the hook can seed the session even when
+// no prior snapshot exists — e.g., when a component makes an API call before
+// AuthBootstrap has completed its own /api/auth/bootstrap round-trip.
 interface RefreshHooks {
-  onRefreshed: (accessToken: string) => void;
+  onRefreshed: (accessToken: string, user: unknown) => void;
   onRefreshFailed: () => void;
 }
 
@@ -102,7 +106,10 @@ async function tryRefresh(): Promise<boolean> {
         refreshHooks?.onRefreshFailed();
         return false;
       }
-      const body = (await response.json()) as { accessToken?: unknown };
+      const body = (await response.json()) as {
+        accessToken?: unknown;
+        user?: unknown;
+      };
       if (
         typeof body.accessToken !== 'string' ||
         body.accessToken.length === 0
@@ -110,7 +117,7 @@ async function tryRefresh(): Promise<boolean> {
         refreshHooks?.onRefreshFailed();
         return false;
       }
-      refreshHooks?.onRefreshed(body.accessToken);
+      refreshHooks?.onRefreshed(body.accessToken, body.user);
       return true;
     } catch {
       refreshHooks?.onRefreshFailed();

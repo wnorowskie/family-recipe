@@ -12,6 +12,19 @@ export interface AuthUser {
   familySpaceName: string | null;
 }
 
+function isAuthUserShape(value: unknown): value is AuthUser {
+  if (!value || typeof value !== 'object') return false;
+  const c = value as Record<string, unknown>;
+  return (
+    typeof c.id === 'string' &&
+    typeof c.name === 'string' &&
+    typeof c.email === 'string' &&
+    typeof c.username === 'string' &&
+    typeof c.role === 'string' &&
+    typeof c.familySpaceId === 'string'
+  );
+}
+
 interface AuthSnapshot {
   accessToken: string | null;
   user: AuthUser | null;
@@ -61,14 +74,14 @@ setAccessTokenProvider(getAccessToken);
 // only the rotated access token — the user identity carries forward from the
 // existing session, so we update only the token here.
 setRefreshHooks({
-  onRefreshed: (accessToken) => {
-    if (snapshot.user === null) {
-      // Refresh succeeded but we have no user to attach the token to. Treat
-      // it as a failure so the next 401 forces a clean re-login.
+  onRefreshed: (accessToken, userPayload) => {
+    const user =
+      snapshot.user ?? (isAuthUserShape(userPayload) ? userPayload : null);
+    if (user === null) {
       clearSession();
       return;
     }
-    setSession(accessToken, snapshot.user);
+    setSession(accessToken, user);
   },
   onRefreshFailed: clearSession,
 });
