@@ -22,6 +22,7 @@ class TestToggleReaction:
         mock_prisma.post.find_unique = AsyncMock(return_value=self._post())
         mock_prisma.reaction.find_first = AsyncMock(return_value=None)
         mock_prisma.reaction.create = AsyncMock(return_value=None)
+        mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         response = client.post(
             "/reactions",
@@ -40,6 +41,7 @@ class TestToggleReaction:
         existing = SimpleNamespace(id="rx_post")
         mock_prisma.reaction.find_first = AsyncMock(return_value=existing)
         mock_prisma.reaction.delete = AsyncMock(return_value=None)
+        mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         response = client.post(
             "/reactions",
@@ -48,13 +50,14 @@ class TestToggleReaction:
         )
 
         assert response.status_code == 200, response.json()
-        assert response.json()["reacted"] is False
+        assert "reactions" in response.json()
         mock_prisma.reaction.delete.assert_awaited_once_with(where={"id": "rx_post"})
 
     def test_toggle_reaction_add_to_comment(self, client, mock_prisma, member_auth):
         mock_prisma.comment.find_unique = AsyncMock(return_value=self._comment())
         mock_prisma.reaction.find_first = AsyncMock(return_value=None)
         mock_prisma.reaction.create = AsyncMock(return_value=None)
+        mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         response = client.post(
             "/reactions",
@@ -72,6 +75,7 @@ class TestToggleReaction:
         existing = SimpleNamespace(id="rx_comment")
         mock_prisma.reaction.find_first = AsyncMock(return_value=existing)
         mock_prisma.reaction.delete = AsyncMock(return_value=None)
+        mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         response = client.post(
             "/reactions",
@@ -80,13 +84,17 @@ class TestToggleReaction:
         )
 
         assert response.status_code == 200, response.json()
-        assert response.json()["reacted"] is False
+        assert "reactions" in response.json()
         mock_prisma.reaction.delete.assert_awaited_once_with(where={"id": "rx_comment"})
 
-    def test_toggle_reaction_returns_reacted_true(self, client, mock_prisma, member_auth):
+    def test_toggle_reaction_add_returns_reactions_list(self, client, mock_prisma, member_auth):
         mock_prisma.post.find_unique = AsyncMock(return_value=self._post())
         mock_prisma.reaction.find_first = AsyncMock(return_value=None)
         mock_prisma.reaction.create = AsyncMock(return_value=None)
+        user = SimpleNamespace(id="u1", name="Alice", avatarStorageKey=None)
+        mock_prisma.reaction.find_many = AsyncMock(
+            return_value=[SimpleNamespace(emoji="👍", user=user)]
+        )
 
         response = client.post(
             "/reactions",
@@ -95,12 +103,16 @@ class TestToggleReaction:
         )
 
         assert response.status_code == 200, response.json()
-        assert response.json()["reacted"] is True
+        body = response.json()
+        assert "reactions" in body
+        assert body["reactions"][0]["emoji"] == "👍"
+        assert body["reactions"][0]["count"] == 1
 
-    def test_toggle_reaction_returns_reacted_false(self, client, mock_prisma, member_auth):
+    def test_toggle_reaction_remove_returns_empty_reactions(self, client, mock_prisma, member_auth):
         mock_prisma.post.find_unique = AsyncMock(return_value=self._post())
         mock_prisma.reaction.find_first = AsyncMock(return_value=SimpleNamespace(id="rx_remove"))
         mock_prisma.reaction.delete = AsyncMock(return_value=None)
+        mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         response = client.post(
             "/reactions",
@@ -109,7 +121,7 @@ class TestToggleReaction:
         )
 
         assert response.status_code == 200, response.json()
-        assert response.json()["reacted"] is False
+        assert response.json()["reactions"] == []
 
     def test_toggle_reaction_post_not_found_404(self, client, mock_prisma, member_auth):
         mock_prisma.post.find_unique = AsyncMock(return_value=None)
@@ -165,6 +177,7 @@ class TestToggleReaction:
         mock_prisma.post.find_unique = AsyncMock(return_value=self._post())
         mock_prisma.reaction.find_first = AsyncMock(side_effect=[None, None])
         mock_prisma.reaction.create = AsyncMock(return_value=None)
+        mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         first_payload = {"targetType": "post", "targetId": POST_ID, "emoji": "❤️"}
         second_payload = {"targetType": "post", "targetId": POST_ID, "emoji": "🔥"}
@@ -174,7 +187,7 @@ class TestToggleReaction:
 
         assert first_response.status_code == 200, first_response.json()
         assert second_response.status_code == 200, second_response.json()
-        assert second_response.json()["reacted"] is True
+        assert "reactions" in second_response.json()
         assert mock_prisma.reaction.create.await_count == 2
         emojis = [call.kwargs["data"]["emoji"] for call in mock_prisma.reaction.create.await_args_list]
         assert emojis == ["❤️", "🔥"]
