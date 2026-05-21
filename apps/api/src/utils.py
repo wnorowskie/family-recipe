@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from typing import Optional
 
-CUID_REGEX = re.compile(r"^c[a-z0-9]{24}$")
+CUID_REGEX = re.compile(r"^c[a-z0-9]{8,}$")
 
 
 def is_cuid(value: str) -> bool:

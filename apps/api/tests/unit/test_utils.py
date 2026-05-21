@@ -12,7 +12,7 @@ from src.utils import is_cuid, iso
 
 class TestIsCuid:
     def test_valid_cuid(self):
-        """is_cuid should return True for valid CUIDs (leading 'c', exactly 25 chars)."""
+        """is_cuid should return True for valid CUIDs (leading 'c', 9+ lowercase alphanumeric chars)."""
         valid_cuids = [
             "cjld2cjxh0000qzrmn831i7rn",
             "cjld2cyuq0000t3rmniod1foy",
@@ -21,21 +21,22 @@ class TestIsCuid:
         for cuid in valid_cuids:
             assert is_cuid(cuid) is True, f"Expected {cuid} to be valid"
 
-    def test_invalid_cuid_wrong_length(self):
-        """is_cuid should return False for strings that aren't exactly 25 chars.
+    def test_invalid_cuid_too_short(self):
+        """is_cuid should return False for strings shorter than 9 chars total.
 
-        Prisma always emits 25-char CUIDs, so this regex is intentionally
-        stricter than Zod's `z.string().cuid()` (which accepts any `c` + 8+
-        non-whitespace, non-hyphen chars). Over-rejecting weird-but-Zod-legal
-        shapes is fine here because every call site uses is_cuid as a 404
-        guard before a prisma.*.find_unique — the rejection outcome is the
-        same, just one step earlier.
+        Mirrors Zod's z.string().cuid(): 'c' + 8 or more lowercase alphanumeric
+        chars. E2E seed IDs like 'ce2epost001' (11 chars) must pass so that
+        FastAPI route guards don't 404 on seeded fixture IDs.
         """
         assert is_cuid("abc123") is False
-        assert is_cuid("cjld2cjxh0000qzrmn831i7r") is False  # 24 chars
-        # Zod would accept this 27-char `c…` string; we reject it because
-        # no Prisma-issued CUID is ever >25 chars.
-        assert is_cuid("cabcdefghijklmnopqrstuvwxyz") is False
+        assert is_cuid("c1234567") is False  # 8 chars total (only 7 after 'c')
+
+    def test_valid_cuid_varied_lengths(self):
+        """is_cuid should return True for any c + 8+ lowercase alphanumeric chars."""
+        assert is_cuid("ce2epost001") is True       # E2E seed (11 chars)
+        assert is_cuid("ce2erecipe001") is True     # E2E seed (13 chars)
+        assert is_cuid("cjld2cjxh0000qzrmn831i7r") is True   # 24 chars
+        assert is_cuid("cabcdefghijklmnopqrstuvwxyz") is True  # 27 chars
 
     def test_invalid_cuid_no_leading_c(self):
         """is_cuid should return False when the first char isn't 'c'."""
