@@ -153,6 +153,20 @@ async def create_comment(
             },
             include={"author": True},
         )
+
+        if post.authorId != user.id:
+            await prisma.notification.create(
+                data={
+                    "familySpaceId": user.familySpaceId,
+                    "postId": post_id,
+                    "recipientId": post.authorId,
+                    "actorId": user.id,
+                    "type": "comment",
+                    "commentId": comment.id,
+                    "metadata": {"commentText": comment.text},
+                }
+            )
+
         return {
             "comment": {
                 "id": comment.id,
