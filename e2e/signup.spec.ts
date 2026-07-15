@@ -37,7 +37,9 @@ test(
     // "e2e_signup_" (11) + 7 timestamp digits + 6 hex = 24 chars.
     const stamp = `${Date.now().toString().slice(-7)}${randomBytes(3).toString('hex')}`;
     const username = `e2e_signup_${stamp}`;
-    const email = `e2e-signup-${stamp}@example.local`;
+    // @example.com, not @example.local — FastAPI's EmailStr (email-validator)
+    // rejects special-use domains like .local that Zod's .email() accepted.
+    const email = `e2e-signup-${stamp}@example.com`;
     const password = 'e2e-signup-password';
 
     await page.goto('/signup');

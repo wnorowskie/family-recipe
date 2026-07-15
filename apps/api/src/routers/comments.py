@@ -2,6 +2,7 @@ import json
 from typing import Dict, List, Optional, TypedDict
 
 from fastapi import APIRouter, Depends, File, Form, Path, UploadFile, status
+from prisma import Json
 from prisma.errors import PrismaError
 
 from ..db import prisma
@@ -163,7 +164,7 @@ async def create_comment(
                     "actorId": user.id,
                     "type": "comment",
                     "commentId": comment.id,
-                    "metadata": {"commentText": comment.text},
+                    "metadata": Json({"commentText": comment.text}),
                 }
             )
 

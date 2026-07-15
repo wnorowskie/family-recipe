@@ -28,6 +28,16 @@ def _make_prisma_stub():
 
 prisma_stub = types.ModuleType("prisma")
 prisma_stub.Prisma = _make_prisma_stub
+
+
+# Mirrors prisma.Json — handlers wrap Json-column payloads with it
+# (e.g. `Json({"commentText": ...})` in routers/comments.py).
+class _Json:
+    def __init__(self, data):
+        self.data = data
+
+
+prisma_stub.Json = _Json
 errors_stub = types.ModuleType("prisma.errors")
 errors_stub.PrismaError = Exception
 
@@ -137,7 +147,7 @@ def mock_prisma(mocker):
     # Set up common async methods
     for model in ["user", "post", "comment", "reaction", "favorite",
                   "cookedevent", "familyspace", "familymembership", "tag",
-                  "idempotencykey"]:
+                  "idempotencykey", "notification"]:
         model_mock = MagicMock()
         model_mock.find_unique = AsyncMock(return_value=None)
         model_mock.find_first = AsyncMock(return_value=None)

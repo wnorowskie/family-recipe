@@ -210,29 +210,33 @@ async def create_post(
         if upload_error is not None:
             return upload_error
 
+        # Nested relation keys must be omitted (not None) — prisma-client-py
+        # rejects an explicit None for `recipeDetails`/`photos`/`tags` because
+        # it can't match None to any allowed nested-create input type.
+        create_data: Dict[str, object] = {
+            "familySpaceId": user.familySpaceId,
+            "authorId": user.id,
+            "title": post_payload.title,
+            "caption": post_payload.caption,
+            "hasRecipeDetails": bool(recipe_data),
+            "mainPhotoStorageKey": saved_photos[0].storage_key if saved_photos else None,
+        }
+        if recipe_data:
+            create_data["recipeDetails"] = {"create": recipe_data}
+        if saved_photos:
+            create_data["photos"] = {
+                "create": [
+                    {"storageKey": photo.storage_key, "sortOrder": idx}
+                    for idx, photo in enumerate(saved_photos)
+                ]
+            }
+        if tags:
+            create_data["tags"] = {
+                "create": [{"tag": {"connect": {"id": tag["id"]}}} for tag in tags]
+            }
+
         created = await prisma.post.create(
-            data={
-                "familySpaceId": user.familySpaceId,
-                "authorId": user.id,
-                "title": post_payload.title,
-                "caption": post_payload.caption,
-                "hasRecipeDetails": bool(recipe_data),
-                "recipeDetails": {"create": recipe_data} if recipe_data else None,
-                "mainPhotoStorageKey": saved_photos[0].storage_key if saved_photos else None,
-                "photos": {
-                    "create": [
-                        {"storageKey": photo.storage_key, "sortOrder": idx}
-                        for idx, photo in enumerate(saved_photos)
-                    ]
-                }
-                if saved_photos
-                else None,
-                "tags": {
-                    "create": [{"tag": {"connect": {"id": tag["id"]}}} for tag in tags]
-                }
-                if tags
-                else None,
-            },
+            data=create_data,
             include={
                 "photos": True,
                 "recipeDetails": True,
@@ -588,13 +592,6 @@ async def update_post(
             "title": update_payload.title if update_payload.title is not None else post.title,
             "caption": update_payload.caption if update_payload.caption is not None else post.caption,
             "hasRecipeDetails": bool(recipe_data),
-            "recipeDetails": recipe_details_data,
-            "tags": {
-                "deleteMany": {},
-                "create": [{"tag": {"connect": {"id": tag["id"]}}} for tag in tags],
-            }
-            if tags is not None
-            else None,
             "mainPhotoStorageKey": resolved_photos[0][0] if resolved_photos else None,
             "lastEditNote": change_note,
             "lastEditedBy": user.id,
@@ -607,6 +604,15 @@ async def update_post(
             # caller removed every photo). Do not "simplify" this to `[]`.
             "photos": {"deleteMany": {"id": {"notIn": list(keep_existing_ids) if keep_existing_ids else [""]}}},
         }
+        # Nested relation keys must be omitted (not None) — prisma-client-py
+        # rejects an explicit None for `recipeDetails`/`tags`.
+        if recipe_details_data is not None:
+            update_data["recipeDetails"] = recipe_details_data
+        if tags is not None:
+            update_data["tags"] = {
+                "deleteMany": {},
+                "create": [{"tag": {"connect": {"id": tag["id"]}}} for tag in tags],
+            }
 
         async with prisma.tx() as tx:
             await tx.post.update(
