@@ -173,7 +173,14 @@ jobs:
         name: Start FastAPI in background
         run: |
           uvicorn src.main:app --host 0.0.0.0 --port 8000 &
-          until curl -sf http://localhost:8000/v1/health > /dev/null 2>&1; do sleep 0.5; done
+          # Bounded wait (60 × 0.5s) so a FastAPI boot failure fails this step
+          # with a clear message instead of hanging until the job timeout.
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8000/v1/health > /dev/null 2>&1 && exit 0
+            sleep 0.5
+          done
+          echo "FastAPI did not become healthy within 30s" >&2
+          exit 1
         working-directory: apps/api
       - if: needs.changes.outputs.next == 'true'
         name: Cache Playwright browsers

@@ -5,7 +5,7 @@ Jest tests for the Next.js monolith. See [README.md](README.md) for the director
 ## Layout
 
 - `unit/lib/` — pure-function tests for [src/lib/](../src/lib/) modules
-- `unit/api/` — handler logic with the prisma mock (only `auth/bootstrap` remains after Phase 4.3)
+- `unit/api/` — handler logic with the prisma mock (only the `auth/*` routes remain after Phase 4.3: `bootstrap` plus the `login`/`signup`/`logout` origin-scoping proxies)
 - `integration/` — OpenAPI contract test + helpers (request builders + Prisma mock setup)
 - `helpers/glob-default.js` — CommonJS shim required by jest's coverage reporter (the runtime uses ESM `glob` v11)
 
@@ -21,7 +21,7 @@ Three things are mocked **for every test** before any test code runs — your te
 
 ## Writing a new test
 
-Route handler tests live under `unit/api/`. The only Next route handler still in `src/app/api/` is `auth/bootstrap/route.ts` (Phase 4.3 deleted the rest — see [docs/verification/next-api.md](../docs/verification/next-api.md)). New backend routes go in FastAPI — see [apps/api/CLAUDE.md](../apps/api/CLAUDE.md).
+Route handler tests live under `unit/api/`. The only Next route handlers still in `src/app/api/` are the four `auth/*` routes — `bootstrap` plus the `login`/`signup`/`logout` origin-scoping proxies (Phase 4.3 deleted the data routes — see [docs/verification/next-api.md](../docs/verification/next-api.md)). New backend routes go in FastAPI — see [apps/api/CLAUDE.md](../apps/api/CLAUDE.md).
 
 ```ts
 import { POST } from '@/app/api/auth/bootstrap/route';

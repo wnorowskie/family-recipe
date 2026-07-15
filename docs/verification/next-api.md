@@ -1,10 +1,13 @@
 # Next.js API verification
 
-> **Phase 4.3 complete** — all `src/app/api/` route handlers have been deleted except `auth/bootstrap/route.ts`, which remains until the full Phase 4 cutover (#38). The data routes are now served exclusively by FastAPI. See [fastapi.md](fastapi.md) for the FastAPI verification playbook.
+> **Phase 4.3 complete** — all `src/app/api/` **data** route handlers have been deleted. The data routes are now served exclusively by FastAPI; only the four auth routes below remain, until the full Phase 4 cutover (#38). See [fastapi.md](fastapi.md) for the FastAPI verification playbook.
 
 ## What remains in src/app/api/
 
-- `auth/bootstrap/route.ts` — called by `<AuthBootstrap>` on every page load to perform the rotating `/v1/auth/refresh` + `/v1/auth/me` round-trip and propagate rotated cookies back to the browser. This is the **only** Next API route still in production use.
+- `auth/bootstrap/route.ts` — called by `<AuthBootstrap>` on every page load to perform the rotating `/v1/auth/refresh` + `/v1/auth/me` round-trip and propagate rotated cookies back to the browser.
+- `auth/login/route.ts`, `auth/signup/route.ts`, `auth/logout/route.ts` — thin same-origin proxies to the FastAPI `/v1/auth/*` equivalents. They exist for **origin scoping**: FastAPI's `Set-Cookie` headers (refresh/csrf) must land on the Next.js origin so the middleware and SSR layout can see them; a direct browser→FastAPI call would scope the cookies to the FastAPI origin instead. They hold no business logic — validation, bcrypt, and token minting all live in FastAPI.
+
+Unit tests: `__tests__/unit/api/auth/{bootstrap,login,signup,logout}.route.test.ts`.
 
 ## Verifying auth/bootstrap
 
@@ -23,10 +26,10 @@ Confirm bootstrap responds (requires valid FastAPI refresh + csrf cookies in the
 curl -s -w "\n%{http_code}\n" -X POST http://localhost:3000/api/auth/bootstrap | tail -2
 ```
 
-Run the unit test:
+Run the unit tests (bootstrap + the three auth proxies):
 
 ```bash
-npx jest __tests__/unit/api/auth/bootstrap.route.test.ts
+npx jest __tests__/unit/api/auth
 ```
 
 ## Before opening a PR touching auth/bootstrap
