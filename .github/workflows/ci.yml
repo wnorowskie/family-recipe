@@ -132,9 +132,8 @@ jobs:
       # Allow browser → FastAPI cross-origin fetches from the Next.js origin.
       CORS_ALLOW_ORIGINS: http://localhost:3000
       # Next is built by the Playwright webServer block; NEXT_PUBLIC_* vars
-      # must be present at build time. FastAPI auth is always on in E2E so
-      # the layout uses the refresh-token session path (not the legacy JWT path).
-      NEXT_PUBLIC_USE_FASTAPI_AUTH: "true"
+      # must be present at build time. FastAPI is the sole backend — the layout
+      # always uses the refresh-token session path.
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
     steps:
       - if: needs.changes.outputs.next == 'true'

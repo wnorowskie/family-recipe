@@ -1,9 +1,16 @@
-import { AuthenticatedUser } from './apiAuth';
-
 /**
  * Permission helper utilities for consistent authorization checks.
  * Centralizes permission logic to make changes easier.
  */
+
+/**
+ * Minimal authenticated-user context the permission helpers operate on.
+ */
+export interface AuthenticatedUser {
+  id: string;
+  familySpaceId: string;
+  role: string;
+}
 
 /**
  * Check if user is an owner or admin

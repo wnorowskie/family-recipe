@@ -6,6 +6,7 @@ Jest tests for the Next.js monolith. See [README.md](README.md) for the director
 
 - `unit/lib/` — pure-function tests for [src/lib/](../src/lib/) modules
 - `unit/api/` — handler logic with the prisma mock (only the `auth/*` routes remain after Phase 4.3: `bootstrap` plus the `login`/`signup`/`logout` origin-scoping proxies)
+- `unit/app/` — narrow invariant guards over `(app)` server components. Not general page rendering: these call the async page function directly with `redirect` mocked to throw (as it does in real Next), which short-circuits the page before any data fetch, so no data-layer mocks are needed. Outside the coverage scope — the value is regression protection, not coverage.
 - `integration/` — OpenAPI contract test + helpers (request builders + Prisma mock setup)
 - `helpers/glob-default.js` — CommonJS shim required by jest's coverage reporter (the runtime uses ESM `glob` v11)
 

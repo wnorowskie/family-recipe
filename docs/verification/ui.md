@@ -95,8 +95,7 @@ Requires the FastAPI service running locally and the env vars set at build time.
 cd apps/api && docker compose up fastapi
 # Or: cd apps/api && uvicorn src.main:app --reload
 
-# Terminal 2: Next with both env vars
-NEXT_PUBLIC_USE_FASTAPI_AUTH=true \
+# Terminal 2: Next pointed at FastAPI
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 \
   npm run dev
 ```
@@ -116,7 +115,6 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 \
 `e2e/fastapi-auth.spec.ts` covers the full happy path + no-loop guarantee. Run with:
 
 ```bash
-NEXT_PUBLIC_USE_FASTAPI_AUTH=true \
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 \
   npx playwright test e2e/fastapi-auth.spec.ts --grep @fastapi-auth
 ```

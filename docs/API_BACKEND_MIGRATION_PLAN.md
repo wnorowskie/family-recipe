@@ -459,9 +459,11 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ### Feature Flags
 
-- `USE_FASTAPI_AUTH`
-- `USE_FASTAPI_DATA`
-- `USE_REFRESH_TOKEN_FLOW`
+> **Status (post Phase 4.4):** the migration is complete and these flags **no longer exist**. FastAPI is the sole backend; the frontend has no runtime toggle for auth or data. The `NEXT_PUBLIC_USE_FASTAPI_AUTH` env var and the `isFastApiAuthEnabled()` accessor were deleted in Phase 4.4. The list below is retained as a historical record of how the canary rollout was gated. Rollback is now a **code revert** — see [Rollback Mechanics](#rollback-mechanics).
+
+- `USE_FASTAPI_AUTH` (implemented as the build-time `NEXT_PUBLIC_USE_FASTAPI_AUTH` — now removed)
+- `USE_FASTAPI_DATA` (planning-only; never implemented as a code flag)
+- `USE_REFRESH_TOKEN_FLOW` (planning-only; never implemented as a code flag)
 
 ### Feature Flag Enforcement Source
 
@@ -491,13 +493,14 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ### Rollback Mechanics
 
-- **Config owner**: product/infra team owns production feature flag system.
+> **Post Phase 4.4:** there is no runtime flag to flip. The dual-mode codepaths and the legacy Next JWT/cookie session helpers were deleted, so rollback now requires a **code revert and redeploy**, not a config change.
+
 - **Roll back steps**:
-  1. Disable `USE_FASTAPI_DATA` (immediate read/write rollback)
-  2. Disable `USE_FASTAPI_AUTH` (restore Next auth)
-  3. Flush CDN and edge cache if auth redirects cached
-  4. Monitor auth and error metrics for 30 minutes
-- **Time to flip**: < 5 minutes (flag propagation)
+  1. `git revert` the Phase 4.4 cutover commit(s) — this restores the `NEXT_PUBLIC_USE_FASTAPI_AUTH` flag, the dual-mode branches, and the legacy session/cookie helpers (`featureFlags.ts`, `jwt.ts`, `apiAuth.ts`, `getCurrentUser`, the `session-core` cookie helpers). Reverting earlier phases (4.3 route deletion, 4.2 middleware) may also be required if data routes are needed.
+  2. Redeploy the reverted build (the flag is `NEXT_PUBLIC_*`, inlined at build time — a rebuild is mandatory).
+  3. Flush CDN and edge cache if auth redirects cached.
+  4. Monitor auth and error metrics for 30 minutes.
+- **Time to roll back**: bounded by a full build + deploy cycle, not flag propagation. Plan accordingly — this is the point of no _easy_ return called out in the Phase 4.4 ticket.
 
 ---
 

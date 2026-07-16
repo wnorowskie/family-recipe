@@ -1,5 +1,7 @@
 # V1 Summary
 
+> **⚠️ Implementation details are out of date as of the Phase 4 FastAPI cutover (#38).** The product overview still holds; the backend/auth descriptions do not — FastAPI is now the sole backend and the Next JWT/`session`-cookie stack was deleted. See [V1_DETAILED_SUMMARY.md](V1_DETAILED_SUMMARY.md) for the same caveat and #244 for the refresh.
+
 ## Product Overview
 
 - Private, single-family app to share cooking, preserve recipes, and keep everything inside one Family Space protected by a Family Master Key.

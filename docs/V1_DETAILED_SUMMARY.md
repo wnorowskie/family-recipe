@@ -1,5 +1,7 @@
 # V1 Detailed Summary
 
+> **⚠️ Architecture sections are out of date as of the Phase 4 FastAPI cutover (#38).** The **product/feature** narrative below still holds, but anything describing the backend does not: the Next `/api/*` data routes were deleted (Phase 4.3, #231) and the Next JWT/`session`-cookie auth stack — `src/lib/jwt.ts`, `apiAuth.ts`, `getCurrentUser`, `setSessionCookie` — was deleted (Phase 4.4, #232). FastAPI ([apps/api/](../apps/api/)) is now the sole backend; auth uses an in-memory access token plus an HTTP-only `refresh_token` cookie. For current architecture see [API_BACKEND_MIGRATION_PLAN.md](API_BACKEND_MIGRATION_PLAN.md) and the root [CLAUDE.md](../CLAUDE.md). Full refresh tracked in #244.
+
 ## Product & Feature Summary
 
 - **Single-family private space:** V1 targets one household; every member creates their own login and joins the sole `FamilySpace` with a shared master key. The app’s job is equal parts preservation (recipes that last) and social fun (lightweight posts, reactions, and cooked logs).

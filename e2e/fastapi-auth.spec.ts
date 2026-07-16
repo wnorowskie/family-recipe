@@ -2,12 +2,10 @@ import { expect, test } from '@playwright/test';
 
 /**
  * FastAPI auth flow smoke. Tagged @fastapi-auth so it does not run with the
- * default @smoke suite — needs NEXT_PUBLIC_USE_FASTAPI_AUTH=true at build
- * time and a running FastAPI service. CI gates this behind a separate matrix
- * entry.
+ * default @smoke suite — needs a running FastAPI service. CI gates this behind
+ * a separate matrix entry.
  *
  * Run locally:
- *   NEXT_PUBLIC_USE_FASTAPI_AUTH=true \
  *   NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 \
  *     npx playwright test e2e/fastapi-auth.spec.ts --grep @fastapi-auth
  */
@@ -15,15 +13,7 @@ import { expect, test } from '@playwright/test';
 const TEST_USER = process.env.E2E_USER ?? 'claude-test';
 const TEST_PASSWORD = process.env.E2E_PASSWORD ?? 'claude-test-password';
 
-const FASTAPI_AUTH_ENABLED =
-  process.env.NEXT_PUBLIC_USE_FASTAPI_AUTH === 'true';
-
 test.describe('@fastapi-auth FastAPI token flow', () => {
-  test.skip(
-    !FASTAPI_AUTH_ENABLED,
-    'NEXT_PUBLIC_USE_FASTAPI_AUTH=true required'
-  );
-
   test('login persists across reload (refresh-on-bootstrap works)', async ({
     page,
   }) => {
