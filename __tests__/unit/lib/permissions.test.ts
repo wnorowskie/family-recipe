@@ -14,8 +14,8 @@ import {
   canDeletePost,
   canDeleteComment,
   canRemoveMember,
+  type AuthenticatedUser,
 } from '@/lib/permissions';
-import { AuthenticatedUser } from '@/lib/apiAuth';
 
 describe('Permission Helpers', () => {
   // Test user fixtures
@@ -326,7 +326,10 @@ describe('Permission Helpers', () => {
 
     describe('Edge Cases', () => {
       it('should handle target user with undefined role', () => {
-        const targetWithUndefinedRole = { id: 'user_test', role: undefined as any };
+        const targetWithUndefinedRole = {
+          id: 'user_test',
+          role: undefined as any,
+        };
         const result = canRemoveMember(ownerUser, targetWithUndefinedRole);
         expect(result.allowed).toBe(true);
         expect(result.reason).toBeUndefined();

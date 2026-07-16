@@ -1,20 +1,9 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import AccountSettingsForm from '@/components/profile/AccountSettingsForm';
-import { getCurrentUser, resolvePageUser } from '@/lib/session';
+import { resolvePageUser } from '@/lib/session';
 
 export default async function SettingsPage() {
-  const fastApiUser = await resolvePageUser();
-
-  const user =
-    fastApiUser ??
-    (await (async () => {
-      const cookieStore = await cookies();
-      const sessionCookie = cookieStore.get('session');
-      if (!sessionCookie) redirect('/login');
-      const mockRequest = { cookies: { get: () => sessionCookie } } as any;
-      return getCurrentUser(mockRequest);
-    })());
+  const user = await resolvePageUser();
 
   if (!user) {
     redirect('/login');

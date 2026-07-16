@@ -57,7 +57,7 @@ Spin up local Postgres with the one-liner in [docs/verification/next-api.md](doc
 
 **Three Prisma schemas** describe the same domain for different deploy targets — [prisma/CLAUDE.md](prisma/CLAUDE.md) explains when to edit which.
 
-**Auth flow.** Credentials login → bcrypt verify → JWT signed with `jose` ([src/lib/jwt.ts](src/lib/jwt.ts)) → HTTP-only `session` cookie. [src/proxy.ts](src/proxy.ts) gates the `(app)` route group; API routes use `withAuth`/`withRole` wrappers from [src/lib/apiAuth.ts](src/lib/apiAuth.ts). See [src/app/api/CLAUDE.md](src/app/api/CLAUDE.md) for the handler pattern.
+**Auth flow (FastAPI-only since Phase 4.4).** Login/signup/logout POST to same-origin Next proxy routes under [src/app/api/auth/](src/app/api/auth/) that forward to FastAPI `/v1/auth/*`; FastAPI sets HTTP-only `refresh_token` + `csrf_token` cookies (no Next-signed `session` JWT anymore). [src/proxy.ts](src/proxy.ts) (the Next 16 middleware entry) gates the `(app)` route group with a presence-only `refresh_token` check ([`hasRefreshTokenFromRequest`](src/lib/session-core.ts)). SSR pages resolve the user via [`resolvePageUser`](src/lib/session.ts) → FastAPI `/v1/auth/session`; the client mints an in-memory access token via `/api/auth/bootstrap`. The legacy `jwt.ts`/`apiAuth.ts`/`getCurrentUser` cookie helpers were deleted.
 
 **Family scoping is implicit.** Every authenticated handler receives `user.familySpaceId`. All Post/Comment/Reaction/etc. queries must filter by it — there is no row-level enforcement in Prisma, so a missing filter leaks data across families. (V1 only has one family, but the schema is multi-tenant-ready and tests assume the filter is present.)
 
@@ -84,7 +84,7 @@ Spin up local Postgres with the one-liner in [docs/verification/next-api.md](doc
 - **Error responses**: use the helpers in [src/lib/apiErrors.ts](src/lib/apiErrors.ts) (`validationError`, `notFoundError`, etc.) — never construct `NextResponse.json({ error: ... })` ad-hoc.
 - **Logger**: use `logError`/`logWarn` from [src/lib/logger.ts](src/lib/logger.ts). Tests silence `console.*` by default; set `ALLOW_TEST_LOGS=true` to see output.
 - **`bcrypt` vs `bcryptjs`**: prod uses native `bcrypt`; jest aliases it to `bcryptjs` (see [jest.config.js](jest.config.js)) so tests don't need native compilation. Don't import `bcryptjs` directly in app code.
-- **Server vs client components**: default to server components for data fetching; mark `'use client'` only for interactive forms/state. Server components reuse `getCurrentUser` by passing a `NextRequest`-shaped object.
+- **Server vs client components**: default to server components for data fetching; mark `'use client'` only for interactive forms/state. Server components in the `(app)` group resolve the user via `resolvePageUser()` from [src/lib/session.ts](src/lib/session.ts).
 
 ## Before opening a PR
 
