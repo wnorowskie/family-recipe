@@ -15,7 +15,9 @@ export default async function ProfilePage() {
   const user = await resolvePageUser();
 
   if (!user) {
-    redirect('/login');
+    // `_se=1` marks a session error so the middleware lets /login through;
+    // see resolvePageUser in src/lib/session.ts.
+    redirect('/login?_se=1');
   }
 
   const [postsResult, cookedResult, favoritesResult] = await Promise.all([

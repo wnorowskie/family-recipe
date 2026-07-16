@@ -17,9 +17,9 @@ import { bootstrapAccessToken } from '@/lib/auth/bootstrapFromCookies';
 // server components. This route handler is the only place that can refresh
 // AND set the rotated cookies on the response.
 //
-// `withAuth` is intentionally NOT applied: the route forwards opaque FastAPI
-// refresh + csrf cookies and lets FastAPI itself perform the credential check.
-// The Next session JWT is irrelevant here.
+// This route deliberately performs no Next-side auth check: it forwards the
+// opaque FastAPI refresh + csrf cookies and lets FastAPI perform the
+// credential check, 401ing on a forgery.
 //
 // Called once per page load by <AuthBootstrap> after hydration. The
 // (app)/layout SSR uses the non-rotating `fetchSessionUser` helper instead,

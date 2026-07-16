@@ -16,7 +16,7 @@ Before doing any work, a new Claude session should:
 
 Private family-only web app for sharing recipes and cooking activity. Single `FamilySpace` model with members joining via a hashed master key. Currently in **testing with real family users**, so prefer minimal, non-breaking changes and protect existing data flows.
 
-The product/domain truth lives in [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md), [docs/USER_STORIES.md](docs/USER_STORIES.md), and [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md). The most up-to-date narrative is [docs/V1_DETAILED_SUMMARY.md](docs/V1_DETAILED_SUMMARY.md).
+The product/domain truth lives in [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md), [docs/USER_STORIES.md](docs/USER_STORIES.md), and [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md). The fullest **product/feature** narrative is [docs/V1_DETAILED_SUMMARY.md](docs/V1_DETAILED_SUMMARY.md) — but treat its **architecture** sections as historical: they predate the Phase 4 FastAPI cutover (see the banner at the top of that file). For current backend architecture, trust this file and [docs/API_BACKEND_MIGRATION_PLAN.md](docs/API_BACKEND_MIGRATION_PLAN.md).
 
 ## Commands
 

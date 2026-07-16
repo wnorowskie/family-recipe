@@ -9,7 +9,9 @@ export default async function FeedbackAdminPage() {
   const user = await resolvePageUser();
 
   if (!user) {
-    redirect('/login');
+    // `_se=1` marks a session error so the middleware lets /login through;
+    // see resolvePageUser in src/lib/session.ts.
+    redirect('/login?_se=1');
   }
 
   const isAdmin = user.role === 'owner' || user.role === 'admin';
