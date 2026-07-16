@@ -101,7 +101,7 @@ class TestCreateComment:
         )
 
     def test_create_comment_text_only(self, client, mock_prisma, member_auth):
-        mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123"))
+        mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123", authorId="author_999"))
         mock_prisma.comment.create = AsyncMock(return_value=self._comment())
 
         response = client.post(
@@ -112,9 +112,27 @@ class TestCreateComment:
 
         assert response.status_code == 201, response.json()
         assert response.json()["comment"]["text"] == "Great post"
+        # Commenter != post author → the author gets a notification row.
+        mock_prisma.notification.create.assert_awaited_once()
+        notif_data = mock_prisma.notification.create.await_args.kwargs["data"]
+        assert notif_data["recipientId"] == "author_999"
+        assert notif_data["type"] == "comment"
+
+    def test_create_comment_on_own_post_skips_notification(self, client, mock_prisma, member_auth):
+        mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123", authorId="user_test_123"))
+        mock_prisma.comment.create = AsyncMock(return_value=self._comment())
+
+        response = client.post(
+            f"/posts/{POST_ID}/comments",
+            data={"payload": json.dumps({"text": "Note to self"})},
+            headers=member_auth,
+        )
+
+        assert response.status_code == 201, response.json()
+        mock_prisma.notification.create.assert_not_awaited()
 
     def test_create_comment_with_photo(self, client, mock_prisma, member_auth, monkeypatch):
-        mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123"))
+        mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123", authorId="author_999"))
         saved_comment = self._comment(photo_url="https://cdn.test/pic.jpg")
         mock_prisma.comment.create = AsyncMock(return_value=saved_comment)
         monkeypatch.setattr("src.routers.comments.save_photo_file", AsyncMock(return_value={"url": "https://cdn.test/pic.jpg"}))
@@ -130,7 +148,7 @@ class TestCreateComment:
         assert response.json()["comment"]["photoUrl"] == "https://cdn.test/pic.jpg"
 
     def test_create_comment_invalid_mime_403(self, client, mock_prisma, member_auth):
-        mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123"))
+        mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123", authorId="author_999"))
 
         response = client.post(
             f"/posts/{POST_ID}/comments",
@@ -161,7 +179,7 @@ class TestCreateComment:
         assert response.status_code == 401
 
     def test_create_comment_returns_shape(self, client, mock_prisma, member_auth):
-        mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123"))
+        mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123", authorId="author_999"))
         mock_prisma.comment.create = AsyncMock(return_value=self._comment())
 
         response = client.post(

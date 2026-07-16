@@ -27,8 +27,12 @@ export function clearAccessTokenProvider(): void {
 // Phase 2 refresh-and-retry hooks. The auth store registers these at module
 // load (avoids an apiClient ↔ authStore import cycle). When unset, the retry
 // loop is a no-op and 401s propagate as before.
+//
+// `user` is included in onRefreshed so the hook can seed the session even when
+// no prior snapshot exists — e.g., when a component makes an API call before
+// AuthBootstrap has completed its own /api/auth/bootstrap round-trip.
 interface RefreshHooks {
-  onRefreshed: (accessToken: string) => void;
+  onRefreshed: (accessToken: string, user: unknown) => void;
   onRefreshFailed: () => void;
 }
 
@@ -42,9 +46,13 @@ export function clearRefreshHooks(): void {
   refreshHooks = null;
 }
 
-const REFRESH_PATH = '/v1/auth/refresh';
+// /api/auth/bootstrap proxies /v1/auth/refresh through Next.js so the rotated
+// refresh cookie is scoped to the Next.js origin rather than the FastAPI origin.
+const REFRESH_PATH = '/api/auth/bootstrap';
 const AUTH_BYPASS_PATHS = new Set([
   REFRESH_PATH,
+  '/api/auth/login',
+  '/api/auth/logout',
   '/v1/auth/login',
   '/v1/auth/signup',
   '/v1/auth/logout',
@@ -74,7 +82,9 @@ function readCookie(name: string): string | null {
 
 let inflightRefresh: Promise<boolean> | null = null;
 
-async function tryRefresh(): Promise<boolean> {
+// Exported so AuthBootstrap can join the same dedup promise instead of racing
+// with a concurrent tryRefresh() call that would rotate the same token twice.
+export async function tryRefresh(): Promise<boolean> {
   if (typeof document === 'undefined') {
     throw new Error('apiClient.tryRefresh must not run on the server');
   }
@@ -86,7 +96,10 @@ async function tryRefresh(): Promise<boolean> {
 
   inflightRefresh = (async () => {
     try {
-      const response = await fetch(buildUrl(REFRESH_PATH), {
+      // REFRESH_PATH is a same-origin Next.js route handler — never prepend
+      // the FastAPI base URL, or the cookies would be forwarded to the wrong
+      // origin and the refreshed Set-Cookie would not reach the browser.
+      const response = await fetch(REFRESH_PATH, {
         method: 'POST',
         headers,
         credentials: 'include',
@@ -95,7 +108,10 @@ async function tryRefresh(): Promise<boolean> {
         refreshHooks?.onRefreshFailed();
         return false;
       }
-      const body = (await response.json()) as { accessToken?: unknown };
+      const body = (await response.json()) as {
+        accessToken?: unknown;
+        user?: unknown;
+      };
       if (
         typeof body.accessToken !== 'string' ||
         body.accessToken.length === 0
@@ -103,7 +119,7 @@ async function tryRefresh(): Promise<boolean> {
         refreshHooks?.onRefreshFailed();
         return false;
       }
-      refreshHooks?.onRefreshed(body.accessToken);
+      refreshHooks?.onRefreshed(body.accessToken, body.user);
       return true;
     } catch {
       refreshHooks?.onRefreshFailed();

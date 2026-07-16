@@ -83,8 +83,27 @@ FRAMEWORK_PATHS: frozenset[str] = frozenset(
 )
 
 
+def _iter_path_endpoint_pairs() -> list[tuple[str, object]]:
+    """Yield (effective_path, endpoint) for every registered app route.
+
+    FastAPI ≥ 0.139 no longer flattens `include_router` calls into `app.routes`
+    — each call appears as a `_IncludedRouter` wrapper holding the original
+    (unprefixed) router plus the include prefix. Walk both shapes so this
+    module keeps working across the upgrade boundary.
+    """
+    pairs: list[tuple[str, object]] = []
+    for route in app.routes:
+        if isinstance(route, Route):
+            pairs.append((route.path, getattr(route, "endpoint", None)))
+        elif hasattr(route, "original_router"):
+            prefix = route.include_context.prefix or ""
+            for inner in route.original_router.routes:
+                pairs.append((prefix + inner.path, getattr(inner, "endpoint", None)))
+    return pairs
+
+
 def _route_paths() -> set[str]:
-    return {r.path for r in app.routes if isinstance(r, Route)}
+    return {path for path, _ in _iter_path_endpoint_pairs()}
 
 
 def test_every_legacy_path_has_a_v1_twin():
@@ -143,9 +162,8 @@ def test_alias_pair_resolves_to_the_same_handler(legacy_path: str, v1_path: str)
     silently behaves differently from its alias.
     """
     by_path: dict[str, set[object]] = {}
-    for route in app.routes:
-        if isinstance(route, Route):
-            by_path.setdefault(route.path, set()).add(route.endpoint)
+    for path, endpoint in _iter_path_endpoint_pairs():
+        by_path.setdefault(path, set()).add(endpoint)
 
     legacy_handlers = by_path.get(legacy_path)
     v1_handlers = by_path.get(v1_path)

@@ -1,31 +1,34 @@
 import { existsSync } from 'fs';
 import path from 'path';
 import { randomBytes } from 'crypto';
-import { expect, test } from '@playwright/test';
+import { expect, test, loginAndInjectCookies } from './fixtures';
 
 /**
  * Smoke flow for #103 — create a post with a photo via the UI and assert it
- * renders on /timeline. Covers the multipart upload path in
- * [src/app/api/posts/route.ts], savePhotoFile in [src/lib/uploads.ts], and the
- * timeline render in [src/components/timeline/PostPreview.tsx]: the three
- * moving parts called out in [docs/research/automated-testing.md#2-highest-value-8020-smoke-suite].
+ * renders on /timeline. Covers the FastAPI multipart upload path
+ * (apps/api/src/routers/posts.py + multipart_uploads.py) and the timeline
+ * render in [src/components/timeline/PostPreview.tsx]: the moving parts
+ * called out in [docs/research/automated-testing.md#2-highest-value-8020-smoke-suite].
  *
- * Uses the shared `claude-test` storageState from global-setup.ts so the spec
- * starts already authenticated.
+ * Does a fresh login before each test (not storageState) so parallel runs
+ * don't race on token rotation via AuthBootstrap.
  *
  * The on-disk assertion is CI/local-only: in a deployed environment photos go
  * to GCS, not `public/uploads`. It's gated on `PLAYWRIGHT_BASE_URL` being
  * unset (webServer mode).
  */
 
-test.use({ storageState: 'e2e/.auth/claude-test.json' });
-
 const FIXTURE_PATH = path.join(__dirname, 'fixtures', 'sample.png');
 
 test(
   'create post with photo renders on timeline',
   { tag: ['@smoke'] },
-  async ({ page }) => {
+  async ({ page, context }) => {
+    await loginAndInjectCookies(
+      context,
+      process.env.E2E_USER ?? 'claude-test',
+      process.env.E2E_PASSWORD ?? 'claude-test-password'
+    );
     const title = `E2E Photo Post ${Date.now()}_${randomBytes(3).toString('hex')}`;
 
     await page.goto('/add');
@@ -60,8 +63,12 @@ test(
         `expected /uploads/<key> in src, got: ${src}`
       ).not.toBeNull();
       const storageKey = decodeURIComponent(match![1]);
+      // Uploads are written by FastAPI (cwd apps/api in CI), not Next —
+      // `Path("public/uploads")` in apps/api/src/uploads.py resolves there.
       const diskPath = path.join(
         process.cwd(),
+        'apps',
+        'api',
         'public',
         'uploads',
         storageKey

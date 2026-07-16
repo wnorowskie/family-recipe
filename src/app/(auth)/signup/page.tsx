@@ -3,7 +3,7 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { apiClient, ApiError } from '@/lib/apiClient';
+import { ApiError } from '@/lib/apiClient';
 import { type AuthUser, setSession } from '@/lib/authStore';
 
 interface AuthTokenResponse {
@@ -30,9 +30,29 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      const data = await apiClient.post<AuthTokenResponse>('/v1/auth/signup', {
-        body: formData,
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(formData),
+        credentials: 'include',
       });
+      const payload = (await response.json()) as
+        | AuthTokenResponse
+        | { error: { message?: string } };
+      if (!response.ok) {
+        const msg =
+          'error' in payload &&
+          typeof payload.error === 'object' &&
+          payload.error !== null
+            ? ((payload.error as { message?: string }).message ??
+              'Signup failed')
+            : 'Signup failed';
+        throw new ApiError('BAD_REQUEST' as never, msg, response.status);
+      }
+      const data = payload as AuthTokenResponse;
       setSession(data.accessToken, data.user);
       router.replace('/timeline');
     } catch (err) {

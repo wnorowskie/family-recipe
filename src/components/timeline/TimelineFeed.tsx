@@ -33,7 +33,7 @@ export default function TimelineFeed({
   const handleLoadMore = async () => {
     setIsLoadingMore(true);
     try {
-      const data = await apiClient.get<TimelinePage>('/api/timeline', {
+      const data = await apiClient.get<TimelinePage>('/v1/timeline', {
         query: { limit: 20, offset },
       });
       setItems((prev) => [...prev, ...data.items]);

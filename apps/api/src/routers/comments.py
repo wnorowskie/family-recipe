@@ -2,6 +2,7 @@ import json
 from typing import Dict, List, Optional, TypedDict
 
 from fastapi import APIRouter, Depends, File, Form, Path, UploadFile, status
+from prisma import Json
 from prisma.errors import PrismaError
 
 from ..db import prisma
@@ -153,6 +154,20 @@ async def create_comment(
             },
             include={"author": True},
         )
+
+        if post.authorId != user.id:
+            await prisma.notification.create(
+                data={
+                    "familySpaceId": user.familySpaceId,
+                    "postId": post_id,
+                    "recipientId": post.authorId,
+                    "actorId": user.id,
+                    "type": "comment",
+                    "commentId": comment.id,
+                    "metadata": Json({"commentText": comment.text}),
+                }
+            )
+
         return {
             "comment": {
                 "id": comment.id,

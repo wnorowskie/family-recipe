@@ -1,4 +1,7 @@
+import { headers } from 'next/headers';
 import { NextRequest } from 'next/server';
+import { fetchSessionUser } from './auth/bootstrapFromCookies';
+import { isFastApiAuthEnabled } from './featureFlags';
 import { prisma } from './prisma';
 import {
   clearSessionCookie,
@@ -64,6 +67,23 @@ export async function getCurrentUser(request: NextRequest) {
     console.error('Error fetching current user:', error);
     return null;
   }
+}
+
+// Dual-mode user resolver for (app) page components. When FastAPI auth is
+// enabled the layout has already verified the session; pages call this to get
+// the user without repeating the JWT session-cookie dance (which would fail
+// because there is no `session` cookie in the FastAPI flow).
+export async function resolvePageUser() {
+  if (isFastApiAuthEnabled()) {
+    const headerStore = await headers();
+    const cookieHeader = headerStore.get('cookie');
+    const result = await fetchSessionUser(cookieHeader);
+    if (!result.ok) return null;
+    return result.user;
+  }
+
+  // Legacy JWT path — unchanged behaviour.
+  return null;
 }
 
 export {

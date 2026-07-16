@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import RecipesBrowseClient from '@/components/recipes/RecipesBrowseClient';
-import { getCurrentUser } from '@/lib/session';
+import { getCurrentUser, resolvePageUser } from '@/lib/session';
 import { getRecipes } from '@/lib/recipes';
 import { getAllTags } from '@/lib/tags';
 import { getFamilyMembers } from '@/lib/family';
@@ -13,20 +13,17 @@ interface RecipesPageProps {
 }
 
 export default async function RecipesPage(_props: RecipesPageProps) {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('session');
+  const fastApiUser = await resolvePageUser();
 
-  if (!sessionCookie) {
-    redirect('/login');
-  }
-
-  const mockRequest = {
-    cookies: {
-      get: () => sessionCookie,
-    },
-  } as any;
-
-  const user = await getCurrentUser(mockRequest);
+  const user =
+    fastApiUser ??
+    (await (async () => {
+      const cookieStore = await cookies();
+      const sessionCookie = cookieStore.get('session');
+      if (!sessionCookie) redirect('/login');
+      const mockRequest = { cookies: { get: () => sessionCookie } } as any;
+      return getCurrentUser(mockRequest);
+    })());
 
   if (!user) {
     redirect('/login');

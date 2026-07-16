@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { apiClient } from '@/lib/apiClient';
 import { clearSession } from '@/lib/authStore';
 
 export default function LogoutButton() {
@@ -14,7 +13,10 @@ export default function LogoutButton() {
     setIsLoading(true);
 
     try {
-      await apiClient.post('/v1/auth/logout');
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
     } catch {
       // Fall through — clearing the local session is more important than
       // surfacing a logout API error to the user.
