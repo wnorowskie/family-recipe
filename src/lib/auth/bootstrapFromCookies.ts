@@ -1,3 +1,4 @@
+import { fetchUpstream, getUpstreamOrigin } from '@/lib/apiUpstream';
 import type { AuthUser } from '@/lib/authStore';
 import { logError } from '@/lib/logger';
 
@@ -83,12 +84,6 @@ function isAuthUserShape(value: unknown): value is AuthUser {
   );
 }
 
-function getFastApiBaseUrl(): string | null {
-  const raw = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!raw) return null;
-  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
-}
-
 function readCookieFromHeader(
   cookieHeader: string,
   name: string
@@ -104,7 +99,6 @@ function readCookieFromHeader(
 }
 
 interface ResolvedCookies {
-  baseUrl: string;
   cookieHeader: string;
   csrfToken: string;
 }
@@ -112,15 +106,17 @@ interface ResolvedCookies {
 function resolveCookies(
   cookieHeader: string | null
 ): ResolvedCookies | { reason: 'CONFIG' | 'MISSING_COOKIES' } {
-  const baseUrl = getFastApiBaseUrl();
-  if (!baseUrl) {
-    logError('auth.bootstrap.config', 'NEXT_PUBLIC_API_BASE_URL is not set');
+  // fetchUpstream would throw UpstreamNotConfiguredError anyway, but these
+  // callers report failures as a typed reason rather than an exception, so
+  // the origin is checked up front.
+  if (!getUpstreamOrigin()) {
+    logError('auth.bootstrap.config', 'API_INTERNAL_URL is not set');
     return { reason: 'CONFIG' };
   }
   if (!cookieHeader) return { reason: 'MISSING_COOKIES' };
   const csrfToken = readCookieFromHeader(cookieHeader, 'csrf_token');
   if (!csrfToken) return { reason: 'MISSING_COOKIES' };
-  return { baseUrl, cookieHeader, csrfToken };
+  return { cookieHeader, csrfToken };
 }
 
 // ---------------------------------------------------------------------------
@@ -137,14 +133,13 @@ export async function fetchSessionUser(
 
   let response: Response;
   try {
-    response = await fetch(`${resolved.baseUrl}/v1/auth/session`, {
+    response = await fetchUpstream('/v1/auth/session', {
       method: 'GET',
       headers: {
         Accept: 'application/json',
         Cookie: resolved.cookieHeader,
         'X-CSRF-Token': resolved.csrfToken,
       },
-      cache: 'no-store',
     });
   } catch (error) {
     logError('auth.session.network', error);
@@ -184,14 +179,13 @@ export async function bootstrapAccessToken(
 
   let refreshResponse: Response;
   try {
-    refreshResponse = await fetch(`${resolved.baseUrl}/v1/auth/refresh`, {
+    refreshResponse = await fetchUpstream('/v1/auth/refresh', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
         Cookie: resolved.cookieHeader,
         'X-CSRF-Token': resolved.csrfToken,
       },
-      cache: 'no-store',
     });
   } catch (error) {
     logError('auth.bootstrap.refresh.network', error);
@@ -217,13 +211,12 @@ export async function bootstrapAccessToken(
 
   let meResponse: Response;
   try {
-    meResponse = await fetch(`${resolved.baseUrl}/v1/auth/me`, {
+    meResponse = await fetchUpstream('/v1/auth/me', {
       method: 'GET',
       headers: {
         Accept: 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      cache: 'no-store',
     });
   } catch (error) {
     logError('auth.bootstrap.me.network', error);

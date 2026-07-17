@@ -67,6 +67,20 @@ output "monitoring_uptime_check_id" {
   value = module.monitoring.uptime_check_id
 }
 
+# FastAPI backend outputs
+output "api_service_name" {
+  value = module.cloud_run_api.service_name
+}
+
+output "api_service_uri" {
+  description = "FastAPI Cloud Run URL — the value deploy-dev.yml passes as API_INTERNAL_URL"
+  value       = module.cloud_run_api.service_uri
+}
+
+output "api_artifact_registry_repository" {
+  value = module.cloud_run_api.artifact_registry_repository_id
+}
+
 # Recipe URL Importer outputs
 output "importer_service_name" {
   value = module.cloud_run_importer.service_name

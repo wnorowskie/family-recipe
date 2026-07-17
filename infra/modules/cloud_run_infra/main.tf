@@ -127,6 +127,10 @@ locals {
       var.jwt_secret_id,
     ],
     var.family_master_key_secret_id == "" ? [] : [var.family_master_key_secret_id],
+    # Consumed by the FastAPI service (cloud_run_api), not by Next. It is
+    # managed here because this module owns the shared runtime service account
+    # that both services run as, and therefore owns its secretAccessor grants.
+    var.refresh_pepper_secret_id == "" ? [] : [var.refresh_pepper_secret_id],
   )
 }
 

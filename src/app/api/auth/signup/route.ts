@@ -5,24 +5,14 @@ import {
   internalError,
   API_ERROR_CODES,
 } from '@/lib/apiErrors';
+import { fetchUpstream, UpstreamNotConfiguredError } from '@/lib/apiUpstream';
 
 // Thin proxy for FastAPI /v1/auth/signup. Same origin-scoping rationale as
 // /api/auth/login — FastAPI's Set-Cookie headers must land on the Next.js
 // origin so the SSR layout's cookie check sees them.
 export const runtime = 'nodejs';
 
-function getFastApiBaseUrl(): string | null {
-  const raw = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!raw) return null;
-  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
-}
-
 export async function POST(request: NextRequest) {
-  const baseUrl = getFastApiBaseUrl();
-  if (!baseUrl) {
-    return internalError('API not configured');
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -36,7 +26,7 @@ export async function POST(request: NextRequest) {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${baseUrl}/v1/auth/signup`, {
+    upstream = await fetchUpstream('/v1/auth/signup', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -44,7 +34,10 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify(body),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof UpstreamNotConfiguredError) {
+      return internalError('API not configured');
+    }
     return createErrorResponse(
       API_ERROR_CODES.INTERNAL_ERROR,
       'Upstream auth service failed',

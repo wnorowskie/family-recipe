@@ -72,6 +72,7 @@ module "cloud_run_infra" {
   database_url_secret_id      = var.database_url_secret_id
   jwt_secret_id               = var.jwt_secret_id
   family_master_key_secret_id = var.family_master_key_secret_id
+  refresh_pepper_secret_id    = var.refresh_pepper_secret_id
   wif_pool_id                 = var.wif_pool_id
   wif_provider_id             = var.wif_provider_id
   github_repository           = var.github_repository
@@ -80,6 +81,38 @@ module "cloud_run_infra" {
   # Recipe Importer integration (use variables to avoid circular dependency)
   recipe_importer_url                   = var.recipe_importer_url
   recipe_importer_service_account_email = var.recipe_importer_service_account_email
+}
+
+module "cloud_run_api" {
+  source = "../../modules/cloud_run_api"
+
+  project_id                    = var.project_id
+  region                        = var.region
+  service_name                  = var.api_service_name
+  artifact_registry_repo_id     = var.api_artifact_registry_repo_id
+  runtime_service_account_email = module.cloud_run_infra.runtime_service_account_email
+  cloud_sql_instances           = [module.sql_instance.instance_connection_name]
+  min_instance_count            = var.api_min_instance_count
+  max_instance_count            = var.api_max_instance_count
+  api_environment               = var.api_environment
+  uploads_bucket_name           = var.uploads_bucket_name
+
+  database_url_secret_id      = var.database_url_secret_id
+  jwt_secret_id               = var.jwt_secret_id
+  refresh_pepper_secret_id    = var.refresh_pepper_secret_id
+  family_master_key_secret_id = var.family_master_key_secret_id
+
+  # The Next runtime SA forwards /v1/* here; the deployer SA needs invoke rights
+  # for the post-deploy health probe in deploy-api.yml. No allUsers.
+  invoker_members = [
+    "serviceAccount:${module.cloud_run_infra.runtime_service_account_email}",
+    "serviceAccount:${module.cloud_run_infra.deployer_service_account_email}",
+  ]
+
+  recipe_importer_url                   = var.recipe_importer_url
+  recipe_importer_service_account_email = var.recipe_importer_service_account_email
+
+  depends_on = [module.cloud_run_infra]
 }
 
 module "cloud_run_importer" {
