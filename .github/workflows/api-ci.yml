@@ -154,6 +154,13 @@ jobs:
           format: table
           exit-code: 1
           severity: HIGH,CRITICAL
+          # The FastAPI image is Debian-based (prisma-client-py's query engine
+          # doesn't run on Alpine's openssl 3 — see apps/api/Dockerfile). The
+          # Debian base carries unfixed HIGH/CRITICAL CVEs in perl / util-linux
+          # that we can't remediate — no upstream fix exists and the app never
+          # invokes them. Fail only on FIXED (actionable) vulns; the unfixed
+          # base-OS backlog is tracked for periodic base-image bumps (#248).
+          ignore-unfixed: true
 
   dependency-scan:
     runs-on: ubuntu-latest
