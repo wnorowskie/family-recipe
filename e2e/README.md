@@ -6,21 +6,22 @@ This directory currently contains:
 
 - [auth.spec.ts](auth.spec.ts) — login + protected-route gating (PoC flow from #58).
 - [signup.spec.ts](signup.spec.ts) — signup via family master key (#106). Tagged `@smoke @destructive`; CI-only (see [Tags](#tags)).
-- [post-with-photo.spec.ts](post-with-photo.spec.ts) — create a post with a photo upload (#103). Tagged `@smoke`; uses shared storageState (see [Authentication](#authentication)).
-- [cooked-event.spec.ts](cooked-event.spec.ts) — log a cooked event against the seeded recipe (#105). Tagged `@smoke`; uses shared storageState.
-- [comment-reaction.spec.ts](comment-reaction.spec.ts) — comment + react on the seeded post and verify the author's notification (#104). Tagged `@smoke`; uses shared storageState, plus a fresh context signed in as the seeded `e2e-author` for the notification assertion.
+- [post-with-photo.spec.ts](post-with-photo.spec.ts) — create a post with a photo upload (#103). Tagged `@smoke`; fresh per-test login (see [Authentication](#authentication)).
+- [cooked-event.spec.ts](cooked-event.spec.ts) — log a cooked event against the seeded recipe (#105). Tagged `@smoke`; fresh per-test login.
+- [comment-reaction.spec.ts](comment-reaction.spec.ts) — comment + react on the seeded post and verify the author's notification (#104). Tagged `@smoke`; fresh per-test login, plus a fresh context signed in as the seeded `e2e-author` for the notification assertion.
 
 Further smoke flows land in follow-up tickets (see the research doc for the list).
 
 ## Authentication
 
-[global-setup.ts](global-setup.ts) logs in the seeded `claude-test` user once per run and saves the session cookie to `e2e/.auth/claude-test.json` (gitignored). Authenticated specs opt in with:
+All login goes through the Next origin's same-origin `/api/auth/login` proxy — never FastAPI directly. [auth-helpers.ts](auth-helpers.ts) centralizes this: `loginViaOrigin` posts to `${E2E_ORIGIN}/api/auth/login` (where `E2E_ORIGIN` = `PLAYWRIGHT_BASE_URL`, defaulting to `http://localhost:3000`) and returns the `refresh_token`/`csrf_token` cookies already scoped to the Next origin.
 
-```ts
-test.use({ storageState: 'e2e/.auth/claude-test.json' });
-```
+This single path works everywhere, which matters post-[#241](https://github.com/wnorowskie/family-recipe/issues/241): FastAPI is now IAM-private and only reachable through the Next origin, so a direct `FASTAPI_BASE_URL` login (the old approach) is unreachable in the dev-deploy runner.
 
-Specs that need a logged-out context (`auth.spec.ts`, `signup.spec.ts`) simply don't opt in.
+- **Fresh per-test login** — the `@smoke` specs use the `test` fixture from [fixtures.ts](fixtures.ts) (or call `loginAndInjectCookies` directly), which logs in and injects cookies into a fresh browser context per test. This avoids the storageState token-rotation race under `fullyParallel`.
+- **Shared storageState** — [global-setup.ts](global-setup.ts) logs in the seeded `claude-test` user once per run and writes `e2e/.auth/claude-test.json` (gitignored) for any spec that opts in with `test.use({ storageState: 'e2e/.auth/claude-test.json' })`.
+
+Specs that need a logged-out context (`auth.spec.ts`, `signup.spec.ts`) simply don't inject cookies.
 
 ## Tags
 
