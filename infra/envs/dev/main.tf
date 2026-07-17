@@ -95,6 +95,7 @@ module "cloud_run_api" {
   min_instance_count            = var.api_min_instance_count
   max_instance_count            = var.api_max_instance_count
   api_environment               = var.api_environment
+  trusted_proxy_hops            = var.api_trusted_proxy_hops
   uploads_bucket_name           = var.uploads_bucket_name
 
   database_url_secret_id      = var.database_url_secret_id

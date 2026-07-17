@@ -72,6 +72,15 @@ resource "google_cloud_run_v2_service" "api" {
         value = var.cors_allow_origins
       }
 
+      # Number of trusted proxies appending to X-Forwarded-For. _client_ip
+      # (apps/api/src/routers/v1/auth.py) resolves the client as the Nth entry
+      # from the right; everything to the left is client-supplied and untrusted
+      # (issue #246).
+      env {
+        name  = "TRUSTED_PROXY_HOPS"
+        value = tostring(var.trusted_proxy_hops)
+      }
+
       env {
         name = "DATABASE_URL"
 
