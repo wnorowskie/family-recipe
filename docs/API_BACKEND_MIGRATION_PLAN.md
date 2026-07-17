@@ -473,11 +473,61 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ### Per‑Environment Cutover
 
-- **Dev**: enable all flags, iterate daily
-- **Staging**: enable auth first, then data endpoints
-- **Prod**: canary rollout (5% → 25% → 50% → 100%)
+> **Status (post Phase 4.4 / #241):** superseded. The percentage canary below assumed a runtime feature flag that no longer exists — Phase 4.4 deleted it, so there is nothing left to ramp a percentage of sessions against. The historical plan is kept for context; the deployed reality is described in [Deploy Topology](#deploy-topology-post-241) below.
+
+- ~~**Dev**: enable all flags, iterate daily~~
+- ~~**Staging**: enable auth first, then data endpoints~~ (no staging environment exists; `develop` → dev, `main` → prod)
+- ~~**Prod**: canary rollout (5% → 25% → 50% → 100%)~~
+
+**What replaces it.** Safety now comes from a _revision-level_ canary rather than a session-level one. Both `deploy-dev.yml` and `deploy-prod.yml` (and the API workflows) deploy with `--no-traffic --tag candidate`, probe the tagged revision directly, and only then `--to-latest`. A failed probe pins traffic back to the previous revision, which never stopped serving. The unit of rollback is a revision, not a flag.
+
+### Deploy Topology (post #241)
+
+Two Cloud Run services per environment, sharing one database, one runtime service account, and one set of secrets:
+
+| Service               | Port | Ingress                     | Reached by               |
+| --------------------- | ---- | --------------------------- | ------------------------ |
+| Next (`src/`)         | 3000 | dev: IAM; prod: public      | the browser              |
+| FastAPI (`apps/api/`) | 8000 | IAM-private (no `allUsers`) | the Next runtime SA only |
+
+The browser never contacts FastAPI directly. It issues same-origin `/v1/*` requests that [`src/app/v1/[...path]/route.ts`](../src/app/v1/%5B...path%5D/route.ts) forwards server-to-server via [`src/lib/apiUpstream.ts`](../src/lib/apiUpstream.ts), attaching a Google ID token on `X-Serverless-Authorization` (Cloud Run checks that header instead of `Authorization` when both are present, leaving the user's FastAPI access token intact).
+
+This shape is what makes the deployment work **without a custom domain**. `run.app` is on the Public Suffix List, so two `*.run.app` hosts can never share a cookie `Domain` — a cross-origin split would leave the `refresh_token` cookie unreadable by the Next host. Keeping one origin also means `CORS_ALLOW_ORIGINS` stays empty and no CORS middleware is installed. See [docs/research/fastapi-cookie-domain-stack0.md](research/fastapi-cookie-domain-stack0.md).
+
+Two env vars, deliberately distinct:
+
+- `NEXT_PUBLIC_API_BASE_URL` — inlined into the **client bundle at build time** (`--build-arg` in the deploy workflows). **Empty** in deployed builds, which is what makes the client issue same-origin requests. Set to `http://localhost:8000` for local dev.
+- `API_INTERNAL_URL` — read at **runtime, server-side only**. The absolute FastAPI URL, resolved from `gcloud run services describe` at deploy time so the hostname cannot drift.
+
+Because the deployed build-arg is empty, the Next build has **no dependency** on FastAPI's URL — only the runtime env does. The Next deploy workflows still fail fast if the FastAPI service is missing, since a Next revision without a backend redirects every page to `/login`.
+
+#### One-time prerequisites per environment
+
+Terraform creates Secret Manager **containers**, never versions — values are added out-of-band (same as `jwt-secret` and `family-master-key`). `#241` adds one new secret, `family-recipe-{env}-refresh-pepper`, which FastAPI requires whenever `ENVIRONMENT=production` (see `validate_settings` in [apps/api/src/settings.py](../apps/api/src/settings.py)); dev runs with `production` semantics too, because it serves over HTTPS and needs `secure` cookies.
+
+**The FastAPI revision will not start until this secret has a version.** Seed it once per environment, before the first API deploy:
+
+```bash
+# >= 32 chars is enforced in production; 32 random bytes is comfortably over.
+openssl rand -base64 48 | tr -d '\n' | \
+  gcloud secrets versions add family-recipe-dev-refresh-pepper \
+    --project family-recipe-dev --data-file=-
+```
+
+Rotating the pepper invalidates every live refresh token — every user is logged out and must sign in again. It is not a routine rotation.
+
+**Order of operations for a first deploy into an environment:**
+
+1. `terraform apply` — creates the API service, its Artifact Registry repo, and the secret containers.
+2. Seed `refresh-pepper` (above).
+3. Run **Deploy API (Cloud Run)** — builds and deploys FastAPI.
+4. Run **Deploy Dev (Cloud Run)** — resolves `API_INTERNAL_URL` from step 3 and deploys Next.
+
+Steps 3 and 4 are order-dependent only on the _first_ deploy; afterwards each service deploys independently.
 
 ### Dual‑Stack Without Data Drift
+
+> **Status (post Phase 4.4):** no longer applicable. There is no dual stack — the Next data routes were deleted in Phase 4.3 and FastAPI is the only write path. Retained as a record of how drift was avoided while both stacks were live.
 
 - Both stacks use the **same database**.
 - Only one write path enabled at a time for a given feature flag.
@@ -696,10 +746,22 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 - Update README and API docs.
 - Add API latency and error metrics.
 
+5. **Deploy FastAPI** (#241)
+
+- The four steps above remove the Next backend **in code**. Until FastAPI is
+  actually deployed and the Next service knows how to reach it, any environment
+  running that code has no backend at all. This step is a hard prerequisite for
+  Phase 4 reaching dev, and a blocker on any `develop → main` release.
+- Terraform module `infra/modules/cloud_run_api` + the `deploy-api*.yml`
+  workflows; `API_INTERNAL_URL` wired into the Next deploys. See
+  [Deploy Topology](#deploy-topology-post-241).
+
 **Exit Criteria**
 
 - No production traffic depends on Next API routes.
 - Frontend uses FastAPI for all data and auth.
+- FastAPI is deployed in every environment the frontend runs in, and the Next
+  service resolves it via `API_INTERNAL_URL`.
 
 ---
 

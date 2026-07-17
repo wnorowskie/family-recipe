@@ -5,6 +5,7 @@ import {
   internalError,
   API_ERROR_CODES,
 } from '@/lib/apiErrors';
+import { fetchUpstream, UpstreamNotConfiguredError } from '@/lib/apiUpstream';
 
 // Thin proxy for FastAPI /v1/auth/login. The browser's POST targets this
 // same-origin Next.js route so that FastAPI's Set-Cookie headers land on the
@@ -14,18 +15,7 @@ import {
 // when the browser navigates to /:3000 routes.
 export const runtime = 'nodejs';
 
-function getFastApiBaseUrl(): string | null {
-  const raw = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!raw) return null;
-  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
-}
-
 export async function POST(request: NextRequest) {
-  const baseUrl = getFastApiBaseUrl();
-  if (!baseUrl) {
-    return internalError('API not configured');
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -39,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${baseUrl}/v1/auth/login`, {
+    upstream = await fetchUpstream('/v1/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -47,7 +37,10 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify(body),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof UpstreamNotConfiguredError) {
+      return internalError('API not configured');
+    }
     return createErrorResponse(
       API_ERROR_CODES.INTERNAL_ERROR,
       'Upstream auth service failed',
