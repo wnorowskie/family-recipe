@@ -12,3 +12,11 @@ httpx==0.27.2
 rsa==4.9
 python-multipart==0.0.31
 Pillow==12.3.0
+
+# Security floors for transitive deps flagged HIGH by Trivy (both have fixes):
+# cryptography < 48.0.1 ships a vulnerable OpenSSL in its wheels (GHSA-537c-gmf6-5ccf);
+# urllib3 < 2.7.0 leaks headers on cross-origin redirect + a decompression DoS
+# (CVE-2026-44431 / CVE-2026-44432). Pinned here so the resolved version can't
+# regress below the fix; remove if a direct dep ever requires them explicitly.
+cryptography==48.0.1
+urllib3==2.7.0

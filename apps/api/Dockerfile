@@ -1,17 +1,18 @@
 # ---- builder ----
 # python:3.12-slim (Debian/glibc), not alpine: prisma-client-py's query engine
-# is a prebuilt binary that is reliable on glibc but fiddly on musl (openssl /
-# libc variants). The importer image can stay alpine because it doesn't use
-# Prisma; this service does. See apps/api/CLAUDE.md.
+# is a prebuilt binary that ships an openssl-1.1.x musl build for Alpine, which
+# will not run against Alpine's current openssl 3 (missing libssl.so.1.1) — and
+# there is no openssl1.1-compat package on current Alpine. On glibc/Debian the
+# openssl-3.0.x engine matches and simply works. The importer image can stay
+# alpine because it doesn't use Prisma; this service does. See apps/api/CLAUDE.md.
 FROM python:3.12-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    # venv on PATH so `prisma generate` can find the `prisma-client-py`
-    # generator executable it shells out to (installed into /opt/venv/bin by the
-    # prisma pip package). Without this the generate step fails with
-    # "prisma-client-py: not found".
+    # venv on PATH so `prisma generate` finds the `prisma-client-py` generator
+    # executable it shells out to (installed into /opt/venv/bin). Without this
+    # the generate step fails with "prisma-client-py: not found".
     PATH="/opt/venv/bin:$PATH" \
     # Engine binaries land in a fixed dir (default is a $HOME cache that
     # wouldn't survive the copy into the runtime stage). Copied to runtime below.
