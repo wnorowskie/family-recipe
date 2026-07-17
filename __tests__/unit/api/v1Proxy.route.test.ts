@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-import { DELETE, GET, POST } from '@/app/v1/[...path]/route';
+import { DELETE, GET, HEAD, POST } from '@/app/v1/[...path]/route';
 
 function buildRequest(
   url: string,
@@ -93,6 +93,35 @@ describe('/v1/[...path] (FastAPI same-origin proxy)', () => {
       ([key]) => key.toLowerCase() === 'x-serverless-authorization'
     );
     expect(forwarded).toBeUndefined();
+  });
+
+  it('forwards X-Forwarded-For so FastAPI can key rate limits on the real client IP', async () => {
+    // Cloud Run stamps XFF on the request to the Next container; FastAPI's
+    // _client_ip takes the first entry. Dropping it here would collapse every
+    // login/signup attempt onto the Next egress IP. See PR #245 review.
+    await POST(
+      buildRequest('http://localhost:3000/v1/auth/login', {
+        method: 'POST',
+        headers: { 'x-forwarded-for': '203.0.113.7, 10.0.0.1' },
+        body: '{}',
+      }),
+      context(['auth', 'login'])
+    );
+
+    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
+      'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+    });
+  });
+
+  it('handles HEAD (forwards the method, sends no body)', async () => {
+    await HEAD(
+      buildRequest('http://localhost:3000/v1/posts', { method: 'HEAD' }),
+      context(['posts'])
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1].method).toBe('HEAD');
+    expect(fetchMock.mock.calls[0][1].body).toBeUndefined();
   });
 
   it('drops hop-by-hop headers', async () => {

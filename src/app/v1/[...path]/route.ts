@@ -184,7 +184,10 @@ async function proxy(
 }
 
 export const GET = proxy;
+export const HEAD = proxy;
 export const POST = proxy;
 export const PATCH = proxy;
 export const PUT = proxy;
 export const DELETE = proxy;
+// OPTIONS is intentionally not exported: the client is always same-origin, so
+// no CORS preflight is ever issued and an OPTIONS to /v1/* is not a real flow.
