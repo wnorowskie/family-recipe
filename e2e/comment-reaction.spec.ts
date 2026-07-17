@@ -1,13 +1,11 @@
 import { randomBytes } from 'crypto';
-import { request } from '@playwright/test';
 import { expect, test, loginAndInjectCookies } from './fixtures';
+import { loginViaOrigin, sessionCookiesFor } from './auth-helpers';
 
 // Posting a comment and reacting now call apiClient.post('/v1/...') and
 // apiClient.post('/v1/reactions'). Without NEXT_PUBLIC_API_BASE_URL set at
 // build time those requests land on same-origin Next.js (no /v1/ routes).
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const FASTAPI_BASE_URL =
-  process.env.FASTAPI_BASE_URL ?? 'http://localhost:8000';
 
 /**
  * Smoke flow for #104 — comment + react on a seeded post as `claude-test`,
@@ -94,46 +92,15 @@ test(
     ).toBeVisible();
 
     // Log in as the post author in a fresh context so we can inspect their
-    // notifications page. Login goes directly to FastAPI; the refresh_token
-    // is then injected into the browser context scoped to the Next origin.
-    const apiCtx = await request.newContext({ baseURL: FASTAPI_BASE_URL });
-    const loginResponse = await apiCtx.post('/v1/auth/login', {
-      data: {
-        emailOrUsername: E2E_AUTHOR_USER,
-        password: E2E_AUTHOR_PASSWORD,
-        rememberMe: false,
-      },
-    });
-    await apiCtx.dispose();
-    expect(loginResponse.ok(), 'e2e-author login').toBeTruthy();
-
-    const setCookieHeader = loginResponse.headers()['set-cookie'] ?? '';
-    const refreshToken = extractCookieValue(setCookieHeader, 'refresh_token');
-    const csrfToken = extractCookieValue(setCookieHeader, 'csrf_token');
-    expect(refreshToken, 'e2e-author refresh_token').toBeTruthy();
-    expect(csrfToken, 'e2e-author csrf_token').toBeTruthy();
+    // notifications page. Login goes through the same-origin `/api/auth/login`
+    // proxy; the returned cookies are already scoped to the Next origin.
+    const authorSession = await loginViaOrigin(
+      E2E_AUTHOR_USER,
+      E2E_AUTHOR_PASSWORD
+    );
 
     const authorContext = await browser.newContext();
-    await authorContext.addCookies([
-      {
-        name: 'refresh_token',
-        value: refreshToken!,
-        domain: 'localhost',
-        path: '/',
-        httpOnly: true,
-        secure: false,
-        sameSite: 'Lax',
-      },
-      {
-        name: 'csrf_token',
-        value: csrfToken!,
-        domain: 'localhost',
-        path: '/',
-        httpOnly: false,
-        secure: false,
-        sameSite: 'Lax',
-      },
-    ]);
+    await authorContext.addCookies(sessionCookiesFor(authorSession));
     try {
       const authorPage = await authorContext.newPage();
       await authorPage.goto('/notifications');
@@ -149,14 +116,3 @@ test(
     }
   }
 );
-
-function extractCookieValue(header: string, name: string): string | null {
-  for (const line of header.split('\n')) {
-    const [pair] = line.split(';');
-    const eqIdx = pair.indexOf('=');
-    if (eqIdx === -1) continue;
-    const key = pair.slice(0, eqIdx).trim();
-    if (key === name) return pair.slice(eqIdx + 1).trim();
-  }
-  return null;
-}

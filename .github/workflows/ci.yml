@@ -128,7 +128,6 @@ jobs:
       FAMILY_MASTER_KEY: ci-only-family-master-key
       CLAUDE_TEST_USER: claude-test
       CLAUDE_TEST_PASSWORD: claude-test-password
-      FASTAPI_BASE_URL: http://localhost:8000
       # Allow browser → FastAPI cross-origin fetches from the Next.js origin.
       CORS_ALLOW_ORIGINS: http://localhost:3000
       # Next is built by the Playwright webServer block; NEXT_PUBLIC_* vars

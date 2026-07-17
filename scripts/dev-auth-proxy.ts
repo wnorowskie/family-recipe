@@ -8,8 +8,12 @@
  * including CSS/JS/image subresources. Browsers won't attach `Authorization`
  * headers to subresource loads, so the page never hydrates. This proxy mints
  * a token by impersonating the deployer SA (same pattern as smoke-dev.sh) and
- * attaches it to every forwarded request. It also strips `Secure` from
- * Set-Cookie so the session cookie survives the plain-HTTP localhost hop.
+ * attaches it to every forwarded request on `X-Serverless-Authorization` — the
+ * header Cloud Run's IAM check honors and strips before the container sees it.
+ * The caller's own `Authorization` header is passed through untouched so the
+ * post-#241 data plane's `Bearer <FastAPI access token>` reaches FastAPI via
+ * the Next `/v1` proxy. It also strips `Secure` from Set-Cookie so the session
+ * cookie survives the plain-HTTP localhost hop.
  *
  * Usage:
  *   npm run proxy:dev             # reads .env.dev.local, listens on :3100
@@ -146,6 +150,14 @@ function buildUpstreamHeaders(
     if (value === undefined) continue;
     const k = key.toLowerCase();
     // Hop-by-hop + ones we rewrite ourselves.
+    //
+    // `authorization` is deliberately NOT stripped: post-#241 the data plane
+    // sends `Authorization: Bearer <FastAPI access token>` and the Next `/v1`
+    // proxy needs that header to forward the user's token to FastAPI. The
+    // Cloud Run IAM assertion rides on `X-Serverless-Authorization` instead
+    // (set below), which Cloud Run consumes and strips before the container
+    // sees it — so the two never collide. This mirrors the same split the app
+    // uses on the Next → FastAPI hop (see src/lib/apiUpstream.ts).
     if (
       k === 'host' ||
       k === 'connection' ||
@@ -156,14 +168,16 @@ function buildUpstreamHeaders(
       k === 'trailer' ||
       k === 'transfer-encoding' ||
       k === 'upgrade' ||
-      k === 'authorization'
+      // Never let a caller supply the header carrying our IAM assertion — we
+      // set it ourselves below.
+      k === 'x-serverless-authorization'
     ) {
       continue;
     }
     headers[k] = value;
   }
   headers['host'] = upstream.host;
-  headers['authorization'] = `Bearer ${token}`;
+  headers['x-serverless-authorization'] = `Bearer ${token}`;
   return headers;
 }
 
