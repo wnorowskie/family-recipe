@@ -505,25 +505,34 @@ Because the deployed build-arg is empty, the Next build has **no dependency** on
 
 Terraform creates Secret Manager **containers**, never versions — values are added out-of-band (same as `jwt-secret` and `family-master-key`). `#241` adds one new secret, `family-recipe-{env}-refresh-pepper`, which FastAPI requires whenever `ENVIRONMENT=production` (see `validate_settings` in [apps/api/src/settings.py](../apps/api/src/settings.py)); dev runs with `production` semantics too, because it serves over HTTPS and needs `secure` cookies.
 
-**The FastAPI revision will not start until this secret has a version.** Seed it once per environment, before the first API deploy:
+Rotating the pepper invalidates every live refresh token — every user is logged out and must sign in again. It is not a routine rotation.
+
+**The versionless-secret trap.** Terraform creates the API Cloud Run service with a `REFRESH_PEPPER=<secret>:latest` env ref. If the secret container exists but has **no version**, Cloud Run rejects the revision and `terraform apply` fails while creating the service. The existing secrets (`database-url`, `jwt-secret`) don't hit this because they already have versions; a brand-new `refresh-pepper` does. So the secret has to be seeded **between** creating its container and creating the API service — a single `apply` can't do that, and neither can the `Infra Apply` workflow (it does one full apply with no `-target`). Use a two-phase local apply for the first bring-up of each environment (this is the exact sequence used for dev on 2026-07-17):
 
 ```bash
-# >= 32 chars is enforced in production; 32 random bytes is comfortably over.
+cd infra/envs/<env>          # dev or prod
+terraform init              # your usual GCS-backend init args
+
+# Phase 1 — create ONLY the refresh-pepper secret container
+terraform apply -target='module.cloud_run_infra.google_secret_manager_secret.secrets["family-recipe-<env>-refresh-pepper"]'
+
+# Seed it (>= 32 chars enforced in production; 48 random bytes is comfortably over)
 openssl rand -base64 48 | tr -d '\n' | \
-  gcloud secrets versions add family-recipe-dev-refresh-pepper \
-    --project family-recipe-dev --data-file=-
+  gcloud secrets versions add family-recipe-<env>-refresh-pepper \
+    --project family-recipe-<env> --data-file=-
+
+# Phase 2 — full apply; the API service can now resolve :latest
+terraform apply
 ```
 
-Rotating the pepper invalidates every live refresh token — every user is logged out and must sign in again. It is not a routine rotation.
+The phase-2 plan also surfaces any pre-existing traffic-pin drift on the **Next** service (`TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION` → `LATEST`) — that is unrelated to this work and safe to apply, since the next `deploy-*` run promotes a fresh revision to `LATEST` anyway. Confirm the pinned revision isn't a deliberate rollback before approving.
 
 **Order of operations for a first deploy into an environment:**
 
-1. `terraform apply` — creates the API service, its Artifact Registry repo, and the secret containers.
-2. Seed `refresh-pepper` (above).
-3. Run **Deploy API (Cloud Run)** — builds and deploys FastAPI.
-4. Run **Deploy Dev (Cloud Run)** — resolves `API_INTERNAL_URL` from step 3 and deploys Next.
+1. Two-phase `terraform apply` + seed (above) — creates the API service (hello-world baseline), its Artifact Registry repo, and the seeded secret.
+2. Merge to the environment's branch (`develop` for dev, `main` for prod), which fires **Deploy API** (swaps in the real FastAPI image) and **Deploy Dev/Prod** (resolves `API_INTERNAL_URL` and deploys Next). These two run in parallel: the Next deploy resolves the API _service_ URL (stable regardless of which image is live), but its post-deploy Playwright login exercises the real API — so if the Next deploy races ahead of the API deploy's promotion, re-run the Next deploy once the API deploy is green.
 
-Steps 3 and 4 are order-dependent only on the _first_ deploy; afterwards each service deploys independently.
+After the first bring-up each service deploys independently on subsequent pushes.
 
 ### Dual‑Stack Without Data Drift
 
