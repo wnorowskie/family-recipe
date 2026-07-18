@@ -48,6 +48,7 @@ from ...tokens import (
     parse_refresh_cookie,
 )
 from ...uploads import get_signed_upload_url
+from ...utils import client_ip_from_forwarded_for
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +56,13 @@ router = APIRouter(prefix="/v1/auth", tags=["auth-v1"])
 
 
 def _client_ip(request: Request) -> Optional[str]:
-    fwd = request.headers.get("x-forwarded-for")
-    if fwd:
-        return fwd.split(",")[0].strip()
-    if request.client:
-        return request.client.host
-    return None
+    # Trust a fixed offset from the END of X-Forwarded-For, never the first
+    # (client-supplied) entry — see client_ip_from_forwarded_for / issue #246.
+    return client_ip_from_forwarded_for(
+        request.headers.get("x-forwarded-for"),
+        request.client.host if request.client else None,
+        settings.trusted_proxy_hops,
+    )
 
 
 def _user_agent(request: Request) -> Optional[str]:

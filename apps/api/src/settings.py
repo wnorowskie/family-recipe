@@ -37,6 +37,18 @@ class Settings(BaseSettings):
     # session-cookie endpoints stay same-origin.
     cors_allow_origins: str = ""
 
+    # Number of trusted reverse proxies in front of this service that append to
+    # X-Forwarded-For. The real client IP is the `trusted_proxy_hops`-th entry
+    # from the RIGHT of the chain; everything further left is client-supplied
+    # and MUST NOT be trusted (issue #246 — the first entry is spoofable).
+    #   0 = no proxy (local/dev): ignore XFF entirely, use the direct TCP peer.
+    #   2 = deployed topology: browser → GFE(Next) → Next proxy → GFE(FastAPI),
+    #       where the two Google front-ends append the trailing two entries.
+    # Configurable via TRUSTED_PROXY_HOPS so the count can be corrected from the
+    # #241 dev E2E observation without a code change. Defaults to 0 so a fresh
+    # clone / test run never trusts a forwarded header it has no proxy to back.
+    trusted_proxy_hops: int = 0
+
     # Refresh cookie attributes; production overrides via env.
     refresh_cookie_name: str = "refresh_token"
     csrf_cookie_name: str = "csrf_token"

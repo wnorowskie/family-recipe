@@ -73,6 +73,12 @@ variable "cors_allow_origins" {
   default     = ""
 }
 
+variable "trusted_proxy_hops" {
+  description = "TRUSTED_PROXY_HOPS for apps/api — number of trusted proxies appending to X-Forwarded-For. Deployed topology is browser → GFE(Next) → Next proxy → GFE(FastAPI), so the two front-ends occupy the trailing two XFF entries and the real client is parts[-2] (issue #246)."
+  type        = number
+  default     = 2
+}
+
 variable "uploads_bucket_name" {
   description = "GCS bucket for uploads (shared with the Next service)"
   type        = string

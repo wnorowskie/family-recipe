@@ -232,6 +232,12 @@ variable "api_environment" {
   default     = "production"
 }
 
+variable "api_trusted_proxy_hops" {
+  description = "TRUSTED_PROXY_HOPS for apps/api — trusted X-Forwarded-For hops (browser → GFE(Next) → Next proxy → GFE(FastAPI) = 2; issue #246)"
+  type        = number
+  default     = 2
+}
+
 variable "wif_pool_id" {
   description = "Workload Identity Pool ID"
   type        = string
