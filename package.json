@@ -39,7 +39,6 @@
     "cross-spawn": "^7.0.6",
     "date-fns": "^4.1.0",
     "glob": "^11.1.0",
-    "jose": "^6.1.2",
     "jsonwebtoken": "^9.0.3",
     "lru-cache": "^11.2.4",
     "lucide-react": "^1.11.0",
