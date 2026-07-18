@@ -41,7 +41,7 @@ Validation logic for the cookie + CSRF gate is shared via `_validate_refresh_coo
 - [src/main.py](src/main.py) — FastAPI app, includes routers, manages prisma connect/disconnect lifespan
 - [src/routers/](src/routers/) — one file per resource, mirrors [src/app/api/](../../src/app/api/) structure
 - [src/dependencies.py](src/dependencies.py) — auth dependency injectors (the FastAPI equivalent of `withAuth`)
-- [src/permissions.py](src/permissions.py) — mirrors [src/lib/permissions.ts](../../src/lib/permissions.ts)
+- [src/permissions.py](src/permissions.py) — ownership/admin authorization rules (`canEditPost`/`canDeletePost`/`canDeleteComment`/`canRemoveMember`). Sole owner since the Next-side `permissions.ts` mirror was removed in #243.
 - [src/security.py](src/security.py) — JWT verify, password hashing
 - [src/schemas/](src/schemas/) — Pydantic request/response models (mirrors `validation.ts` + `apiErrors.ts`)
 - [src/uploads.py](src/uploads.py) — signed URL resolution for GCS

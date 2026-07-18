@@ -5,12 +5,11 @@ Module map for the shared backend logic. Most of these are imported from API rou
 ## Auth & sessions
 
 - [prisma.ts](prisma.ts) — singleton `PrismaClient`. Always import `prisma` from here, never construct your own.
-- [auth.ts](auth.ts) — bcrypt password hashing/verify. Tests substitute `bcryptjs` via [jest.config.js](../../jest.config.js). (Auth is served by FastAPI now — this module is a leftover pending cleanup.)
 - [session-core.ts](session-core.ts) — `hasRefreshTokenFromRequest`: Edge-safe, presence-only `refresh_token` cookie check used by [src/proxy.ts](../proxy.ts). No JWT decode. (Phase 4.4 deleted the legacy `session` cookie set/clear/verify helpers.)
 - [session.ts](session.ts) — `resolvePageUser()`: resolves the `(app)` page user via FastAPI's non-rotating `/v1/auth/session` (delegates to [auth/bootstrapFromCookies.ts](auth/bootstrapFromCookies.ts)). Returns `null` on failure so the caller redirects to `/login`.
 - [auth/bootstrapFromCookies.ts](auth/bootstrapFromCookies.ts) — `fetchSessionUser` (non-rotating `/v1/auth/session`, used by SSR) and `bootstrapAccessToken` (rotating `/v1/auth/refresh` + `/v1/auth/me`, used only by the `/api/auth/bootstrap` route). See issue #173.
-- [permissions.ts](permissions.ts) — `canEditPost`, `canDeletePost`, `canDeleteComment`, `canRemoveMember`, plus the `AuthenticatedUser` type. Centralizes ownership/admin rules.
-- [masterKey.ts](masterKey.ts) — bcrypt hash/verify for the family master key (signup gate). (Signup is proxied to FastAPI now — leftover pending cleanup.)
+
+> Password hashing, the master-key signup gate, and ownership/admin authorization all live in FastAPI now (`apps/api/src/security.py`, `apps/api/src/permissions.py`). The old Next-side `auth.ts` / `masterKey.ts` / `permissions.ts` were removed in #243.
 
 ## Validation & errors
 

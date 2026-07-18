@@ -14,14 +14,6 @@ describe('Jest Setup', () => {
     expect(process.env.NODE_ENV).toBe('test');
   });
 
-  it('should have Jest secret configured', () => {
-    expect(process.env.JWT_SECRET).toBeDefined();
-    expect(typeof process.env.JWT_SECRET).toBe('string');
-    expect((process.env.JWT_SECRET as string).length).toBeGreaterThanOrEqual(
-      16
-    );
-  });
-
   it('should have DATABASE_URL configured', () => {
     expect(process.env.DATABASE_URL).toBeDefined();
     expect(process.env.DATABASE_URL).toMatch(/^postgresql:\/\//);
