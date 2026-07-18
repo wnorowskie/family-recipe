@@ -2,10 +2,13 @@ import { NextRequest } from 'next/server';
 
 import { POST } from '@/app/api/auth/signup/route';
 
-function buildRequest(body?: string): NextRequest {
+function buildRequest(
+  body?: string,
+  headers?: Record<string, string>
+): NextRequest {
   return new NextRequest('http://localhost:3000/api/auth/signup', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
     body,
   });
 }
@@ -106,10 +109,39 @@ describe('POST /api/auth/signup (FastAPI proxy)', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('http://api.local/v1/auth/signup');
     expect(JSON.parse(init.body)).toEqual(payload);
+    // No client IP headers supplied → none synthesized on the upstream call.
+    expect(init.headers['X-Forwarded-For']).toBeUndefined();
+    expect(init.headers['X-Real-IP']).toBeUndefined();
 
     const setCookies = response.headers.getSetCookie();
     expect(setCookies).toContain('refresh_token=abc.def; Path=/; HttpOnly');
     expect(setCookies).toContain('csrf_token=csrf-1; Path=/');
+  });
+
+  it('forwards the client IP chain but never a spoofed hop-by-hop / auth header', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ accessToken: 'access-1' }), {
+        status: 201,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    const response = await POST(
+      buildRequest(JSON.stringify({ name: 'N', email: 'new@example.com' }), {
+        'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+        'x-real-ip': '203.0.113.7',
+        // A client must not be able to smuggle the IAM bearer through the
+        // allowlist — fetchUpstream sets X-Serverless-Authorization itself.
+        'x-serverless-authorization': 'Bearer spoofed',
+      })
+    );
+
+    expect(response.status).toBe(201);
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers['X-Forwarded-For']).toBe('203.0.113.7, 10.0.0.1');
+    expect(init.headers['X-Real-IP']).toBe('203.0.113.7');
+    expect(init.headers['X-Serverless-Authorization']).toBeUndefined();
   });
 
   it('passes upstream error statuses through unchanged', async () => {
