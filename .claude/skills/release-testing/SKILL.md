@@ -71,10 +71,10 @@ Map the file list to areas:
 
 | File glob                                                                  | Area     | Dev coverage                                                                                     |
 | -------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `src/app/api/**/route.ts`                                                  | Next API | **Covered by `smoke:dev`** (login + post + comment + reaction + cleanup)                         |
+| `src/app/api/**/route.ts`                                                  | Next API | **Covered by `smoke:dev`** (auth-proxy login + bootstrap + `/api/health`)                        |
 | `src/app/**` (non-api), `src/components/**`                                | UI       | Partial — see "UI limitations" below                                                             |
 | `apps/recipe-url-importer/**`                                              | Importer | Manual `/health` probe (see step 5)                                                              |
-| `apps/api/**`                                                              | FastAPI  | Not deployed to dev yet — skip with a note                                                       |
+| `apps/api/**`                                                              | FastAPI  | **Covered by `smoke:dev`** (direct `/health` probe + `/v1` post/comment/reaction/cleanup path)   |
 | `prisma/schema*.prisma`, `prisma/migrations/**`                            | Prisma   | Migration already ran during `deploy-dev.yml`; smoke writes exercise it                          |
 | `.github/workflows/deploy-*.yml`, `infra/**`                               | Infra    | **Inspect the workflow diff carefully** — a change here changes the pipeline you're about to use |
 | `scripts/smoke-dev.sh`, `docs/verification/dev-deployments.md`, this skill | Tooling  | Self-test: run the skill against itself                                                          |
@@ -153,18 +153,20 @@ IMP_TOKEN=$(gcloud auth print-identity-token \
 curl -sS -H "Authorization: Bearer $IMP_TOKEN" "$DEV_IMPORTER_URL/health"
 # → {"status":"ok"}
 
-# Read-only Next probes (reuse the smoke script's login flow if you need
-# a session; otherwise just check unauthenticated gating)
+# Read-only /v1 probes through the Next forwarder (reuse the smoke script's
+# login + bootstrap flow if you need an access token; otherwise just check
+# unauthenticated gating). The IAM token rides on X-Serverless-Authorization;
+# the app token (absent here) would ride on Authorization.
 NEXT_TOKEN=$(gcloud auth print-identity-token \
   --impersonate-service-account="$DEV_DEPLOYER_SA" \
   --audiences="$DEV_NEXT_URL")
-curl -sS -H "Authorization: Bearer $NEXT_TOKEN" -w 'HTTP %{http_code}\n' \
-  "$DEV_NEXT_URL/api/timeline"   # expect 401 without session cookie
+curl -sS -H "X-Serverless-Authorization: Bearer $NEXT_TOKEN" -w 'HTTP %{http_code}\n' \
+  "$DEV_NEXT_URL/v1/timeline"   # expect 401 without an app access token
 ```
 
 ### 6. UI verification via the auth-injecting proxy
 
-Dev Cloud Run runs `--no-allow-unauthenticated`, so a browser can't load the UI directly: every request (including CSS/JS subresources) needs a Bearer ID token, and browsers don't attach auth headers to subresource loads. The fix is the local auth-injecting proxy ([scripts/dev-auth-proxy.ts](../../../scripts/dev-auth-proxy.ts)) — it mints an impersonated ID token on every forwarded request and strips `Secure` from Set-Cookie so the session cookie survives the localhost hop.
+Dev Cloud Run runs `--no-allow-unauthenticated`, so a browser can't load the UI directly: every request (including CSS/JS subresources) needs a Bearer ID token, and browsers don't attach auth headers to subresource loads. The fix is the local auth-injecting proxy ([scripts/dev-auth-proxy.ts](../../../scripts/dev-auth-proxy.ts)) — it mints an impersonated ID token on `X-Serverless-Authorization` for every forwarded request (leaving `Authorization` free for the app's FastAPI access token) and strips `Secure` from Set-Cookie so the auth cookies (`refresh_token` + `csrf_token`) survive the localhost hop.
 
 Run the Playwright suite against the live dev deployment through the proxy:
 
@@ -198,7 +200,7 @@ Absolute. Violating any of these turns the skill into a liability:
 - **Never mint a fake ID token or re-use a stale one across audiences.** The `--audiences` flag must match the target Cloud Run URL exactly; a token for `$DEV_NEXT_URL` will 401 against `$DEV_IMPORTER_URL`.
 - **Never suppress a non-zero smoke exit.** If `npm run smoke:dev` exits non-zero, that's the headline of the report — capture the failing step and stop. Cleanup already ran via the trap.
 - **Never stop the dev DB as a "tidy up" step.** Leaving it running is the default; stopping disrupts the next session and costs a 60s restart.
-- **Never invent endpoints.** If a probe returns 404, first verify the endpoint exists in the source (`grep -rn "app.get\|@app.post\|export const POST" apps/recipe-url-importer/src/ src/app/api/`). One non-obvious trap: Google Frontend on `*.run.app` blackholes the exact path `/healthz` at the edge — a 404 there with no `server: Google Frontend` header means the request never reached the container. The importer's health endpoint is `/health`.
+- **Never invent endpoints.** If a probe returns 404, first verify the endpoint exists in the source. Data-plane `/v1/*` routes live in FastAPI (`grep -rn "@router\.\(get\|post\|patch\|delete\)" apps/api/src/routers/`); the Next side only serves `/api/auth/*` + `/api/health` (`grep -rln "export const \(GET\|POST\)" src/app/api/`); the importer is `grep -rn "@app\." apps/recipe-url-importer/src/`. One non-obvious trap: Google Frontend on `*.run.app` blackholes the exact path `/healthz` at the edge — a 404 there with no `server: Google Frontend` header means the request never reached the container. The importer's health endpoint is `/health`.
 - **Never paper over a missing prerequisite.** If `roles/iam.serviceAccountTokenCreator` isn't granted or `.env.dev.local` isn't populated, stop and surface the exact command from [dev-deployments.md](../../../docs/verification/dev-deployments.md). Silent fallbacks lead to later confusion.
 
 ## Report template
@@ -220,15 +222,17 @@ Paste-ready GitHub comment. Adjust the bullets to what was actually run.
 ### Dev smoke (`npm run smoke:dev`)
 
 ```
-PASS  mint Bearer ID token
+PASS  mint Bearer ID tokens (next + api)
+PASS  GET $DEV_API_URL/health → 200 (FastAPI up)
 PASS  GET /api/health → 200
-PASS  POST /api/auth/login → 200
-PASS  POST /api/posts → 201
-PASS  POST /api/posts/:id/comments → 201
-PASS  POST /api/reactions → 200
-PASS  GET /api/posts/:id → 200 (comments=1, reactions=1)
-PASS  DELETE /api/posts/:id → 200
-PASS  GET /api/posts/:id after delete → 404
+PASS  POST /api/auth/login → 200 (refresh_token cookie set)
+PASS  POST /api/auth/bootstrap → 200 (access token)
+PASS  POST /v1/posts → 201
+PASS  POST /v1/posts/:id/comments → 201
+PASS  POST /v1/reactions → 200
+PASS  GET /v1/posts/:id → 200 (comments=1, reactions=1)
+PASS  DELETE /v1/posts/:id → 200
+PASS  GET /v1/posts/:id after delete → 404
 ```
 
 _(or paste the failure line + stderr if any step failed)_
