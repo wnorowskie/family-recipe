@@ -5,7 +5,7 @@
 > ([apps/api/](../apps/api/)) is now the sole JSON API, and the Next `/api/*`
 > data routes plus the Next JWT/`session`-cookie auth stack have been removed.
 > For the authoritative architecture, see [API_BACKEND_MIGRATION_PLAN.md](API_BACKEND_MIGRATION_PLAN.md)
-> and the root [CLAUDE.md](../CLAUDE.md); this doc tracks them.
+> and the root [CLAUDE.md](../CLAUDE.md), which this doc defers to.
 
 ## Product & Feature Summary
 
