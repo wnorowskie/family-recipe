@@ -1,5 +1,13 @@
 # Frontend ↔ FastAPI Migration Plan
 
+> ## ✅ Status: Migration complete (Phase 4 cutover shipped)
+>
+> **FastAPI is the sole application and auth backend.** The Next `/api/*` data routes were deleted (Phase 4.3, #231) and the legacy Next JWT/`session`-cookie auth stack was removed (Phase 4.4, #232). The Next service now serves only the UI plus same-origin auth proxies (`login`/`signup`/`logout`/`bootstrap`) and a health check; all data and auth flow through FastAPI under `/v1/*`.
+>
+> This document is now **two things**: a historical record of how the migration ran, and the reference for the current backend architecture (Phase-status call-outs are inline below). Because the feature flags are gone, **rollback is a code revert, not a config flip** — see the standalone [Phase 4 rollback runbook](rollback-phase4.md).
+>
+> **Phase 4 sub-phases, all shipped:** 4.1 shared API client on `/v1/*` (#229) · 4.2 refresh-token-only middleware (#230) · 4.3 delete Next `/api/*` data routes (#231) · 4.4 force-on flags + delete dual-mode/legacy auth (#232) · 4.5 collapse FastAPI routers to `/v1`-only (#233) · 4.6 extend dev smoke tooling for FastAPI (#234) · 4.7 docs + rollback runbook (#235) · Deploy FastAPI to Cloud Run (#241).
+
 ## Objective
 
 Migrate the Next.js frontend to use the FastAPI service as the primary backend while maintaining stability during the transition. The end state is a token‑based auth system (access + refresh tokens), standardized API contracts, and no reliance on Next.js API route handlers for application data.
@@ -736,6 +744,8 @@ After the first bring-up each service deploys independently on subsequent pushes
 
 ## Phase 4 — Cutover and Cleanup
 
+> ✅ **Complete.** Executed across sub-phases 4.1–4.7 (see the status banner at the top of this document). FastAPI is the sole backend; the Next `/api/*` data routes and legacy auth stack are gone; FastAPI is deployed to Cloud Run in every environment and reached via `API_INTERNAL_URL`.
+
 **Goals:** make FastAPI the sole backend for the frontend.
 
 1. **Switch all fetches**
@@ -767,10 +777,10 @@ After the first bring-up each service deploys independently on subsequent pushes
 
 **Exit Criteria**
 
-- No production traffic depends on Next API routes.
-- Frontend uses FastAPI for all data and auth.
-- FastAPI is deployed in every environment the frontend runs in, and the Next
-  service resolves it via `API_INTERNAL_URL`.
+- [x] No production traffic depends on Next API routes.
+- [x] Frontend uses FastAPI for all data and auth.
+- [x] FastAPI is deployed in every environment the frontend runs in, and the Next
+      service resolves it via `API_INTERNAL_URL`.
 
 ---
 
