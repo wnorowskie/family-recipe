@@ -6,22 +6,22 @@ from fastapi import APIRouter, Depends, File, Form, Path, UploadFile, status
 from prisma import Json
 from prisma.errors import PrismaError
 
-from ..db import prisma
-from ..dependencies import get_current_user
-from ..errors import forbidden, internal_error, not_found
-from ..permissions import can_delete_comment
-from ..schemas.auth import UserResponse
-from ..schemas.comments import CreateCommentRequest
-from ..uploads import (
+from ...db import prisma
+from ...dependencies import get_current_user
+from ...errors import forbidden, internal_error, not_found
+from ...permissions import can_delete_comment
+from ...schemas.auth import UserResponse
+from ...schemas.comments import CreateCommentRequest
+from ...uploads import (
     ALLOWED_MIME_TYPES,
     create_signed_url_resolver,
     delete_uploads,
     get_signed_upload_url,
     save_photo_file,
 )
-from ..utils import iso, is_cuid
+from ...utils import iso, is_cuid
 
-router = APIRouter(prefix="/posts/{post_id}/comments", tags=["comments"])
+router = APIRouter(prefix="/v1/posts/{post_id}/comments", tags=["comments"])
 
 MAX_COMMENT_LIMIT = 50
 
@@ -214,7 +214,7 @@ comments_router = router
 
 
 # Standalone deletion route for /comments/{comment_id}
-delete_router = APIRouter(prefix="/comments", tags=["comments"])
+delete_router = APIRouter(prefix="/v1/comments", tags=["comments"])
 
 
 @delete_router.delete("/{comment_id}")

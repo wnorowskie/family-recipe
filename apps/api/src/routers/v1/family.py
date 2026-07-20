@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Depends, Path
 from prisma.errors import PrismaError
 
-from ..db import prisma
-from ..dependencies import get_current_user
-from ..errors import forbidden, internal_error, not_found
-from ..permissions import can_remove_member
-from ..schemas.auth import UserResponse
-from ..uploads import create_signed_url_resolver
-from ..utils import is_cuid
+from ...db import prisma
+from ...dependencies import get_current_user
+from ...errors import forbidden, internal_error, not_found
+from ...permissions import can_remove_member
+from ...schemas.auth import UserResponse
+from ...uploads import create_signed_url_resolver
+from ...utils import is_cuid
 
-router = APIRouter(prefix="/family/members", tags=["family"])
+router = APIRouter(prefix="/v1/family/members", tags=["family"])
 
 
 @router.get("")

@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends
 from prisma.errors import PrismaError
 
-from ..db import prisma
-from ..dependencies import get_current_user
-from ..errors import internal_error
-from ..schemas.auth import UserResponse
+from ...db import prisma
+from ...dependencies import get_current_user
+from ...errors import internal_error
+from ...schemas.auth import UserResponse
 
-router = APIRouter(prefix="/tags", tags=["tags"])
+router = APIRouter(prefix="/v1/tags", tags=["tags"])
 
 
 @router.get("")

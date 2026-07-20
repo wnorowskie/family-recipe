@@ -28,7 +28,7 @@ class TestListComments:
         mock_prisma.comment.find_many = AsyncMock(return_value=[self._comment("c1"), self._comment("c2", text="Yo")])
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        response = client.get(f"/posts/{POST_ID}/comments", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}/comments", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         body = response.json()
@@ -40,7 +40,7 @@ class TestListComments:
         mock_prisma.comment.find_many = AsyncMock(return_value=[self._comment("c1"), self._comment("c2")])
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        response = client.get(f"/posts/{POST_ID}/comments?limit=1", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}/comments?limit=1", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         body = response.json()
@@ -70,7 +70,7 @@ class TestListComments:
             ]
         )
 
-        response = client.get(f"/posts/{POST_ID}/comments", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}/comments", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         reactions = response.json()["comments"][0]["reactions"]
@@ -79,12 +79,12 @@ class TestListComments:
         assert counts["👍"] == 1
 
     def test_list_comments_post_not_found_404(self, client, member_auth):
-        response = client.get("/posts/invalid/comments", headers=member_auth)
+        response = client.get("/v1/posts/invalid/comments", headers=member_auth)
 
         assert response.status_code == 404
 
     def test_list_comments_requires_auth(self, client):
-        response = client.get(f"/posts/{POST_ID}/comments")
+        response = client.get(f"/v1/posts/{POST_ID}/comments")
 
         assert response.status_code == 401
 
@@ -105,7 +105,7 @@ class TestCreateComment:
         mock_prisma.comment.create = AsyncMock(return_value=self._comment())
 
         response = client.post(
-            f"/posts/{POST_ID}/comments",
+            f"/v1/posts/{POST_ID}/comments",
             data={"payload": json.dumps({"text": "Great post"})},
             headers=member_auth,
         )
@@ -123,7 +123,7 @@ class TestCreateComment:
         mock_prisma.comment.create = AsyncMock(return_value=self._comment())
 
         response = client.post(
-            f"/posts/{POST_ID}/comments",
+            f"/v1/posts/{POST_ID}/comments",
             data={"payload": json.dumps({"text": "Note to self"})},
             headers=member_auth,
         )
@@ -135,10 +135,10 @@ class TestCreateComment:
         mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123", authorId="author_999"))
         saved_comment = self._comment(photo_url="https://cdn.test/pic.jpg")
         mock_prisma.comment.create = AsyncMock(return_value=saved_comment)
-        monkeypatch.setattr("src.routers.comments.save_photo_file", AsyncMock(return_value={"url": "https://cdn.test/pic.jpg"}))
+        monkeypatch.setattr("src.routers.v1.comments.save_photo_file", AsyncMock(return_value={"url": "https://cdn.test/pic.jpg"}))
 
         response = client.post(
-            f"/posts/{POST_ID}/comments",
+            f"/v1/posts/{POST_ID}/comments",
             data={"payload": json.dumps({"text": "Photo"})},
             files={"photo": ("pic.jpg", b"data", "image/jpeg")},
             headers=member_auth,
@@ -151,7 +151,7 @@ class TestCreateComment:
         mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123", authorId="author_999"))
 
         response = client.post(
-            f"/posts/{POST_ID}/comments",
+            f"/v1/posts/{POST_ID}/comments",
             data={"payload": json.dumps({"text": "Bad"})},
             files={"photo": ("doc.txt", b"data", "text/plain")},
             headers=member_auth,
@@ -163,7 +163,7 @@ class TestCreateComment:
         mock_prisma.post.find_unique = AsyncMock(return_value=None)
 
         response = client.post(
-            f"/posts/{POST_ID}/comments",
+            f"/v1/posts/{POST_ID}/comments",
             data={"payload": json.dumps({"text": "Missing"})},
             headers=member_auth,
         )
@@ -172,7 +172,7 @@ class TestCreateComment:
 
     def test_create_comment_requires_auth(self, client):
         response = client.post(
-            f"/posts/{POST_ID}/comments",
+            f"/v1/posts/{POST_ID}/comments",
             data={"payload": json.dumps({"text": "No auth"})},
         )
 
@@ -183,7 +183,7 @@ class TestCreateComment:
         mock_prisma.comment.create = AsyncMock(return_value=self._comment())
 
         response = client.post(
-            f"/posts/{POST_ID}/comments",
+            f"/v1/posts/{POST_ID}/comments",
             data={"payload": json.dumps({"text": "Shape"})},
             headers=member_auth,
         )
@@ -207,9 +207,9 @@ class TestDeleteComment:
         mock_prisma.comment.find_unique = AsyncMock(return_value=comment)
         mock_prisma.comment.delete = AsyncMock(return_value=None)
         delete_mock = AsyncMock()
-        monkeypatch.setattr("src.routers.comments.delete_uploads", delete_mock)
+        monkeypatch.setattr("src.routers.v1.comments.delete_uploads", delete_mock)
 
-        response = client.delete(f"/comments/{COMMENT_ID}", headers=member_auth)
+        response = client.delete(f"/v1/comments/{COMMENT_ID}", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         delete_mock.assert_awaited_once_with(["https://cdn.test/c.jpg"])
@@ -228,7 +228,7 @@ class TestDeleteComment:
         mock_prisma.comment.find_unique = AsyncMock(return_value=comment)
         mock_prisma.comment.delete = AsyncMock(return_value=None)
 
-        response = client.delete(f"/comments/{COMMENT_ID}", headers=admin_auth)
+        response = client.delete(f"/v1/comments/{COMMENT_ID}", headers=admin_auth)
 
         assert response.status_code == 200, response.json()
 
@@ -246,7 +246,7 @@ class TestDeleteComment:
         mock_prisma.comment.find_unique = AsyncMock(return_value=comment)
         mock_prisma.comment.delete = AsyncMock(return_value=None)
 
-        response = client.delete(f"/comments/{COMMENT_ID}", headers=owner_auth)
+        response = client.delete(f"/v1/comments/{COMMENT_ID}", headers=owner_auth)
 
         assert response.status_code == 200, response.json()
 
@@ -254,23 +254,23 @@ class TestDeleteComment:
         comment = self._comment(author_id="different")
         mock_prisma.comment.find_unique = AsyncMock(return_value=comment)
 
-        response = client.delete(f"/comments/{COMMENT_ID}", headers=member_auth)
+        response = client.delete(f"/v1/comments/{COMMENT_ID}", headers=member_auth)
 
         assert response.status_code == 403
 
     def test_delete_comment_not_found_404(self, client, mock_prisma, member_auth):
         mock_prisma.comment.find_unique = AsyncMock(return_value=None)
 
-        response = client.delete(f"/comments/{COMMENT_ID}", headers=member_auth)
+        response = client.delete(f"/v1/comments/{COMMENT_ID}", headers=member_auth)
 
         assert response.status_code == 404
 
     def test_delete_comment_invalid_id_404(self, client, member_auth):
-        response = client.delete("/comments/not-a-cuid", headers=member_auth)
+        response = client.delete("/v1/comments/not-a-cuid", headers=member_auth)
 
         assert response.status_code == 404
 
     def test_delete_comment_requires_auth(self, client):
-        response = client.delete(f"/comments/{COMMENT_ID}")
+        response = client.delete(f"/v1/comments/{COMMENT_ID}")
 
         assert response.status_code == 401

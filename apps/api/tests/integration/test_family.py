@@ -51,7 +51,7 @@ def test_list_members_success(client, mock_prisma, member_auth):
     membership = _make_membership(user, role="admin")
     mock_prisma.familymembership.find_many = AsyncMock(return_value=[membership])
 
-    response = client.get("/family/members", headers=member_auth)
+    response = client.get("/v1/family/members", headers=member_auth)
 
     assert response.status_code == 200
     assert response.json() == {
@@ -77,7 +77,7 @@ def test_list_members_includes_post_count(client, mock_prisma, member_auth):
     membership = _make_membership(user)
     mock_prisma.familymembership.find_many = AsyncMock(return_value=[membership])
 
-    response = client.get("/family/members", headers=member_auth)
+    response = client.get("/v1/family/members", headers=member_auth)
 
     assert response.status_code == 200
     assert response.json()["members"][0]["postCount"] == 2
@@ -87,7 +87,7 @@ def test_list_members_includes_role(client, mock_prisma, member_auth):
     membership = _make_membership(_make_user(), role="owner")
     mock_prisma.familymembership.find_many = AsyncMock(return_value=[membership])
 
-    response = client.get("/family/members", headers=member_auth)
+    response = client.get("/v1/family/members", headers=member_auth)
 
     assert response.status_code == 200
     assert response.json()["members"][0]["role"] == "owner"
@@ -97,14 +97,14 @@ def test_list_members_sorted_by_join_date(client, mock_prisma, member_auth):
     memberships = [_make_membership(_make_user(idx=idx)) for idx in range(2)]
     mock_prisma.familymembership.find_many = AsyncMock(return_value=memberships)
 
-    response = client.get("/family/members", headers=member_auth)
+    response = client.get("/v1/family/members", headers=member_auth)
 
     assert response.status_code == 200
     assert mock_prisma.familymembership.find_many.await_args.kwargs["order"] == {"createdAt": "asc"}
 
 
 def test_list_members_requires_auth(client):
-    response = client.get("/family/members")
+    response = client.get("/v1/family/members")
 
     assert response.status_code == 401
 
@@ -130,7 +130,7 @@ def test_remove_member_admin_removes_member(client, mock_prisma, admin_auth, moc
     mock_prisma.familymembership.find_first = AsyncMock(return_value=membership)
     mock_prisma.familymembership.delete = AsyncMock(return_value=None)
 
-    response = client.delete(f"/family/members/{_VALID_CUID}", headers=admin_auth)
+    response = client.delete(f"/v1/family/members/{_VALID_CUID}", headers=admin_auth)
 
     assert response.status_code == 200
     assert response.json() == {"message": "Member removed"}
@@ -143,7 +143,7 @@ def test_remove_member_owner_removes_member(client, mock_prisma, owner_auth, moc
     mock_prisma.familymembership.find_first = AsyncMock(return_value=membership)
     mock_prisma.familymembership.delete = AsyncMock(return_value=None)
 
-    response = client.delete(f"/family/members/{_VALID_CUID}", headers=owner_auth)
+    response = client.delete(f"/v1/family/members/{_VALID_CUID}", headers=owner_auth)
 
     assert response.status_code == 200
     mock_prisma.familymembership.delete.assert_awaited()
@@ -155,7 +155,7 @@ def test_remove_member_owner_removes_admin(client, mock_prisma, owner_auth, mock
     mock_prisma.familymembership.find_first = AsyncMock(return_value=membership)
     mock_prisma.familymembership.delete = AsyncMock(return_value=None)
 
-    response = client.delete(f"/family/members/{_VALID_CUID}", headers=owner_auth)
+    response = client.delete(f"/v1/family/members/{_VALID_CUID}", headers=owner_auth)
 
     assert response.status_code == 200
     mock_prisma.familymembership.delete.assert_awaited()
@@ -166,7 +166,7 @@ def test_remove_member_member_cannot_remove_403(client, mock_prisma, member_auth
     mock_prisma.familymembership.find_first = AsyncMock(return_value=membership)
     mock_prisma.familymembership.delete = AsyncMock()
 
-    response = client.delete(f"/family/members/{_VALID_CUID}", headers=member_auth)
+    response = client.delete(f"/v1/family/members/{_VALID_CUID}", headers=member_auth)
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "FORBIDDEN"
@@ -179,7 +179,7 @@ def test_remove_member_admin_cannot_remove_owner_403(client, mock_prisma, admin_
     mock_prisma.familymembership.find_first = AsyncMock(return_value=membership)
     mock_prisma.familymembership.delete = AsyncMock()
 
-    response = client.delete(f"/family/members/{_VALID_CUID}", headers=admin_auth)
+    response = client.delete(f"/v1/family/members/{_VALID_CUID}", headers=admin_auth)
 
     assert response.status_code == 403
     assert mock_prisma.familymembership.delete.await_count == 0
@@ -194,7 +194,7 @@ def test_remove_member_cannot_remove_self_403(client, mock_prisma, mock_family_s
     mock_prisma.familymembership.delete = AsyncMock()
     headers = {"Cookie": f"{settings.cookie_name}=" + sign_token({"userId": _VALID_CUID, "familySpaceId": mock_family_space.id, "role": "owner"})}
 
-    response = client.delete(f"/family/members/{_VALID_CUID}", headers=headers)
+    response = client.delete(f"/v1/family/members/{_VALID_CUID}", headers=headers)
 
     assert response.status_code == 403
     assert mock_prisma.familymembership.delete.await_count == 0
@@ -204,7 +204,7 @@ def test_remove_member_not_found_404(client, mock_prisma, admin_auth, mock_admin
     _set_current_user(mock_prisma, mock_admin_user, mock_family_space, "admin")
     mock_prisma.familymembership.find_first = AsyncMock(return_value=None)
 
-    response = client.delete(f"/family/members/{_VALID_CUID}", headers=admin_auth)
+    response = client.delete(f"/v1/family/members/{_VALID_CUID}", headers=admin_auth)
 
     assert response.status_code == 404
 
@@ -212,13 +212,13 @@ def test_remove_member_not_found_404(client, mock_prisma, admin_auth, mock_admin
 def test_remove_member_invalid_id_404(client, mock_prisma, admin_auth):
     mock_prisma.familymembership.find_first = AsyncMock()
 
-    response = client.delete("/family/members/not-a-cuid", headers=admin_auth)
+    response = client.delete("/v1/family/members/not-a-cuid", headers=admin_auth)
 
     assert response.status_code == 404
     assert mock_prisma.familymembership.find_first.await_count == 0
 
 
 def test_remove_member_requires_auth(client):
-    response = client.delete(f"/family/members/{_VALID_CUID}")
+    response = client.delete(f"/v1/family/members/{_VALID_CUID}")
 
     assert response.status_code == 401

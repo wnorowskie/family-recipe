@@ -1,11 +1,12 @@
 """Integration tests for PATCH /v1/me/profile — issue #187 multipart on profile.
 
-The handler in `src/routers/me.py#update_profile_multipart` accepts a
+The handler in `src/routers/v1/me.py#update_profile_multipart` accepts a
 flat-field multipart body (`name`, `email`, `username`, optional `avatar`,
 optional `currentPassword`, optional `removeAvatar`) and writes to the
-`avatar_url` column when an avatar is included. Session-cookie auth,
-not bearer-token: the legacy `me.py` router is mounted at both `/me` and
-`/v1/me`, so the same handler covers Phase 3 and the legacy path.
+`avatar_url` column when an avatar is included. Cookie-capable
+`get_current_user` auth (the SPA sends a Bearer token; the legacy session
+cookie still resolves via the fallback), mounted at `/v1/me` only after the
+#233 cleanup collapsed the un-prefixed aliases.
 
 Tests verify:
   - Happy path (no avatar, no sensitive change)
@@ -96,7 +97,7 @@ def test_patch_profile_with_avatar_writes_storage_key(client, mock_prisma, membe
     mock_prisma.user.update = AsyncMock(return_value=_updated_user(avatarStorageKey="abc-123.jpg"))
 
     monkeypatch.setattr(
-        "src.routers.me.process_upload",
+        "src.routers.v1.me.process_upload",
         AsyncMock(
             return_value=ProcessedUpload(
                 storage_key="abc-123.jpg", size_bytes=1000, content_type="image/jpeg"
@@ -120,7 +121,7 @@ def test_patch_profile_with_avatar_writes_storage_key(client, mock_prisma, membe
 
 def test_patch_profile_oversized_avatar_400(client, mock_prisma, member_auth, monkeypatch):
     monkeypatch.setattr(
-        "src.routers.me.process_upload",
+        "src.routers.v1.me.process_upload",
         AsyncMock(side_effect=UploadError("FILE_TOO_LARGE", "File exceeds the 5MB limit for avatar")),
     )
 
@@ -141,7 +142,7 @@ def test_patch_profile_oversized_avatar_400(client, mock_prisma, member_auth, mo
 
 def test_patch_profile_bad_mime_400(client, mock_prisma, member_auth, monkeypatch):
     monkeypatch.setattr(
-        "src.routers.me.process_upload",
+        "src.routers.v1.me.process_upload",
         AsyncMock(
             side_effect=UploadError(
                 "UNSUPPORTED_FILE_TYPE",
@@ -190,7 +191,7 @@ def test_patch_profile_email_change_requires_password(client, mock_prisma, membe
 def test_patch_profile_wrong_password_401(client, mock_prisma, member_auth, monkeypatch):
     """Email change with a *wrong* password is 401 INVALID_CREDENTIALS
     per Next's `invalidCredentialsError` mapping."""
-    monkeypatch.setattr("src.routers.me.verify_password", lambda *_args, **_kw: False)
+    monkeypatch.setattr("src.routers.v1.me.verify_password", lambda *_args, **_kw: False)
 
     response = client.patch(
         "/v1/me/profile",
@@ -220,7 +221,7 @@ def test_patch_profile_email_change_clears_session_cookie(
     mock_prisma.user.update = AsyncMock(
         return_value=_updated_user(email="new@example.com")
     )
-    monkeypatch.setattr("src.routers.me.verify_password", lambda *_args, **_kw: True)
+    monkeypatch.setattr("src.routers.v1.me.verify_password", lambda *_args, **_kw: True)
 
     response = client.patch(
         "/v1/me/profile",
@@ -247,7 +248,7 @@ def test_patch_profile_email_change_clears_session_cookie(
 def test_patch_profile_duplicate_email_409(client, mock_prisma, member_auth, monkeypatch):
     """A P2002 unique-constraint hit from prisma -> 409 CONFLICT
     "That email or username is already in use" (mirrors Next)."""
-    monkeypatch.setattr("src.routers.me.verify_password", lambda *_args, **_kw: True)
+    monkeypatch.setattr("src.routers.v1.me.verify_password", lambda *_args, **_kw: True)
     mock_prisma.user.update = AsyncMock(
         side_effect=UniqueViolationError("unique violation")
     )

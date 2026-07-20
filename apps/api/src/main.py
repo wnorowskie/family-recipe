@@ -6,7 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .db import connect_db, disconnect_db
 from .errors import ApiError, error_response, validation_error
-from .routers import auth, comments, family, health, me, posts, profile, reactions, recipes, tags, timeline
+from .routers.v1 import (
+    comments,
+    family,
+    health,
+    posts,
+    profile,
+    reactions,
+    tags,
+    timeline,
+)
 from .routers.v1 import auth as auth_v1
 from .routers.v1 import feedback as feedback_v1
 from .routers.v1 import me as me_v1
@@ -55,53 +64,34 @@ if settings.cors_origins_list:
     )
 
 
-# Per the migration plan, every endpoint is reachable under `/v1`. Each
-# resource router is included twice — once at its native prefix (the
-# un-prefixed alias kept for the duration of the rollout) and once under `/v1`.
-# The aliases sunset after the Phase 4 cutover (#38).
+# Every endpoint is served under `/v1` only. Each router hardcodes its full
+# `/v1/...` prefix (matching `v1/auth.py`) and is included once with no prefix
+# kwarg. The un-prefixed rollout aliases and the legacy session-cookie
+# `auth.router` were removed in #233 (Phase 4.5), after the cutover (#38).
 #
-# `auth.router` is the legacy session-cookie auth path and is NOT dual-included
-# — `/v1/auth/*` is owned by `auth_v1.router`, which implements the
-# token+refresh flow and is a deliberate behavioural divergence from
-# `auth.router`, not a path alias.
-_DUAL_INCLUDED_ROUTERS = (
+# The two merged modules each expose two routers under one `/v1` namespace,
+# split by auth mode: `recipes_v1` = `browse_router` (GET /v1/recipes,
+# cookie-capable) + `router` (POST /v1/recipes/import, bearer); `me_v1` =
+# `me_router` (favorites/profile/password, cookie-capable) + `router`
+# (DELETE /v1/me/delete, bearer). See their module docstrings.
+_ROUTERS = (
     health.router,
     posts.router,
     comments.comments_router,
     comments.delete_router,
     reactions.router,
     timeline.router,
-    recipes.router,
+    recipes_v1.browse_router,
+    recipes_v1.router,
     profile.router,
     family.router,
     tags.router,
-    me.router,
+    me_v1.me_router,
+    me_v1.router,
+    auth_v1.router,
+    notifications_v1.router,
+    feedback_v1.router,
 )
 
-for _router in _DUAL_INCLUDED_ROUTERS:
+for _router in _ROUTERS:
     app.include_router(_router)
-    app.include_router(_router, prefix="/v1")
-
-app.include_router(auth.router)
-app.include_router(auth_v1.router)
-# `/v1/notifications/*` is owned exclusively by the v1 namespace — Bearer
-# auth, no cookie-auth twin. The Phase 2 frontend only hits these endpoints
-# when `USE_FASTAPI_AUTH` is on (and is therefore already sending access
-# tokens); a dual-mounted unprefixed cookie-auth alias would have no caller.
-app.include_router(notifications_v1.router)
-# `/v1/feedback` (issue #183): same rationale as notifications. The legacy
-# Next handler at src/app/api/feedback/route.ts stays alive (cookie auth,
-# accepts anonymous submissions) until the Phase 4 cutover (#38) — there is
-# no behavioural overlap to alias.
-app.include_router(feedback_v1.router)
-# `/v1/recipes/import` (issue #185): bearer-auth-only proxy to the
-# standalone recipe-url-importer. No dual-mount: the legacy
-# `routers/recipes.py` already serves `/recipes` + `/v1/recipes` for
-# browse/search under cookie auth, and adding the importer there would
-# mix two auth modes on one router. See routers/v1/recipes.py docstring.
-app.include_router(recipes_v1.router)
-# `/v1/me/delete` (issue #186): bearer-auth-only account delete. Same
-# rationale as feedback/notifications/recipes_v1 — the cookie-auth twin
-# at `routers/me.py` stays alive through Phase 4, and there is no
-# behavioural overlap to alias.
-app.include_router(me_v1.router)

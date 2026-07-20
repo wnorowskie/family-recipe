@@ -67,7 +67,7 @@ def test_my_posts_success(client, mock_prisma, member_auth):
     mock_prisma.post.find_many = AsyncMock(return_value=[post])
     mock_prisma.cookedevent.find_many = AsyncMock(return_value=[])
 
-    response = client.get("/profile/posts", headers=member_auth)
+    response = client.get("/v1/profile/posts", headers=member_auth)
 
     assert response.status_code == 200
     body = response.json()
@@ -91,7 +91,7 @@ def test_my_posts_pagination(client, mock_prisma, member_auth):
     mock_prisma.post.find_many = AsyncMock(return_value=posts)
     mock_prisma.cookedevent.find_many = AsyncMock(return_value=[])
 
-    response = client.get("/profile/posts?limit=2&offset=5", headers=member_auth)
+    response = client.get("/v1/profile/posts?limit=2&offset=5", headers=member_auth)
 
     assert response.status_code == 200
     payload = response.json()
@@ -113,7 +113,7 @@ def test_my_posts_includes_cooked_stats(client, mock_prisma, member_auth):
     mock_prisma.post.find_many = AsyncMock(return_value=[post])
     mock_prisma.cookedevent.find_many = AsyncMock(return_value=cooked_events)
 
-    response = client.get("/profile/posts", headers=member_auth)
+    response = client.get("/v1/profile/posts", headers=member_auth)
 
     assert response.status_code == 200
     stats = response.json()["items"][0]["cookedStats"]
@@ -122,7 +122,7 @@ def test_my_posts_includes_cooked_stats(client, mock_prisma, member_auth):
 
 def test_my_posts_only_own_posts(client, mock_prisma, member_auth, prisma_user_with_membership):
     mock_prisma.post.find_many = AsyncMock(return_value=[])
-    response = client.get("/profile/posts", headers=member_auth)
+    response = client.get("/v1/profile/posts", headers=member_auth)
 
     assert response.status_code == 200
     where = mock_prisma.post.find_many.await_args.kwargs["where"]
@@ -131,7 +131,7 @@ def test_my_posts_only_own_posts(client, mock_prisma, member_auth, prisma_user_w
 
 
 def test_my_posts_requires_auth(client):
-    response = client.get("/profile/posts")
+    response = client.get("/v1/profile/posts")
 
     assert response.status_code == 401
 
@@ -145,7 +145,7 @@ def test_my_cooked_success(client, mock_prisma, member_auth):
     event = _make_cooked_event()
     mock_prisma.cookedevent.find_many = AsyncMock(return_value=[event])
 
-    response = client.get("/profile/cooked", headers=member_auth)
+    response = client.get("/v1/profile/cooked", headers=member_auth)
 
     assert response.status_code == 200
     body = response.json()
@@ -172,7 +172,7 @@ def test_my_cooked_pagination(client, mock_prisma, member_auth):
     events = [_make_cooked_event(idx=i) for i in range(2)]
     mock_prisma.cookedevent.find_many = AsyncMock(return_value=events)
 
-    response = client.get("/profile/cooked?limit=1&offset=10", headers=member_auth)
+    response = client.get("/v1/profile/cooked?limit=1&offset=10", headers=member_auth)
 
     assert response.status_code == 200
     data = response.json()
@@ -188,7 +188,7 @@ def test_my_cooked_includes_post(client, mock_prisma, member_auth):
     event = _make_cooked_event(post=_make_post(title="Winter Stew"))
     mock_prisma.cookedevent.find_many = AsyncMock(return_value=[event])
 
-    response = client.get("/profile/cooked", headers=member_auth)
+    response = client.get("/v1/profile/cooked", headers=member_auth)
 
     assert response.status_code == 200
     post_summary = response.json()["items"][0]["post"]
@@ -202,7 +202,7 @@ def test_my_cooked_includes_post(client, mock_prisma, member_auth):
 def test_my_cooked_only_own_events(client, mock_prisma, member_auth, prisma_user_with_membership):
     mock_prisma.cookedevent.find_many = AsyncMock(return_value=[])
 
-    response = client.get("/profile/cooked", headers=member_auth)
+    response = client.get("/v1/profile/cooked", headers=member_auth)
 
     assert response.status_code == 200
     where = mock_prisma.cookedevent.find_many.await_args.kwargs["where"]
@@ -211,7 +211,7 @@ def test_my_cooked_only_own_events(client, mock_prisma, member_auth, prisma_user
 
 
 def test_my_cooked_requires_auth(client):
-    response = client.get("/profile/cooked")
+    response = client.get("/v1/profile/cooked")
 
     assert response.status_code == 401
 
@@ -225,7 +225,7 @@ def test_my_favorites_success(client, mock_prisma, member_auth):
     favorite = _make_favorite()
     mock_prisma.favorite.find_many = AsyncMock(return_value=[favorite])
 
-    response = client.get("/profile/favorites", headers=member_auth)
+    response = client.get("/v1/profile/favorites", headers=member_auth)
 
     assert response.status_code == 200
     body = response.json()
@@ -251,7 +251,7 @@ def test_my_favorites_pagination(client, mock_prisma, member_auth):
     favorites = [_make_favorite(idx=i) for i in range(3)]
     mock_prisma.favorite.find_many = AsyncMock(return_value=favorites)
 
-    response = client.get("/profile/favorites?limit=2&offset=3", headers=member_auth)
+    response = client.get("/v1/profile/favorites?limit=2&offset=3", headers=member_auth)
 
     assert response.status_code == 200
     data = response.json()
@@ -274,7 +274,7 @@ def test_my_favorites_includes_post(client, mock_prisma, member_auth):
     )
     mock_prisma.favorite.find_many = AsyncMock(return_value=[favorite])
 
-    response = client.get("/profile/favorites", headers=member_auth)
+    response = client.get("/v1/profile/favorites", headers=member_auth)
 
     assert response.status_code == 200
     post_summary = response.json()["items"][0]["post"]
@@ -289,7 +289,7 @@ def test_my_favorites_includes_post(client, mock_prisma, member_auth):
 def test_my_favorites_only_own(client, mock_prisma, member_auth, prisma_user_with_membership):
     mock_prisma.favorite.find_many = AsyncMock(return_value=[])
 
-    response = client.get("/profile/favorites", headers=member_auth)
+    response = client.get("/v1/profile/favorites", headers=member_auth)
 
     assert response.status_code == 200
     where = mock_prisma.favorite.find_many.await_args.kwargs["where"]
@@ -298,6 +298,6 @@ def test_my_favorites_only_own(client, mock_prisma, member_auth, prisma_user_wit
 
 
 def test_my_favorites_requires_auth(client):
-    response = client.get("/profile/favorites")
+    response = client.get("/v1/profile/favorites")
 
     assert response.status_code == 401
