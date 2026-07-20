@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Dict, List, Optional, TypedDict
 
@@ -71,28 +72,47 @@ async def list_comments(
         ids = [c.id for c in comments]
         resolve_avatar = create_signed_url_resolver()
         reaction_map: Dict[str, List[ReactionSummary]] = {}
-        if ids:
-            reactions = await prisma.reaction.find_many(
+        reactions = (
+            await prisma.reaction.find_many(
                 where={"targetType": "comment", "targetId": {"in": ids}},
                 order={"createdAt": "asc"},
                 include={"user": True},
             )
-            for r in reactions:
-                if not r.user:
-                    continue
-                lst = reaction_map.setdefault(r.targetId, [])
-                found = next((entry for entry in lst if entry["emoji"] == r.emoji), None)
-                if not found:
-                    found = {"emoji": r.emoji, "count": 0, "users": []}
-                    lst.append(found)
-                found["count"] += 1
-                found["users"].append(
-                    {
-                        "id": r.user.id,
-                        "name": r.user.name,
-                        "avatarUrl": await resolve_avatar(r.user.avatarStorageKey),
-                    }
-                )
+            if ids
+            else []
+        )
+
+        # Pre-resolve every distinct avatar key (comment authors + reaction
+        # users) concurrently so the per-row awaits below are cache hits. The
+        # resolver memoizes per key, so this seeds its cache in one batch
+        # instead of one sequential signed-URL call per author/reactor.
+        avatar_keys = {
+            c.author.avatarStorageKey
+            for c in comments
+            if c.author and c.author.avatarStorageKey
+        }
+        avatar_keys |= {
+            r.user.avatarStorageKey for r in reactions if r.user and r.user.avatarStorageKey
+        }
+        if avatar_keys:
+            await asyncio.gather(*(resolve_avatar(key) for key in avatar_keys))
+
+        for r in reactions:
+            if not r.user:
+                continue
+            lst = reaction_map.setdefault(r.targetId, [])
+            found = next((entry for entry in lst if entry["emoji"] == r.emoji), None)
+            if not found:
+                found = {"emoji": r.emoji, "count": 0, "users": []}
+                lst.append(found)
+            found["count"] += 1
+            found["users"].append(
+                {
+                    "id": r.user.id,
+                    "name": r.user.name,
+                    "avatarUrl": await resolve_avatar(r.user.avatarStorageKey),
+                }
+            )
 
         serialized = []
         for c in reversed(comments):
