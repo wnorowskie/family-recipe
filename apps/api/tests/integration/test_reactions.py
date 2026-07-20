@@ -25,7 +25,7 @@ class TestToggleReaction:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         response = client.post(
-            "/reactions",
+            "/v1/reactions",
             json={"targetType": "post", "targetId": POST_ID, "emoji": "❤️"},
             headers=member_auth,
         )
@@ -44,7 +44,7 @@ class TestToggleReaction:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         response = client.post(
-            "/reactions",
+            "/v1/reactions",
             json={"targetType": "post", "targetId": POST_ID, "emoji": "❤️"},
             headers=member_auth,
         )
@@ -60,7 +60,7 @@ class TestToggleReaction:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         response = client.post(
-            "/reactions",
+            "/v1/reactions",
             json={"targetType": "comment", "targetId": COMMENT_ID, "emoji": "🔥"},
             headers=member_auth,
         )
@@ -78,7 +78,7 @@ class TestToggleReaction:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         response = client.post(
-            "/reactions",
+            "/v1/reactions",
             json={"targetType": "comment", "targetId": COMMENT_ID, "emoji": "🔥"},
             headers=member_auth,
         )
@@ -97,7 +97,7 @@ class TestToggleReaction:
         )
 
         response = client.post(
-            "/reactions",
+            "/v1/reactions",
             json={"targetType": "post", "targetId": POST_ID, "emoji": "👍"},
             headers=member_auth,
         )
@@ -115,7 +115,7 @@ class TestToggleReaction:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         response = client.post(
-            "/reactions",
+            "/v1/reactions",
             json={"targetType": "post", "targetId": POST_ID, "emoji": "👍"},
             headers=member_auth,
         )
@@ -127,7 +127,7 @@ class TestToggleReaction:
         mock_prisma.post.find_unique = AsyncMock(return_value=None)
 
         response = client.post(
-            "/reactions",
+            "/v1/reactions",
             json={"targetType": "post", "targetId": POST_ID, "emoji": "❤️"},
             headers=member_auth,
         )
@@ -138,7 +138,7 @@ class TestToggleReaction:
         mock_prisma.comment.find_unique = AsyncMock(return_value=None)
 
         response = client.post(
-            "/reactions",
+            "/v1/reactions",
             json={"targetType": "comment", "targetId": COMMENT_ID, "emoji": "🔥"},
             headers=member_auth,
         )
@@ -147,7 +147,7 @@ class TestToggleReaction:
 
     def test_toggle_reaction_invalid_target_id_404(self, client, member_auth):
         response = client.post(
-            "/reactions",
+            "/v1/reactions",
             json={"targetType": "post", "targetId": "not-a-cuid", "emoji": "❤️"},
             headers=member_auth,
         )
@@ -158,7 +158,7 @@ class TestToggleReaction:
         mock_prisma.post.find_unique = AsyncMock(return_value=self._post(family_space_id="other_family"))
 
         response = client.post(
-            "/reactions",
+            "/v1/reactions",
             json={"targetType": "post", "targetId": POST_ID, "emoji": "❤️"},
             headers=member_auth,
         )
@@ -167,7 +167,7 @@ class TestToggleReaction:
 
     def test_toggle_reaction_requires_auth(self, client):
         response = client.post(
-            "/reactions",
+            "/v1/reactions",
             json={"targetType": "post", "targetId": POST_ID, "emoji": "❤️"},
         )
 
@@ -182,8 +182,8 @@ class TestToggleReaction:
         first_payload = {"targetType": "post", "targetId": POST_ID, "emoji": "❤️"}
         second_payload = {"targetType": "post", "targetId": POST_ID, "emoji": "🔥"}
 
-        first_response = client.post("/reactions", json=first_payload, headers=member_auth)
-        second_response = client.post("/reactions", json=second_payload, headers=member_auth)
+        first_response = client.post("/v1/reactions", json=first_payload, headers=member_auth)
+        second_response = client.post("/v1/reactions", json=second_payload, headers=member_auth)
 
         assert first_response.status_code == 200, first_response.json()
         assert second_response.status_code == 200, second_response.json()
@@ -226,7 +226,7 @@ class TestReactionSummaryAvatarBatching:
             "src.uploads.get_signed_upload_url", new=AsyncMock(side_effect=fake_sign)
         ) as mock_sign:
             response = client.post(
-                "/reactions",
+                "/v1/reactions",
                 json={"targetType": "post", "targetId": POST_ID, "emoji": "👍"},
                 headers=member_auth,
             )

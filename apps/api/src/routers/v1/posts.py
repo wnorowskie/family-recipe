@@ -5,9 +5,9 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from fastapi import APIRouter, Depends, File, Form, Path, UploadFile, status
 from prisma.errors import PrismaError
 
-from ..db import prisma
-from ..dependencies import get_current_user
-from ..errors import (
+from ...db import prisma
+from ...dependencies import get_current_user
+from ...errors import (
     file_too_large,
     forbidden,
     internal_error,
@@ -17,28 +17,28 @@ from ..errors import (
     unsupported_file_type,
     validation_error,
 )
-from ..multipart_uploads import (
+from ...multipart_uploads import (
     POSTS_MEDIA_MAX_BYTES,
     ProcessedUpload,
     UploadError,
     process_upload,
 )
-from ..permissions import can_edit_post
-from ..schemas.auth import UserResponse
-from ..schemas.posts import CookedRequest, CreatePostRequest, FavoriteResponse, UpdatePostRequest
-from ..uploads import (
+from ...permissions import can_edit_post
+from ...schemas.auth import UserResponse
+from ...schemas.posts import CookedRequest, CreatePostRequest, FavoriteResponse, UpdatePostRequest
+from ...uploads import (
     MAX_PHOTO_COUNT,
     create_signed_url_resolver,
     delete_uploads,
 )
-from ..utils import iso, is_cuid
+from ...utils import iso, is_cuid
 
 # Per the Phase 3 migration plan: aggregate cap on a single create/update-post
 # request after individual files have passed the per-file 10MB check. Without
 # this, a client could pin memory by uploading ten 9.9MB files in one POST.
 POSTS_TOTAL_REQUEST_MAX_BYTES = 50 * 1024 * 1024  # 50 MB
 
-router = APIRouter(prefix="/posts", tags=["posts"])
+router = APIRouter(prefix="/v1/posts", tags=["posts"])
 COURSE_VALUES = {"breakfast", "lunch", "dinner", "dessert", "snack", "other"}
 
 

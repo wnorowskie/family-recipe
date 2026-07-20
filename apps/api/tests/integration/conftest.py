@@ -26,27 +26,22 @@ from tests.helpers.test_data import make_mock_family_space, make_mock_membership
 def mock_prisma(monkeypatch):
     mock = create_mock_prisma_client()
     monkeypatch.setattr(db, "prisma", mock)
-    monkeypatch.setattr("src.routers.auth.prisma", mock)
-    monkeypatch.setattr("src.routers.posts.prisma", mock)
-    monkeypatch.setattr("src.routers.comments.prisma", mock)
-    monkeypatch.setattr("src.routers.reactions.prisma", mock)
-    monkeypatch.setattr("src.routers.tags.prisma", mock)
-    monkeypatch.setattr("src.routers.timeline.prisma", mock)
-    monkeypatch.setattr("src.routers.profile.prisma", mock)
-    monkeypatch.setattr("src.routers.me.prisma", mock)
-    monkeypatch.setattr("src.routers.family.prisma", mock)
-    monkeypatch.setattr("src.routers.recipes.prisma", mock)
+    monkeypatch.setattr("src.routers.v1.posts.prisma", mock)
+    monkeypatch.setattr("src.routers.v1.comments.prisma", mock)
+    monkeypatch.setattr("src.routers.v1.reactions.prisma", mock)
+    monkeypatch.setattr("src.routers.v1.tags.prisma", mock)
+    monkeypatch.setattr("src.routers.v1.timeline.prisma", mock)
+    monkeypatch.setattr("src.routers.v1.profile.prisma", mock)
+    monkeypatch.setattr("src.routers.v1.family.prisma", mock)
+    # v1.recipes now has a module-level `prisma`: the recipe browse/search
+    # handler (merged in from the legacy router in #233) queries it. The
+    # bearer-only /recipes/import endpoint in the same module is a proxy and
+    # doesn't touch the DB, but they share the one module-level client.
+    monkeypatch.setattr("src.routers.v1.recipes.prisma", mock)
     monkeypatch.setattr("src.routers.v1.auth.prisma", mock)
     monkeypatch.setattr("src.routers.v1.notifications.prisma", mock)
     monkeypatch.setattr("src.routers.v1.feedback.prisma", mock)
     monkeypatch.setattr("src.routers.v1.me.prisma", mock)
-    # src.routers.v1.recipes (issue #185) doesn't touch prisma directly
-    # — auth happens via dependencies_v1 and the rest is a proxy to the
-    # importer service. The patch is still included so a future
-    # persistence change here surfaces missing test wiring at the
-    # AttributeError stage, not at "test passed but DB query ran".
-    # Note: no module-level `prisma` import in routers/v1/recipes.py,
-    # so setattr would fail. Skip the line until that changes.
     # The idempotency helper reads `prisma` directly from src.idempotency;
     # the feedback router goes through it, so without this patch the
     # X-Request-Id replay test would hit the real (unconnected) prisma

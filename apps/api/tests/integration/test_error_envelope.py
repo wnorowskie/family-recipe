@@ -21,7 +21,7 @@ class TestPydanticValidationEnvelope:
         # Missing required fields trigger Pydantic validation; the global
         # handler wraps the error rather than letting FastAPI's default
         # 422 `{detail: [...]}` shape leak.
-        response = client.post("/auth/login", json={})
+        response = client.post("/v1/auth/login", json={})
 
         assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
 
@@ -30,12 +30,12 @@ class TestPydanticValidationEnvelope:
         # Validation runs before the route body, so the prisma stub doesn't
         # need any specific return value here — the request never reaches
         # the handler.
-        response = client.get("/recipes?sort=popularity", headers=member_auth)
+        response = client.get("/v1/recipes?sort=popularity", headers=member_auth)
 
         assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
 
     def test_validation_error_does_not_leak_detail_key(self, client):
-        response = client.post("/auth/login", json={})
+        response = client.post("/v1/auth/login", json={})
 
         body = response.json()
         assert "detail" not in body, (
@@ -45,14 +45,17 @@ class TestPydanticValidationEnvelope:
 
 
 class TestCookieAuthUnauthorizedEnvelope:
-    """Legacy cookie-auth dependency raises ApiError, not HTTPException."""
+    """The cookie-capable auth dependency (get_current_user) raises ApiError,
+    not a bare HTTPException. Exercised via /v1/timeline, one of the resource
+    routes that depend on it — the legacy /auth/me it used to hit was removed
+    with the cookie-session auth router in #233."""
 
     def test_missing_cookie_returns_envelope(self, client):
-        response = client.get("/auth/me")
+        response = client.get("/v1/timeline")
 
         assert_error_envelope(response, status_code=401, code="UNAUTHORIZED")
 
     def test_invalid_cookie_returns_envelope(self, client):
-        response = client.get("/auth/me", headers={"Cookie": "session=not-a-real-jwt"})
+        response = client.get("/v1/timeline", headers={"Cookie": "session=not-a-real-jwt"})
 
         assert_error_envelope(response, status_code=401, code="UNAUTHORIZED")

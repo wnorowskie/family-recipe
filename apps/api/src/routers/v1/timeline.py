@@ -2,16 +2,16 @@ from fastapi import APIRouter, Depends, Query
 from prisma.errors import PrismaError
 import logging
 
-from ..db import prisma
-from ..dependencies import get_current_user
-from ..errors import internal_error
-from ..schemas.auth import UserResponse
-from ..uploads import create_signed_url_resolver
-from ..utils import iso
+from ...db import prisma
+from ...dependencies import get_current_user
+from ...errors import internal_error
+from ...schemas.auth import UserResponse
+from ...uploads import create_signed_url_resolver
+from ...utils import iso
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/timeline", tags=["timeline"])
+router = APIRouter(prefix="/v1/timeline", tags=["timeline"])
 
 
 @router.get("")

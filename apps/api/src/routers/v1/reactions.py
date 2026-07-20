@@ -4,15 +4,15 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, status
 from prisma.errors import PrismaError
 
-from ..db import prisma
-from ..dependencies import get_current_user
-from ..errors import bad_request, internal_error, not_found
-from ..schemas.auth import UserResponse
-from ..schemas.reactions import ReactionRequest
-from ..uploads import create_signed_url_resolver
-from ..utils import is_cuid
+from ...db import prisma
+from ...dependencies import get_current_user
+from ...errors import bad_request, internal_error, not_found
+from ...schemas.auth import UserResponse
+from ...schemas.reactions import ReactionRequest
+from ...uploads import create_signed_url_resolver
+from ...utils import is_cuid
 
-router = APIRouter(prefix="/reactions", tags=["reactions"])
+router = APIRouter(prefix="/v1/reactions", tags=["reactions"])
 
 
 async def _build_reaction_summary(
