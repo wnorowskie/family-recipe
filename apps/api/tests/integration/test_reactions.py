@@ -194,8 +194,13 @@ class TestToggleReaction:
 
 
 class TestReactionSummaryAvatarBatching:
-    """The reaction summary resolves each avatar signed-URL once per distinct
-    storage key (batched via the memoizing resolver), not once per reactor."""
+    """Guards the resolution invariant the batched pre-warm relies on: the
+    summary signs once per *distinct* avatar key (not once per reactor) and a
+    None key never reaches the signer.
+
+    Note this pins dedup + None-handling, which hold for both the old
+    sequential path and the new gathered pre-warm — the concurrency win itself
+    is not asserted here (it can't be without brittle timing/ordering)."""
 
     def _post(self, *, family_space_id: str = "family_test_123") -> SimpleNamespace:
         return SimpleNamespace(id=POST_ID, familySpaceId=family_space_id)
