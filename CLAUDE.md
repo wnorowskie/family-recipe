@@ -51,9 +51,9 @@ Spin up local Postgres with the one-liner in [docs/verification/next-api.md](doc
 
 **Three concurrent runtimes share one database.** Code lives in three places that must stay schema-consistent:
 
-1. **Next.js monolith** ([src/](src/)) — App Router UI + REST-ish API under [src/app/api/](src/app/api/). Today this is the production backend.
-2. **FastAPI service** ([apps/api/](apps/api/)) — Python re-implementation of the same auth/session/JSON contract. Mid-migration target per [docs/API_BACKEND_MIGRATION_PLAN.md](docs/API_BACKEND_MIGRATION_PLAN.md). When changing an endpoint in `src/app/api/`, check whether the equivalent router in `apps/api/src/routers/` needs the same change.
-3. **Recipe URL Importer** ([apps/recipe-url-importer/](apps/recipe-url-importer/)) — standalone Python service called by the Next backend (see [apps/recipe-url-importer/SPEC.md](apps/recipe-url-importer/SPEC.md)). Does not touch the database.
+1. **Next.js frontend** ([src/](src/)) — App Router UI. The only routes left under [src/app/api/](src/app/api/) are the auth proxies (`login`/`logout`/`signup`/`bootstrap`) that forward to FastAPI and a `health` check; all data routes were removed in the Phase 4 cutover (#231).
+2. **FastAPI service** ([apps/api/](apps/api/)) — the sole backend for the auth/session/JSON contract, per [docs/API_BACKEND_MIGRATION_PLAN.md](docs/API_BACKEND_MIGRATION_PLAN.md). Handlers live under [apps/api/src/routers/v1/](apps/api/src/routers/v1/) — this is where API behavior changes go.
+3. **Recipe URL Importer** ([apps/recipe-url-importer/](apps/recipe-url-importer/)) — standalone Python service called by FastAPI ([apps/api/src/recipe_importer.py](apps/api/src/recipe_importer.py), from the recipes router; see [apps/recipe-url-importer/SPEC.md](apps/recipe-url-importer/SPEC.md)). Does not touch the database.
 
 **Three Prisma schemas** describe the same domain for different deploy targets — [prisma/CLAUDE.md](prisma/CLAUDE.md) explains when to edit which.
 
@@ -73,7 +73,7 @@ Spin up local Postgres with the one-liner in [docs/verification/next-api.md](doc
 - [src/lib/CLAUDE.md](src/lib/CLAUDE.md) — what each lib/ module is for
 - [prisma/CLAUDE.md](prisma/CLAUDE.md) — schema variants and migration rules
 - [**tests**/CLAUDE.md](__tests__/CLAUDE.md) — global mocks and helper conventions
-- [apps/api/CLAUDE.md](apps/api/CLAUDE.md) — FastAPI mirror service
+- [apps/api/CLAUDE.md](apps/api/CLAUDE.md) — FastAPI backend service
 - [apps/recipe-url-importer/CLAUDE.md](apps/recipe-url-importer/CLAUDE.md) — importer service
 
 ## Conventions worth knowing
