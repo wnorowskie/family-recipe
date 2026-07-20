@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, status
@@ -23,6 +24,14 @@ async def _build_reaction_summary(
         include={"user": True},
     )
     resolve_avatar = create_signed_url_resolver()
+    # Pre-resolve every distinct avatar key concurrently so the per-row awaits
+    # below are cache hits — otherwise N distinct reactors mean N sequential
+    # signed-URL calls. The resolver memoizes per key, so this seeds its cache.
+    distinct_keys = {
+        r.user.avatarStorageKey for r in rows if r.user and r.user.avatarStorageKey
+    }
+    if distinct_keys:
+        await asyncio.gather(*(resolve_avatar(key) for key in distinct_keys))
     summary: Dict[str, Dict[str, Any]] = {}
     for r in rows:
         entry = summary.get(r.emoji) or {"emoji": r.emoji, "count": 0, "users": []}

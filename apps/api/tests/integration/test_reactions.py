@@ -1,7 +1,7 @@
 """Integration tests for reactions router."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -191,3 +191,49 @@ class TestToggleReaction:
         assert mock_prisma.reaction.create.await_count == 2
         emojis = [call.kwargs["data"]["emoji"] for call in mock_prisma.reaction.create.await_args_list]
         assert emojis == ["❤️", "🔥"]
+
+
+class TestReactionSummaryAvatarBatching:
+    """The reaction summary resolves each avatar signed-URL once per distinct
+    storage key (batched via the memoizing resolver), not once per reactor."""
+
+    def _post(self, *, family_space_id: str = "family_test_123") -> SimpleNamespace:
+        return SimpleNamespace(id=POST_ID, familySpaceId=family_space_id)
+
+    def test_signs_once_per_distinct_avatar_key(self, client, mock_prisma, member_auth):
+        mock_prisma.post.find_unique = AsyncMock(return_value=self._post())
+        mock_prisma.reaction.find_first = AsyncMock(return_value=None)
+        mock_prisma.reaction.create = AsyncMock(return_value=None)
+        # 4 reactors across 2 emojis, but only 2 distinct non-null avatar keys
+        # (a.jpg is shared by Alice + Cara; Dave has no avatar).
+        rows = [
+            SimpleNamespace(emoji="👍", user=SimpleNamespace(id="u1", name="Alice", avatarStorageKey="a.jpg")),
+            SimpleNamespace(emoji="👍", user=SimpleNamespace(id="u2", name="Bob", avatarStorageKey="b.jpg")),
+            SimpleNamespace(emoji="🔥", user=SimpleNamespace(id="u3", name="Cara", avatarStorageKey="a.jpg")),
+            SimpleNamespace(emoji="🔥", user=SimpleNamespace(id="u4", name="Dave", avatarStorageKey=None)),
+        ]
+        mock_prisma.reaction.find_many = AsyncMock(return_value=rows)
+
+        async def fake_sign(key):
+            return f"/uploads/{key}"
+
+        with patch(
+            "src.uploads.get_signed_upload_url", new=AsyncMock(side_effect=fake_sign)
+        ) as mock_sign:
+            response = client.post(
+                "/reactions",
+                json={"targetType": "post", "targetId": POST_ID, "emoji": "👍"},
+                headers=member_auth,
+            )
+
+        assert response.status_code == 200, response.json()
+        # Signed exactly twice (a.jpg, b.jpg) despite 4 reactors — the None key
+        # short-circuits in the resolver and never reaches the signer.
+        assert mock_sign.await_count == 2
+        # Response shape/values are unchanged by the batching.
+        by_emoji = {e["emoji"]: e for e in response.json()["reactions"]}
+        assert [u["avatarUrl"] for u in by_emoji["👍"]["users"]] == [
+            "/uploads/a.jpg",
+            "/uploads/b.jpg",
+        ]
+        assert [u["avatarUrl"] for u in by_emoji["🔥"]["users"]] == ["/uploads/a.jpg", None]
