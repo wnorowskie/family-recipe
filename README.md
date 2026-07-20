@@ -38,7 +38,7 @@ This app is intentionally **not** a public social network – it's a cozy, perso
 
 The app runs as **three cooperating services that share one Postgres database**:
 
-1. **Next.js app** ([`src/`](src/)) – App Router UI. It serves pages and a small set of same-origin routes under [`src/app/api/`](src/app/api/): auth proxies (`login`, `signup`, `logout`, `bootstrap`) that forward to FastAPI, plus a `health` check. **It is no longer the data backend.**
+1. **Next.js app** ([`src/`](src/)) – App Router UI. It serves pages and a small set of same-origin routes under [`src/app/api/`](src/app/api/): auth proxies (`login`, `signup`, `logout`) that forward to FastAPI, a `bootstrap` route that mints the in-memory access token from the refresh cookie (and forwards FastAPI's rotated cookies), plus a `health` check. **It is no longer the data backend.**
 2. **FastAPI service** ([`apps/api/`](apps/api/)) – **the sole application backend.** All post/recipe/comment/reaction/cooked/profile data and all authentication live here, served under a versioned `/v1/*` contract. In deployment the Next service reaches it via a same-origin `/v1` proxy (`API_INTERNAL_URL`).
 3. **Recipe URL Importer** ([`apps/recipe-url-importer/`](apps/recipe-url-importer/)) – standalone Python service the FastAPI backend calls to parse recipes from a URL. It does not touch the database.
 
