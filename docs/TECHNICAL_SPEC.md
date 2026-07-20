@@ -8,6 +8,8 @@ The goal is to keep the implementation **small, understandable, and easy to exte
 
 ## 1. High-Level Architecture
 
+> **⚠️ Post Phase 4 cutover (#38):** this section describes the original V1 MVP target — a Next.js monolith serving a same-origin REST API. That is **no longer the architecture.** The "eventually transformed into separate backend/frontend services" plan below has since happened: a **FastAPI service** ([`apps/api/`](../apps/api/)) is now the sole application and auth backend under `/v1/*`, and the Next `/api/*` data routes were deleted. For current architecture see [`API_BACKEND_MIGRATION_PLAN.md`](API_BACKEND_MIGRATION_PLAN.md) and the root [`CLAUDE.md`](../CLAUDE.md). The domain model, validation, and data-flow **contract** below still hold — only the runtime that serves them changed.
+
 ### 1.1 Overall Approach
 
 - **Client:** Mobile-first web application (SPA) built with a modern component-based framework.

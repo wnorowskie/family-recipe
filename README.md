@@ -3,7 +3,8 @@
 > A private family recipe sharing application – share what we're cooking, preserve recipes, and keep family's culinary traditions alive.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-14.2-black.svg)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.2-black.svg)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688.svg)](https://fastapi.tiangolo.com/)
 [![Prisma](https://img.shields.io/badge/Prisma-5.11-2D3748.svg)](https://www.prisma.io/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -30,6 +31,20 @@ This app is intentionally **not** a public social network – it's a cozy, perso
 - **Search & Filter** – Find recipes by title, author, tags, course, difficulty
 - **Personal Lists** – Favorite recipes and track what users cooked
 - **Mobile-First** – Designed for easy use on any device
+
+---
+
+## Architecture
+
+The app runs as **three cooperating services that share one Postgres database**:
+
+1. **Next.js app** ([`src/`](src/)) – App Router UI. It serves pages and a small set of same-origin routes under [`src/app/api/`](src/app/api/): auth proxies (`login`, `signup`, `logout`, `bootstrap`) that forward to FastAPI, plus a `health` check. **It is no longer the data backend.**
+2. **FastAPI service** ([`apps/api/`](apps/api/)) – **the sole application backend.** All post/recipe/comment/reaction/cooked/profile data and all authentication live here, served under a versioned `/v1/*` contract. In deployment the Next service reaches it via a same-origin `/v1` proxy (`API_INTERNAL_URL`).
+3. **Recipe URL Importer** ([`apps/recipe-url-importer/`](apps/recipe-url-importer/)) – standalone Python service the FastAPI backend calls to parse recipes from a URL. It does not touch the database.
+
+**Auth flow:** login/signup/logout POST to the Next proxy routes, which forward to FastAPI `/v1/auth/*`. FastAPI issues a short-lived in-memory **access token** and sets HTTP-only `refresh_token` + `csrf_token` cookies. The Next middleware ([`src/proxy.ts`](src/proxy.ts)) gates protected routes on the presence of the refresh-token cookie; SSR pages resolve the user through FastAPI `/v1/auth/session`.
+
+> This is the state after the **Phase 4 FastAPI cutover** (issue #38). The Next `/api/*` data routes and the legacy Next JWT/`session`-cookie auth stack were deleted. For the full migration record and current architecture, see [`docs/API_BACKEND_MIGRATION_PLAN.md`](docs/API_BACKEND_MIGRATION_PLAN.md) and the root [`CLAUDE.md`](CLAUDE.md). To undo the cutover, see the [Phase 4 rollback runbook](docs/rollback-phase4.md).
 
 ---
 
@@ -65,14 +80,9 @@ Edit `.env` and update the values:
 
 ```
 DATABASE_URL="postgresql://family_app:dev-only-password@localhost:5432/family_recipe_dev"
-JWT_SECRET="jwt-secret-placeholder"
 ```
 
-> **Security Note:** Generate a strong random secret for production using:
->
-> ```
-> openssl rand -base64 32
-> ```
+> **Note:** The Next service no longer signs its own sessions, so there is no `JWT_SECRET` here anymore — authentication is issued by the FastAPI backend. To exercise auth and app data locally you also need the FastAPI service running; see [`docs/verification/fastapi.md`](docs/verification/fastapi.md).
 
 ### 4. Set Up the Database
 
@@ -206,17 +216,20 @@ family-recipe/
 │ │ │ ├── posts/ # Post detail pages
 │ │ │ ├── profile/ # User profile
 │ │ │ └── family-members/ # Family admin
-│ │ ├── api/ # API routes (REST endpoints)
+│ │ ├── api/ # Auth proxies to FastAPI + health check (no data routes)
 │ │ ├── globals.css # Global styles
 │ │ └── layout.tsx # Root layout
 │ ├── components/ # React components
 │ ├── lib/ # Utilities and helpers
 │ │ ├── prisma.ts # Prisma client singleton
-│ │ ├── auth.ts # Password hashing
-│ │ ├── session.ts # Session management
+│ │ ├── session.ts # SSR user resolution via FastAPI /v1/auth/session
+│ │ ├── uploads.ts # Photo storage (local FS or GCS)
 │ │ ├── validation.ts # Zod schemas
 │ │ └── ...
-│ └── proxy.ts # Next.js proxy / middleware (auth)
+│ └── proxy.ts # Next.js middleware (auth gate)
+├── apps/
+│ ├── api/ # FastAPI service — the application backend (Python)
+│ └── recipe-url-importer/ # Standalone recipe-from-URL parser (Python)
 ├── docs/ # Product and technical specs
 ├── figma/ # Figma design prototypes
 ├── public/ # Static assets
@@ -267,8 +280,8 @@ See [`prisma/schema.postgres.node.prisma`](prisma/schema.postgres.node.prisma) f
 
 - **Password Storage:** Passwords are hashed using \`bcrypt\` (12 rounds)
 - **Family Master Key:** Stored as a hash in the database, required for signup
-- **Sessions:** JWT-based sessions stored in HTTP-only cookies
-- **Validation:** All API inputs validated using Zod schemas
+- **Sessions:** Issued by the FastAPI backend — a short-lived in-memory access token plus HTTP-only `refresh_token` / `csrf_token` cookies. The legacy Next-signed JWT `session` cookie was removed in the Phase 4 cutover.
+- **Validation:** All API inputs validated using Zod schemas (Next) and Pydantic (FastAPI)
 - **Middleware:** Authentication required for all \`/app/\*\` routes
 
 ---
@@ -280,6 +293,8 @@ Detailed documentation is available in the [`docs/`](docs/) directory:
 - [`PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) – Product requirements and UX flows
 - [`TECHNICAL_SPEC.md`](docs/TECHNICAL_SPEC.md) – API design, data models, validation
 - [`USER_STORIES.md`](docs/USER_STORIES.md) – User stories and acceptance criteria
+- [`API_BACKEND_MIGRATION_PLAN.md`](docs/API_BACKEND_MIGRATION_PLAN.md) – FastAPI migration record and current backend architecture
+- [`rollback-phase4.md`](docs/rollback-phase4.md) – How to roll back the FastAPI cutover
 - [`V1_SUMMARY.md`](docs/V1_SUMMARY.md) – V1 implementation overview
 - [`V2_PLAN.md`](docs/V2_PLAN.md) – Roadmap for production deployment
 
@@ -287,15 +302,16 @@ Detailed documentation is available in the [`docs/`](docs/) directory:
 
 ## Tech Stack
 
-| Category         | Technology                          |
-| ---------------- | ----------------------------------- |
-| **Framework**    | Next.js 14 (App Router)             |
-| **Language**     | TypeScript (strict mode)            |
-| **Database**     | Prisma + PostgreSQL (dev and prod)  |
-| **Auth**         | Credentials-based with JWT sessions |
-| **Styling**      | Tailwind CSS                        |
-| **Validation**   | Zod                                 |
-| **File Uploads** | Local filesystem (V1)               |
+| Category         | Technology                                                   |
+| ---------------- | ------------------------------------------------------------ |
+| **Frontend**     | Next.js 16 (App Router), React 19                            |
+| **Backend API**  | FastAPI (Python) — sole application/auth backend, `/v1/*`    |
+| **Language**     | TypeScript (strict mode) · Python                            |
+| **Database**     | Prisma + PostgreSQL (dev and prod)                           |
+| **Auth**         | FastAPI-issued access token (JWT) + HTTP-only refresh cookie |
+| **Styling**      | Tailwind CSS                                                 |
+| **Validation**   | Zod (Next) · Pydantic (FastAPI)                              |
+| **File Uploads** | Local filesystem (dev) · Google Cloud Storage (prod)         |
 
 ---
 
