@@ -10,7 +10,7 @@
 #
 # What it does:
 #   1. mints two Cloud Run ID tokens (one per IAM-private service audience)
-#   2. probes FastAPI directly (GET $DEV_API_URL/health) to prove the service
+#   2. probes FastAPI directly (GET $DEV_API_URL/v1/health) to prove the service
 #      itself is up, independent of the Next forwarder
 #   3. logs in as the `claude-test` seed user via the Next auth proxy, then
 #      bootstraps a FastAPI access token (the in-memory token the SPA uses)
@@ -163,22 +163,22 @@ pass "mint Bearer ID tokens (next len=${#NEXT_TOKEN}, api len=${#API_TOKEN})"
 
 # --- Step 2: FastAPI direct health ------------------------------------------
 # Hit the FastAPI service directly (bypassing the Next forwarder) so an
-# outage here points at FastAPI itself, not the proxy. /health needs no app
+# outage here points at FastAPI itself, not the proxy. /v1/health needs no app
 # auth, so the IAM token can ride on Authorization with nothing to collide.
 FASTAPI_HEALTH_STATUS=$(curl -sS -o "$BODY_FILE" -w '%{http_code}' \
   -H "Authorization: Bearer $API_TOKEN" \
-  "$API_HOST/health")
+  "$API_HOST/v1/health")
 if [[ "$FASTAPI_HEALTH_STATUS" != "200" ]]; then
-  fail "GET \$DEV_API_URL/health → HTTP $FASTAPI_HEALTH_STATUS"
+  fail "GET \$DEV_API_URL/v1/health → HTTP $FASTAPI_HEALTH_STATUS"
   head -c 400 "$BODY_FILE" >&2; echo >&2
   exit 1
 fi
 if [[ "$(jq -r '.status' < "$BODY_FILE")" != "ok" ]]; then
-  fail "FastAPI /health returned 200 but body.status != ok"
+  fail "FastAPI /v1/health returned 200 but body.status != ok"
   head -c 400 "$BODY_FILE" >&2; echo >&2
   exit 1
 fi
-pass "GET \$DEV_API_URL/health → 200 (FastAPI up)"
+pass "GET \$DEV_API_URL/v1/health → 200 (FastAPI up)"
 
 # --- Step 3: Next health ----------------------------------------------------
 HEALTH_STATUS=$(curl -sS -o "$BODY_FILE" -w '%{http_code}' \
