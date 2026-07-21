@@ -134,6 +134,10 @@ jobs:
       # must be present at build time. FastAPI is the sole backend — the layout
       # always uses the refresh-token session path.
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      # The smoke suite logs in repeatedly from one IP; disable the #175 auth
+      # IP rate limiter so it doesn't 429 (issue #268). Parity with jest
+      # globally mocking the Next limiter. Read by the uvicorn process below.
+      AUTH_RATE_LIMIT_ENABLED: 'false'
     steps:
       - if: needs.changes.outputs.next == 'true'
         uses: actions/checkout@v4

@@ -1234,3 +1234,16 @@ class TestV1AuthRateLimit:
         assert (
             client.post("/v1/auth/login", json=payload, headers=ip_b).status_code == 401
         )
+
+    def test_disabled_flag_bypasses_limiter(self, client, mock_prisma, monkeypatch):
+        # AUTH_RATE_LIMIT_ENABLED=false (issue #268) short-circuits
+        # _enforce_ip_rate_limit so the E2E suite's repeated same-IP logins are
+        # never throttled. Loop well past the 5/15min login limit and confirm
+        # every attempt still reaches the handler (401 here) rather than 429.
+        monkeypatch.setattr(settings, "auth_rate_limit_enabled", False)
+        mock_prisma.user.find_first = AsyncMock(return_value=None)
+        payload = {"emailOrUsername": "nobody@example.com", "password": "password123"}
+
+        for i in range(8):
+            r = client.post("/v1/auth/login", json=payload)
+            assert r.status_code == 401, f"attempt {i + 1} should bypass the limiter"
