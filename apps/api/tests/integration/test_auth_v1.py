@@ -1299,3 +1299,21 @@ class TestV1AuthRateLimit:
         self._assert_429(client.post("/v1/auth/refresh", headers=ip_a), 60)
         # ...but IP B still has its own fresh bucket.
         assert client.post("/v1/auth/refresh", headers=ip_b).status_code == 401
+
+    def test_session_keyed_on_real_client_ip_not_next_service_ip(
+        self, client, mock_prisma, monkeypatch
+    ):
+        # Same real-client-IP guarantee as the /refresh case above, asserted for
+        # /session too — the AC calls for real-IP keying on both endpoints, and
+        # /session is the one every SSR render hits, so it is the more important
+        # of the two to pin. Distinct XFF values must not share a bucket.
+        monkeypatch.setattr(settings, "trusted_proxy_hops", 1)
+        ip_a = {"X-Forwarded-For": "203.0.113.1"}
+        ip_b = {"X-Forwarded-For": "203.0.113.2"}
+
+        for _ in range(60):
+            assert client.get("/v1/auth/session", headers=ip_a).status_code == 401
+        # IP A is now exhausted...
+        self._assert_429(client.get("/v1/auth/session", headers=ip_a), 60)
+        # ...but IP B still has its own fresh bucket.
+        assert client.get("/v1/auth/session", headers=ip_b).status_code == 401

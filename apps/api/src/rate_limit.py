@@ -125,5 +125,14 @@ reset_limiter = RateLimiter(name="reset", limit=5, window_seconds=15 * 60)
 # rest of the auth surface. Limits carry the #175 acceptance criteria migrated
 # onto #265: /session ~60/IP/min (SSR hits it on every protected render),
 # /refresh ~30/IP/min (page nav with a stale token). Both use a 60s window.
+#
+# Headroom watch (confirm at release via docs/verification/dev-deployments.md):
+# the /session budget is per *real client IP*, so it is shared by everyone
+# behind one public IP — several family members on a shared household NAT count
+# against the same 60/min, and each full protected SSR render (plus any
+# prefetch that renders a dynamic (app) segment) spends one. Default Next Link
+# prefetch skips dynamic segments, so normal navigation should stay well under
+# 60/min per household, but this is the number to revisit if real users see
+# spurious /login?_se=1 bounces under heavy simultaneous use.
 session_limiter = RateLimiter(name="session", limit=60, window_seconds=60)
 refresh_limiter = RateLimiter(name="refresh", limit=30, window_seconds=60)
