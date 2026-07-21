@@ -33,6 +33,16 @@ class Settings(BaseSettings):
     # (e.g. on signing-key compromise). Bumping it forces a refresh-rotation.
     auth_epoch: int = 1
 
+    # Master switch for the IP-keyed auth-surface rate limiters (issue #175:
+    # login/signup/reset). On by default. Set AUTH_RATE_LIMIT_ENABLED=false for
+    # the E2E suite, which logs in many times from a single IP and would
+    # otherwise trip login_limiter (5/15min). This is the FastAPI parity for the
+    # Next side globally mocking src/lib/rateLimit.ts in jest.setup.js — the
+    # limiter's own behavior is covered by tests/unit/test_rate_limit.py, so the
+    # functional E2E flows have no business being throttled. Never set false in
+    # production.
+    auth_rate_limit_enabled: bool = True
+
     # CORS origins for the v1 token flow (comma-separated). The legacy
     # session-cookie endpoints stay same-origin.
     cors_allow_origins: str = ""
