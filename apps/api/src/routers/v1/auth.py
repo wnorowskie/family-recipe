@@ -34,7 +34,14 @@ from ...errors import (
     rate_limited,
     unauthorized,
 )
-from ...rate_limit import RateLimiter, login_limiter, reset_limiter, signup_limiter
+from ...rate_limit import (
+    RateLimiter,
+    login_limiter,
+    refresh_limiter,
+    reset_limiter,
+    session_limiter,
+    signup_limiter,
+)
 from ...schemas.auth import LoginRequest, ResetPasswordRequest, SignupRequest, UserResponse
 from ...schemas.auth_v1 import (
     AccessTokenResponse,
@@ -322,18 +329,23 @@ async def login(payload: LoginRequest, request: Request, response: Response):
 # ---------------------------------------------------------------------------
 # POST /v1/auth/refresh
 # ---------------------------------------------------------------------------
-# Not IP-rate-limited (issue #175 covers only login/signup/reset). Legitimate
+# IP-rate-limited at ~30/IP/min (issue #265). Enforced before the CSRF/cookie
+# work — the cheapest point — so an attacker spraying invalid refresh requests
+# is throttled at the door rather than after a token-store probe. Legitimate
 # refresh traffic arrives server-to-server from Next SSR (/api/auth/bootstrap →
-# fetchUpstream), which does NOT forward the browser's X-Forwarded-For — so a
-# per-IP bucket would collapse the whole family onto the Next service's IP and
-# self-throttle. The endpoint is IAM-private and its work (one DB lookup + token
-# rotation) is cheap. Revisit once the SSR path forwards the client IP.
+# fetchUpstream), which since #265 forwards the browser's X-Forwarded-For, so
+# the bucket keys on the real client IP instead of collapsing onto the Next
+# service's IP. Rate limiting also honours AUTH_RATE_LIMIT_ENABLED=false (#268).
 @router.post("/refresh", response_model=AccessTokenResponse)
 async def refresh(
     request: Request,
     response: Response,
     x_csrf_token: Optional[str] = Header(default=None, alias="X-CSRF-Token"),
 ):
+    limited = _enforce_ip_rate_limit(refresh_limiter, request)
+    if limited is not None:
+        return limited
+
     refresh_cookie = request.cookies.get(settings.refresh_cookie_name)
     csrf_cookie = request.cookies.get(settings.csrf_cookie_name)
 
@@ -589,16 +601,20 @@ async def me(user: UserResponse = Depends(get_current_user_v1)):
 # repeatedly does NOT mark the row as rotated and does NOT trigger reuse
 # detection. Rotation and the reuse signal remain exclusive to /v1/auth/refresh.
 #
-# Not IP-rate-limited (issue #175 covers only login/signup/reset). SSR hits this
-# on every protected render via fetchUpstream, which does NOT forward the
-# browser's X-Forwarded-For, so a per-IP bucket would collapse all family SSR
-# onto the Next service's IP and self-throttle. IAM-private, replay-safe, and
-# cheap (token verify + one user lookup). Revisit once SSR forwards the client IP.
+# IP-rate-limited at ~60/IP/min (issue #265), enforced before the CSRF/cookie
+# work. SSR hits this on every protected render via fetchUpstream, which since
+# #265 forwards the browser's X-Forwarded-For, so the bucket keys on the real
+# client IP rather than collapsing all family SSR onto the Next service's IP.
+# Honours AUTH_RATE_LIMIT_ENABLED=false (#268) so E2E's per-render hits don't 429.
 @router.get("/session", response_model=MeResponse)
 async def session(
     request: Request,
     x_csrf_token: Optional[str] = Header(default=None, alias="X-CSRF-Token"),
 ):
+    limited = _enforce_ip_rate_limit(session_limiter, request)
+    if limited is not None:
+        return limited
+
     refresh_cookie = request.cookies.get(settings.refresh_cookie_name)
     csrf_cookie = request.cookies.get(settings.csrf_cookie_name)
 

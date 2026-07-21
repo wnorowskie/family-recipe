@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { clientIpForwardHeaders } from './apiUpstream';
 import { fetchSessionUser } from './auth/bootstrapFromCookies';
 
 // User resolver for (app) page components. The (app) layout has already
@@ -13,7 +14,12 @@ import { fetchSessionUser } from './auth/bootstrapFromCookies';
 export async function resolvePageUser() {
   const headerStore = await headers();
   const cookieHeader = headerStore.get('cookie');
-  const result = await fetchSessionUser(cookieHeader);
+  // Forward the browser's client-IP chain so FastAPI's per-IP session limiter
+  // (#265) keys on the real client, not this Next process's egress peer.
+  const result = await fetchSessionUser(
+    cookieHeader,
+    clientIpForwardHeaders(headerStore)
+  );
   if (!result.ok) return null;
   return result.user;
 }

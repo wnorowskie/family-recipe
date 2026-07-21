@@ -92,6 +92,29 @@ describe('bootstrapFromCookies helpers', () => {
       expect(init.headers['X-CSRF-Token']).toBe('csrf-abc');
     });
 
+    it('forwards supplied client-IP headers to /v1/auth/session (#265)', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ user: fixtureUser }));
+
+      await fetchSessionUser('refresh_token=opaque; csrf_token=csrf-abc', {
+        'X-Forwarded-For': '203.0.113.7, 10.0.0.1',
+        'X-Real-IP': '203.0.113.7',
+      });
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.headers['X-Forwarded-For']).toBe('203.0.113.7, 10.0.0.1');
+      expect(init.headers['X-Real-IP']).toBe('203.0.113.7');
+    });
+
+    it('omits client-IP headers when none are supplied', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ user: fixtureUser }));
+
+      await fetchSessionUser('refresh_token=opaque; csrf_token=csrf-abc');
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.headers['X-Forwarded-For']).toBeUndefined();
+      expect(init.headers['X-Real-IP']).toBeUndefined();
+    });
+
     it('returns SESSION_FAILED on non-2xx', async () => {
       fetchMock.mockResolvedValueOnce(
         new Response(JSON.stringify({ error: 'no' }), { status: 401 })
@@ -203,6 +226,33 @@ describe('bootstrapFromCookies helpers', () => {
       expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe(
         'Bearer new-token'
       );
+    });
+
+    it('forwards client-IP headers to /v1/auth/refresh but not /v1/auth/me (#265)', async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ accessToken: 'new-token' }), {
+            status: 200,
+            headers: [['content-type', 'application/json']],
+          })
+        )
+        .mockResolvedValueOnce(jsonResponse({ user: fixtureUser }));
+
+      await bootstrapAccessToken('refresh_token=opaque; csrf_token=csrf-abc', {
+        'X-Forwarded-For': '203.0.113.7, 10.0.0.1',
+        'X-Real-IP': '203.0.113.7',
+      });
+
+      // /refresh is the rate-limited hop and gets the forwarded client IP.
+      const refreshInit = fetchMock.mock.calls[0][1];
+      expect(refreshInit.headers['X-Forwarded-For']).toBe(
+        '203.0.113.7, 10.0.0.1'
+      );
+      expect(refreshInit.headers['X-Real-IP']).toBe('203.0.113.7');
+      // /me is Bearer-auth and unlimited — no client-IP headers needed.
+      const meInit = fetchMock.mock.calls[1][1];
+      expect(meInit.headers['X-Forwarded-For']).toBeUndefined();
+      expect(meInit.headers['X-Real-IP']).toBeUndefined();
     });
 
     it('returns REFRESH_FAILED when refresh non-2xx', async () => {

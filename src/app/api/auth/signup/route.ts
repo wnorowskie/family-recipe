@@ -5,7 +5,11 @@ import {
   internalError,
   API_ERROR_CODES,
 } from '@/lib/apiErrors';
-import { fetchUpstream, UpstreamNotConfiguredError } from '@/lib/apiUpstream';
+import {
+  clientIpForwardHeaders,
+  fetchUpstream,
+  UpstreamNotConfiguredError,
+} from '@/lib/apiUpstream';
 
 // Thin proxy for FastAPI /v1/auth/signup. Same origin-scoping rationale as
 // /api/auth/login — FastAPI's Set-Cookie headers must land on the Next.js
@@ -25,17 +29,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Forward the client IP chain so FastAPI's _client_ip (issue #246) keys the
-  // RefreshToken audit row and any IP-based auth throttling on the real browser
-  // IP rather than the Next egress peer. Explicit allowlist — never blanket-copy
-  // inbound headers, which would let a client spoof hop-by-hop / auth headers.
+  // RefreshToken audit row and the IP-based signup throttle on the real browser
+  // IP rather than the Next egress peer. See clientIpForwardHeaders for the
+  // allowlist rationale.
   const forwardHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    ...clientIpForwardHeaders(request.headers),
   };
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  if (forwardedFor) forwardHeaders['X-Forwarded-For'] = forwardedFor;
-  const realIp = request.headers.get('x-real-ip');
-  if (realIp) forwardHeaders['X-Real-IP'] = realIp;
 
   let upstream: Response;
   try {

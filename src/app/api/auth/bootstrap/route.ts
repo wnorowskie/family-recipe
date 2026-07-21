@@ -6,6 +6,7 @@ import {
   internalError,
   unauthorizedError,
 } from '@/lib/apiErrors';
+import { clientIpForwardHeaders } from '@/lib/apiUpstream';
 import { bootstrapAccessToken } from '@/lib/auth/bootstrapFromCookies';
 
 // Bootstrap endpoint for the Phase 2 FastAPI auth flow.
@@ -30,7 +31,12 @@ export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   const cookieHeader = request.headers.get('cookie');
-  const result = await bootstrapAccessToken(cookieHeader);
+  // Forward the browser's client-IP chain so FastAPI's per-IP refresh limiter
+  // (#265) keys on the real client, not this Next process's egress peer.
+  const result = await bootstrapAccessToken(
+    cookieHeader,
+    clientIpForwardHeaders(request.headers)
+  );
 
   if (!result.ok) {
     switch (result.reason) {
