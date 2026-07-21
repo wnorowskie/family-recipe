@@ -1158,10 +1158,12 @@ class TestV1Session:
 
 
 class TestV1AuthRateLimit:
-    """login/signup/reset are IP-keyed limited. The check runs before any DB or
-    bcrypt work, so even rejected payloads count toward the bucket. With the
-    default trusted_proxy_hops=0, every TestClient request resolves to the same
-    peer, so looping one client fills a single IP bucket without any header."""
+    """login/signup/reset are IP-keyed limited. The check runs after Pydantic
+    parsing but before any DB or bcrypt work, so a schema-valid request that then
+    fails auth still counts toward the bucket (schema-invalid bodies 422 before
+    the check and do not count). With the default trusted_proxy_hops=0, every
+    TestClient request resolves to the same peer, so looping one client fills a
+    single IP bucket without any header."""
 
     def _assert_429(self, response, max_window: int):
         assert_error_envelope(response, status_code=429, code="RATE_LIMITED")
