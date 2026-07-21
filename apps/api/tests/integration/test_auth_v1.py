@@ -15,13 +15,28 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src import tokens
+from src.rate_limit import login_limiter, reset_limiter, signup_limiter
 from src.settings import settings
+from tests.helpers.error_envelope import assert_error_envelope
 from tests.helpers.test_data import (
     make_mock_family_space,
     make_mock_membership,
     make_mock_refresh_token,
     make_mock_user,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_auth_limiters():
+    """The IP-keyed auth limiters (issue #175) are module-scoped singletons, so
+    without a reset a test that exhausts a bucket would leave the next test's
+    first request rate-limited. Mirrors `_reset_feedback_limiter` in
+    test_feedback.py. Runs for every test in this module."""
+    for limiter in (login_limiter, signup_limiter, reset_limiter):
+        limiter.reset()
+    yield
+    for limiter in (login_limiter, signup_limiter, reset_limiter):
+        limiter.reset()
 
 
 def _setup_signup_tx(mock_prisma, user, membership):
@@ -1135,3 +1150,85 @@ class TestV1Session:
             "/v1/auth/session", headers={"X-CSRF-Token": "x"}
         )
         assert response.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Per-IP rate limiting (issue #175)
+# ---------------------------------------------------------------------------
+
+
+class TestV1AuthRateLimit:
+    """login/signup/reset are IP-keyed limited. The check runs before any DB or
+    bcrypt work, so even rejected payloads count toward the bucket. With the
+    default trusted_proxy_hops=0, every TestClient request resolves to the same
+    peer, so looping one client fills a single IP bucket without any header."""
+
+    def _assert_429(self, response, max_window: int):
+        assert_error_envelope(response, status_code=429, code="RATE_LIMITED")
+        assert "Retry-After" in response.headers
+        retry = int(response.headers["Retry-After"])
+        assert 1 <= retry <= max_window
+
+    def test_login_429_after_5_attempts(self, client, mock_prisma):
+        # find_first → None, so each allowed call returns 401 INVALID_CREDENTIALS.
+        mock_prisma.user.find_first = AsyncMock(return_value=None)
+        payload = {"emailOrUsername": "nobody@example.com", "password": "password123"}
+
+        for i in range(5):
+            r = client.post("/v1/auth/login", json=payload)
+            assert r.status_code == 401, f"attempt {i + 1} should pass the limiter"
+
+        self._assert_429(client.post("/v1/auth/login", json=payload), 15 * 60)
+
+    def test_signup_429_after_3_attempts(self, client, mock_prisma):
+        # An existing user makes each allowed signup return 400 (not a 500 path).
+        mock_prisma.user.find_first = AsyncMock(return_value=make_mock_user())
+        payload = {
+            "name": "New User",
+            "email": "newuser@example.com",
+            "username": "newuser",
+            "password": "securepassword123",
+            "familyMasterKey": "family-secret-key",
+        }
+
+        for i in range(3):
+            r = client.post("/v1/auth/signup", json=payload)
+            assert r.status_code == 400, f"attempt {i + 1} should pass the limiter"
+
+        self._assert_429(client.post("/v1/auth/signup", json=payload), 60 * 60)
+
+    def test_reset_429_after_5_attempts(self, client, mock_prisma):
+        # find_unique → None, so each allowed call returns an enumeration-safe 401.
+        mock_prisma.user.find_unique = AsyncMock(return_value=None)
+        payload = {
+            "email": "nobody@example.com",
+            "masterKey": "family-secret-key",
+            "newPassword": "newpassword123",
+        }
+
+        for i in range(5):
+            r = client.post("/v1/auth/reset", json=payload)
+            assert r.status_code == 401, f"attempt {i + 1} should pass the limiter"
+
+        self._assert_429(client.post("/v1/auth/reset", json=payload), 15 * 60)
+
+    def test_distinct_ips_get_independent_buckets(
+        self, client, mock_prisma, monkeypatch
+    ):
+        # One trusted proxy hop → _client_ip reads the last XFF entry, so each
+        # X-Forwarded-For value is a distinct bucket.
+        monkeypatch.setattr(settings, "trusted_proxy_hops", 1)
+        mock_prisma.user.find_first = AsyncMock(return_value=None)
+        payload = {"emailOrUsername": "nobody@example.com", "password": "password123"}
+        ip_a = {"X-Forwarded-For": "203.0.113.1"}
+        ip_b = {"X-Forwarded-For": "203.0.113.2"}
+
+        for _ in range(5):
+            r = client.post("/v1/auth/login", json=payload, headers=ip_a)
+            assert r.status_code == 401
+        # IP A is now exhausted...
+        self._assert_429(client.post("/v1/auth/login", json=payload, headers=ip_a), 15 * 60)
+        # ...but IP B still has its own fresh bucket.
+        assert (
+            client.post("/v1/auth/login", json=payload, headers=ip_b).status_code == 401
+        )

@@ -15,6 +15,7 @@ from typing import Optional
 
 import jwt
 from fastapi import APIRouter, Depends, Header, Request, Response, status
+from fastapi.responses import JSONResponse
 from prisma.errors import PrismaError
 
 from ...cookies import (
@@ -25,7 +26,15 @@ from ...cookies import (
 )
 from ...db import prisma
 from ...dependencies_v1 import get_current_user_v1
-from ...errors import bad_request, forbidden, internal_error, invalid_credentials, unauthorized
+from ...errors import (
+    bad_request,
+    forbidden,
+    internal_error,
+    invalid_credentials,
+    rate_limited,
+    unauthorized,
+)
+from ...rate_limit import RateLimiter, login_limiter, reset_limiter, signup_limiter
 from ...schemas.auth import LoginRequest, ResetPasswordRequest, SignupRequest, UserResponse
 from ...schemas.auth_v1 import (
     AccessTokenResponse,
@@ -68,6 +77,23 @@ def _client_ip(request: Request) -> Optional[str]:
 def _user_agent(request: Request) -> Optional[str]:
     ua = request.headers.get("user-agent")
     return ua[:500] if ua else None
+
+
+def _enforce_ip_rate_limit(
+    limiter: RateLimiter, request: Request
+) -> Optional[JSONResponse]:
+    """Record a hit against `limiter` for the request's client IP (issue #175).
+
+    Returns a 429 `JSONResponse` for the caller to `return` when the IP is over
+    the limit, else `None`. Callers must check this before any bcrypt / DB work
+    so a flood of bad payloads is throttled at the cheapest point. Keyed on
+    `_client_ip` with an `"unknown"` fallback so IP-less callers (no XFF, no
+    peer) share one bucket rather than each bypassing the limit with a `None`.
+    """
+    rate = limiter.check(_client_ip(request) or "unknown")
+    if not rate.allowed:
+        return rate_limited(retry_after_seconds=rate.retry_after_seconds)
+    return None
 
 
 async def _persist_refresh_and_set_cookies(
@@ -157,6 +183,9 @@ async def _lookup_active_refresh_row(*, jti: str, secret: str):
 # ---------------------------------------------------------------------------
 @router.post("/signup", response_model=AuthTokenResponse, status_code=status.HTTP_201_CREATED)
 async def signup(payload: SignupRequest, request: Request, response: Response):
+    limited = _enforce_ip_rate_limit(signup_limiter, request)
+    if limited is not None:
+        return limited
     try:
         email = payload.email.strip()
         username = payload.username.strip()
@@ -235,6 +264,9 @@ async def signup(payload: SignupRequest, request: Request, response: Response):
 # ---------------------------------------------------------------------------
 @router.post("/login", response_model=AuthTokenResponse)
 async def login(payload: LoginRequest, request: Request, response: Response):
+    limited = _enforce_ip_rate_limit(login_limiter, request)
+    if limited is not None:
+        return limited
     try:
         identifier = payload.emailOrUsername.strip()
         user = await prisma.user.find_first(
@@ -285,6 +317,12 @@ async def login(payload: LoginRequest, request: Request, response: Response):
 # ---------------------------------------------------------------------------
 # POST /v1/auth/refresh
 # ---------------------------------------------------------------------------
+# Not IP-rate-limited (issue #175 covers only login/signup/reset). Legitimate
+# refresh traffic arrives server-to-server from Next SSR (/api/auth/bootstrap →
+# fetchUpstream), which does NOT forward the browser's X-Forwarded-For — so a
+# per-IP bucket would collapse the whole family onto the Next service's IP and
+# self-throttle. The endpoint is IAM-private and its work (one DB lookup + token
+# rotation) is cheap. Revisit once the SSR path forwards the client IP.
 @router.post("/refresh", response_model=AccessTokenResponse)
 async def refresh(
     request: Request,
@@ -430,11 +468,14 @@ async def refresh(
 #     everywhere", and what the ticket calls for. Caller's own session is
 #     terminated; they must log in again with the new password.
 #
-# Rate limiting is intentionally deferred to issue #175, which will add a
-# limiter to every /v1/auth/* endpoint at once. The legacy /api/auth/reset
-# handler is still rate-limited and remains the production path until Phase 4.
+# Rate limiting (issue #175): 5 attempts per IP per 15 minutes, matching what
+# the legacy /api/auth/reset got from the Next `loginLimiter`. Checked before the
+# master-key verify so a flood of bad payloads is throttled at the cheapest point.
 @router.post("/reset", response_model=ResetPasswordResponse)
-async def reset(payload: ResetPasswordRequest):
+async def reset(payload: ResetPasswordRequest, request: Request):
+    limited = _enforce_ip_rate_limit(reset_limiter, request)
+    if limited is not None:
+        return limited
     try:
         email = payload.email.strip()
         user = await prisma.user.find_unique(where={"email": email})
@@ -542,6 +583,12 @@ async def me(user: UserResponse = Depends(get_current_user_v1)):
 # This endpoint is replay-safe by design: validating the same refresh cookie
 # repeatedly does NOT mark the row as rotated and does NOT trigger reuse
 # detection. Rotation and the reuse signal remain exclusive to /v1/auth/refresh.
+#
+# Not IP-rate-limited (issue #175 covers only login/signup/reset). SSR hits this
+# on every protected render via fetchUpstream, which does NOT forward the
+# browser's X-Forwarded-For, so a per-IP bucket would collapse all family SSR
+# onto the Next service's IP and self-throttle. IAM-private, replay-safe, and
+# cheap (token verify + one user lookup). Revisit once SSR forwards the client IP.
 @router.get("/session", response_model=MeResponse)
 async def session(
     request: Request,

@@ -104,3 +104,20 @@ class RateLimiter:
 feedback_limiter = RateLimiter(
     name="feedback", limit=20, window_seconds=60 * 60
 )
+
+# Auth-surface limiters (issue #175). These are IP-keyed — the caller token is
+# `_client_ip(request)` from routers/v1/auth.py, not a user id — so unlike the
+# feedback limiter they are the high-cardinality case the module docstring flags
+# above: the plain dict grows with distinct client IPs and gets no eviction until
+# the LRU/shared-store work in #33 lands. Limits mirror the Next side's
+# src/lib/rateLimit.ts (`loginLimiter` 5/15min, `signupLimiter` 3/hour); reset
+# reuses the login window per the #175 ticket (parity with what the legacy
+# /api/auth/reset got from `loginLimiter`).
+#
+# Only login/signup/reset are limited. session/refresh are deliberately left
+# unlimited — their legitimate traffic arrives server-to-server from Next SSR
+# (no forwarded client IP), so a per-IP bucket would collapse the whole family
+# onto one key; see the note next to those handlers in routers/v1/auth.py.
+login_limiter = RateLimiter(name="login", limit=5, window_seconds=15 * 60)
+signup_limiter = RateLimiter(name="signup", limit=3, window_seconds=60 * 60)
+reset_limiter = RateLimiter(name="reset", limit=5, window_seconds=15 * 60)
