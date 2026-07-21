@@ -89,7 +89,12 @@ def _enforce_ip_rate_limit(
     so a flood of bad payloads is throttled at the cheapest point. Keyed on
     `_client_ip` with an `"unknown"` fallback so IP-less callers (no XFF, no
     peer) share one bucket rather than each bypassing the limit with a `None`.
+
+    No-op when `AUTH_RATE_LIMIT_ENABLED=false` (issue #268) — the single
+    chokepoint the E2E suite disables so its repeated same-IP logins don't 429.
     """
+    if not settings.auth_rate_limit_enabled:
+        return None
     rate = limiter.check(_client_ip(request) or "unknown")
     if not rate.allowed:
         return rate_limited(retry_after_seconds=rate.retry_after_seconds)
