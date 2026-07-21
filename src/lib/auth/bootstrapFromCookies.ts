@@ -124,7 +124,8 @@ function resolveCookies(
 // ---------------------------------------------------------------------------
 
 export async function fetchSessionUser(
-  cookieHeader: string | null
+  cookieHeader: string | null,
+  clientHeaders: Record<string, string> = {}
 ): Promise<SessionUserResult | SessionUserError> {
   const resolved = resolveCookies(cookieHeader);
   if ('reason' in resolved) {
@@ -139,6 +140,9 @@ export async function fetchSessionUser(
         Accept: 'application/json',
         Cookie: resolved.cookieHeader,
         'X-CSRF-Token': resolved.csrfToken,
+        // Forwarded so FastAPI's per-IP session limiter keys on the real
+        // browser IP, not this Next process's egress peer (issue #265).
+        ...clientHeaders,
       },
     });
   } catch (error) {
@@ -170,7 +174,8 @@ export async function fetchSessionUser(
 // ---------------------------------------------------------------------------
 
 export async function bootstrapAccessToken(
-  cookieHeader: string | null
+  cookieHeader: string | null,
+  clientHeaders: Record<string, string> = {}
 ): Promise<BootstrapResult | BootstrapError> {
   const resolved = resolveCookies(cookieHeader);
   if ('reason' in resolved) {
@@ -185,6 +190,10 @@ export async function bootstrapAccessToken(
         Accept: 'application/json',
         Cookie: resolved.cookieHeader,
         'X-CSRF-Token': resolved.csrfToken,
+        // Forwarded so FastAPI's per-IP refresh limiter keys on the real
+        // browser IP, not this Next process's egress peer (issue #265). Only
+        // the /refresh call needs it — /me below is Bearer-auth and unlimited.
+        ...clientHeaders,
       },
     });
   } catch (error) {

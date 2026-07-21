@@ -128,6 +128,33 @@ export interface UpstreamRequestInit extends Omit<RequestInit, 'headers'> {
   headers?: Record<string, string>;
 }
 
+// A minimal `get(name)` reader — satisfied by both `Headers` (route handlers)
+// and Next's `ReadonlyHeaders` from `headers()` (server components).
+interface HeaderReader {
+  get(name: string): string | null;
+}
+
+// Extract the allowlisted client-IP headers to forward to FastAPI so its
+// `_client_ip` (issue #246, `parts[-TRUSTED_PROXY_HOPS]`) resolves the real
+// browser IP rather than this Next process's egress peer. Used by the
+// login/signup proxies (#252) and the SSR session/refresh path (#265).
+//
+// Explicit allowlist by design — never blanket-copy inbound headers, which
+// would let a client smuggle hop-by-hop or auth headers through the proxy.
+// The X-Forwarded-For chain is forwarded verbatim; FastAPI counts trusted
+// hops from the right, so a client-prepended spoof entry stays out of the
+// resolved position.
+export function clientIpForwardHeaders(
+  source: HeaderReader
+): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const forwardedFor = source.get('x-forwarded-for');
+  if (forwardedFor) headers['X-Forwarded-For'] = forwardedFor;
+  const realIp = source.get('x-real-ip');
+  if (realIp) headers['X-Real-IP'] = realIp;
+  return headers;
+}
+
 // Issues a server-to-server request to FastAPI at `path` (e.g. `/v1/posts`).
 //
 // The caller's `Authorization` header is passed through untouched — it carries

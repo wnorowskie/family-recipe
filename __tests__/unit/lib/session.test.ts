@@ -42,10 +42,15 @@ const buildUser = (overrides: Partial<AuthUser> = {}): AuthUser => ({
   ...overrides,
 });
 
-// Mock the Next headers() store so resolvePageUser can read the cookie header.
-const mockCookieHeader = (value: string | null) => {
+// Mock the Next headers() store so resolvePageUser can read the cookie header
+// (and, since #265, the forwarded client-IP headers).
+const mockCookieHeader = (
+  value: string | null,
+  extra: Record<string, string> = {}
+) => {
   mockHeaders.mockResolvedValue({
-    get: (name: string) => (name === 'cookie' ? value : null),
+    get: (name: string) =>
+      name === 'cookie' ? value : (extra[name.toLowerCase()] ?? null),
   } as unknown as Awaited<ReturnType<typeof headers>>);
 };
 
@@ -71,7 +76,8 @@ describe('resolvePageUser()', () => {
     await resolvePageUser();
 
     expect(mockFetchSessionUser).toHaveBeenCalledWith(
-      'refresh_token=opaque; csrf_token=abc'
+      'refresh_token=opaque; csrf_token=abc',
+      {}
     );
   });
 
@@ -81,7 +87,22 @@ describe('resolvePageUser()', () => {
 
     await resolvePageUser();
 
-    expect(mockFetchSessionUser).toHaveBeenCalledWith(null);
+    expect(mockFetchSessionUser).toHaveBeenCalledWith(null, {});
+  });
+
+  it('forwards the browser client-IP headers to fetchSessionUser (#265)', async () => {
+    mockCookieHeader('refresh_token=opaque; csrf_token=abc', {
+      'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+      'x-real-ip': '203.0.113.7',
+    });
+    mockFetchSessionUser.mockResolvedValue({ ok: true, user: buildUser() });
+
+    await resolvePageUser();
+
+    expect(mockFetchSessionUser).toHaveBeenCalledWith(
+      'refresh_token=opaque; csrf_token=abc',
+      { 'X-Forwarded-For': '203.0.113.7, 10.0.0.1', 'X-Real-IP': '203.0.113.7' }
+    );
   });
 
   it('returns null when the session call fails', async () => {

@@ -1,5 +1,6 @@
 import {
   clearIdentityTokenCache,
+  clientIpForwardHeaders,
   fetchUpstream,
   getUpstreamOrigin,
   UpstreamNotConfiguredError,
@@ -227,6 +228,39 @@ describe('lib/apiUpstream', () => {
       expect(metadataInit.headers).toMatchObject({
         'Metadata-Flavor': 'Google',
       });
+    });
+  });
+});
+
+describe('clientIpForwardHeaders', () => {
+  it('extracts x-forwarded-for and x-real-ip into the FastAPI header casing', () => {
+    const source = new Headers({
+      'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+      'x-real-ip': '203.0.113.7',
+    });
+
+    expect(clientIpForwardHeaders(source)).toEqual({
+      'X-Forwarded-For': '203.0.113.7, 10.0.0.1',
+      'X-Real-IP': '203.0.113.7',
+    });
+  });
+
+  it('omits absent headers rather than emitting empty values', () => {
+    expect(clientIpForwardHeaders(new Headers({}))).toEqual({});
+    expect(
+      clientIpForwardHeaders(new Headers({ 'x-real-ip': '203.0.113.7' }))
+    ).toEqual({ 'X-Real-IP': '203.0.113.7' });
+  });
+
+  it('never copies non-allowlisted headers (no header smuggling)', () => {
+    const source = new Headers({
+      'x-forwarded-for': '203.0.113.7',
+      authorization: 'Bearer stolen',
+      cookie: 'refresh_token=leak',
+    });
+
+    expect(clientIpForwardHeaders(source)).toEqual({
+      'X-Forwarded-For': '203.0.113.7',
     });
   });
 });
