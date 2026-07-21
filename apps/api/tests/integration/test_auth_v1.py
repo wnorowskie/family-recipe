@@ -15,7 +15,13 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src import tokens
-from src.rate_limit import login_limiter, reset_limiter, signup_limiter
+from src.rate_limit import (
+    login_limiter,
+    refresh_limiter,
+    reset_limiter,
+    session_limiter,
+    signup_limiter,
+)
 from src.settings import settings
 from tests.helpers.error_envelope import assert_error_envelope
 from tests.helpers.test_data import (
@@ -28,14 +34,21 @@ from tests.helpers.test_data import (
 
 @pytest.fixture(autouse=True)
 def _reset_auth_limiters():
-    """The IP-keyed auth limiters (issue #175) are module-scoped singletons, so
-    without a reset a test that exhausts a bucket would leave the next test's
-    first request rate-limited. Mirrors `_reset_feedback_limiter` in
+    """The IP-keyed auth limiters (issues #175, #265) are module-scoped
+    singletons, so without a reset a test that exhausts a bucket would leave the
+    next test's first request rate-limited. Mirrors `_reset_feedback_limiter` in
     test_feedback.py. Runs for every test in this module."""
-    for limiter in (login_limiter, signup_limiter, reset_limiter):
+    limiters = (
+        login_limiter,
+        signup_limiter,
+        reset_limiter,
+        session_limiter,
+        refresh_limiter,
+    )
+    for limiter in limiters:
         limiter.reset()
     yield
-    for limiter in (login_limiter, signup_limiter, reset_limiter):
+    for limiter in limiters:
         limiter.reset()
 
 
@@ -1158,10 +1171,11 @@ class TestV1Session:
 
 
 class TestV1AuthRateLimit:
-    """login/signup/reset are IP-keyed limited. The check runs after Pydantic
-    parsing but before any DB or bcrypt work, so a schema-valid request that then
-    fails auth still counts toward the bucket (schema-invalid bodies 422 before
-    the check and do not count). With the default trusted_proxy_hops=0, every
+    """login/signup/reset/session/refresh are IP-keyed limited. The check runs
+    after Pydantic parsing but before any DB or bcrypt work (and, for
+    session/refresh, before the CSRF/cookie gate), so a request that then fails
+    auth still counts toward the bucket (schema-invalid bodies 422 before the
+    check and do not count). With the default trusted_proxy_hops=0, every
     TestClient request resolves to the same peer, so looping one client fills a
     single IP bucket without any header."""
 
@@ -1247,3 +1261,41 @@ class TestV1AuthRateLimit:
         for i in range(8):
             r = client.post("/v1/auth/login", json=payload)
             assert r.status_code == 401, f"attempt {i + 1} should bypass the limiter"
+
+    # session/refresh limiters (issue #265). The limiter runs before the
+    # CSRF/cookie work, so a cookie-less request counts toward the bucket and
+    # returns 401 (CSRF fail) until the bucket is exhausted, then 429. This is
+    # the point of running it first — an attacker spraying invalid requests is
+    # throttled rather than getting a free probe of the token store.
+    def test_session_429_after_60_attempts(self, client, mock_prisma):
+        for i in range(60):
+            r = client.get("/v1/auth/session")
+            assert r.status_code == 401, f"attempt {i + 1} should pass the limiter"
+
+        self._assert_429(client.get("/v1/auth/session"), 60)
+
+    def test_refresh_429_after_30_attempts(self, client, mock_prisma):
+        for i in range(30):
+            r = client.post("/v1/auth/refresh")
+            assert r.status_code == 401, f"attempt {i + 1} should pass the limiter"
+
+        self._assert_429(client.post("/v1/auth/refresh"), 60)
+
+    def test_refresh_keyed_on_real_client_ip_not_next_service_ip(
+        self, client, mock_prisma, monkeypatch
+    ):
+        # The whole reason #265 exists: with the SSR path now forwarding XFF,
+        # the limiter must key on the real browser IP. One trusted proxy hop →
+        # _client_ip reads the last XFF entry, so two X-Forwarded-For values are
+        # two independent buckets. If the limiter keyed on the Next service peer
+        # instead, IP B would already be exhausted here.
+        monkeypatch.setattr(settings, "trusted_proxy_hops", 1)
+        ip_a = {"X-Forwarded-For": "203.0.113.1"}
+        ip_b = {"X-Forwarded-For": "203.0.113.2"}
+
+        for _ in range(30):
+            assert client.post("/v1/auth/refresh", headers=ip_a).status_code == 401
+        # IP A is now exhausted...
+        self._assert_429(client.post("/v1/auth/refresh", headers=ip_a), 60)
+        # ...but IP B still has its own fresh bucket.
+        assert client.post("/v1/auth/refresh", headers=ip_b).status_code == 401

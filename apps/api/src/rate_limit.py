@@ -105,19 +105,25 @@ feedback_limiter = RateLimiter(
     name="feedback", limit=20, window_seconds=60 * 60
 )
 
-# Auth-surface limiters (issue #175). These are IP-keyed — the caller token is
-# `_client_ip(request)` from routers/v1/auth.py, not a user id — so unlike the
-# feedback limiter they are the high-cardinality case the module docstring flags
-# above: the plain dict grows with distinct client IPs and gets no eviction until
-# the LRU/shared-store work in #33 lands. Limits mirror the Next side's
-# src/lib/rateLimit.ts (`loginLimiter` 5/15min, `signupLimiter` 3/hour); reset
-# reuses the login window per the #175 ticket (parity with what the legacy
-# /api/auth/reset got from `loginLimiter`).
-#
-# Only login/signup/reset are limited. session/refresh are deliberately left
-# unlimited — their legitimate traffic arrives server-to-server from Next SSR
-# (no forwarded client IP), so a per-IP bucket would collapse the whole family
-# onto one key; see the note next to those handlers in routers/v1/auth.py.
+# Auth-surface limiters (issues #175, #265). These are IP-keyed — the caller
+# token is `_client_ip(request)` from routers/v1/auth.py, not a user id — so
+# unlike the feedback limiter they are the high-cardinality case the module
+# docstring flags above: the plain dict grows with distinct client IPs and gets
+# no eviction until the LRU/shared-store work in #33 lands. login/signup/reset
+# limits mirror the Next side's src/lib/rateLimit.ts (`loginLimiter` 5/15min,
+# `signupLimiter` 3/hour); reset reuses the login window per the #175 ticket
+# (parity with what the legacy /api/auth/reset got from `loginLimiter`).
 login_limiter = RateLimiter(name="login", limit=5, window_seconds=15 * 60)
 signup_limiter = RateLimiter(name="signup", limit=3, window_seconds=60 * 60)
 reset_limiter = RateLimiter(name="reset", limit=5, window_seconds=15 * 60)
+
+# session/refresh were deliberately unlimited until #265: their legitimate
+# traffic arrives server-to-server from Next SSR, and until the SSR path
+# forwarded the browser's X-Forwarded-For a per-IP bucket would have collapsed
+# the whole family onto the Next service's IP. #265 forwards the real client IP
+# through fetchUpstream, so these can now be keyed per real client IP like the
+# rest of the auth surface. Limits carry the #175 acceptance criteria migrated
+# onto #265: /session ~60/IP/min (SSR hits it on every protected render),
+# /refresh ~30/IP/min (page nav with a stale token). Both use a 60s window.
+session_limiter = RateLimiter(name="session", limit=60, window_seconds=60)
+refresh_limiter = RateLimiter(name="refresh", limit=30, window_seconds=60)
