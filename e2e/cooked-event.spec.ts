@@ -1,11 +1,6 @@
 import { randomBytes } from 'crypto';
 import { expect, test, loginAndInjectCookies } from './fixtures';
 
-// The "Save cooked event" button triggers apiClient.post('/v1/posts/.../cooked').
-// Without NEXT_PUBLIC_API_BASE_URL set at build time the call lands on
-// same-origin Next.js which has no /v1/ routes, so the dialog never closes.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
 /**
  * Smoke flow for #105 — log a cooked event against the seeded recipe via the
  * UI and assert it renders on the recipe detail page AND on /timeline. This
@@ -21,8 +16,11 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
  * Each run appends a new cooked event — the note carries a unique stamp so
  * assertions can't collide with the seeded cooked event or prior runs.
  *
- * Requires NEXT_PUBLIC_API_BASE_URL (FastAPI) — the cooked event form calls
- * /v1/posts/{id}/cooked via apiClient.
+ * Post-cutover (#241) the cooked-event form posts same-origin to
+ * /v1/posts/{id}/cooked through the Next forwarder — there is no
+ * NEXT_PUBLIC_API_BASE_URL prerequisite, so this @smoke flow runs against both
+ * the CI sandbox and the live dev deploy (the stale skip guard was removed in
+ * #273).
  */
 
 const RECIPE_POST_ID = 'ce2erecipe001';
@@ -32,10 +30,6 @@ test(
   'logged cooked event renders on recipe detail and timeline',
   { tag: ['@smoke'] },
   async ({ page, context }) => {
-    test.skip(
-      !API_BASE_URL,
-      'NEXT_PUBLIC_API_BASE_URL must be set: cooked event form calls /v1/posts/{id}/cooked which requires FastAPI'
-    );
     await loginAndInjectCookies(
       context,
       process.env.E2E_USER ?? 'claude-test',

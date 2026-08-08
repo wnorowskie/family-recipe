@@ -2,11 +2,6 @@ import { randomBytes } from 'crypto';
 import { expect, test, loginAndInjectCookies } from './fixtures';
 import { loginViaOrigin, sessionCookiesFor } from './auth-helpers';
 
-// Posting a comment and reacting now call apiClient.post('/v1/...') and
-// apiClient.post('/v1/reactions'). Without NEXT_PUBLIC_API_BASE_URL set at
-// build time those requests land on same-origin Next.js (no /v1/ routes).
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
 /**
  * Smoke flow for #104 — comment + react on a seeded post as `claude-test`,
  * assert both land on the post detail page, and assert the resulting comment
@@ -22,8 +17,11 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
  * signs in as `e2e-author` via a separate fresh context. Both users live in
  * the same FamilySpace via [prisma/seed.ts] `SEED_E2E=1` fixtures.
  *
- * Requires NEXT_PUBLIC_API_BASE_URL (FastAPI) — comment and reaction writes
- * call /v1/posts/{id}/comments and /v1/reactions via apiClient.
+ * Post-cutover (#241) these writes go same-origin to /v1/posts/{id}/comments
+ * and /v1/reactions through the Next forwarder — there is no
+ * NEXT_PUBLIC_API_BASE_URL prerequisite, so this @smoke flow runs against both
+ * the CI sandbox and the live dev deploy (the stale skip guard was removed in
+ * #273).
  */
 
 const POST_ID = 'ce2epost001';
@@ -38,10 +36,6 @@ test(
   'comment + reaction on a post persist and notify the author',
   { tag: ['@smoke'] },
   async ({ page, context, browser }) => {
-    test.skip(
-      !API_BASE_URL,
-      'NEXT_PUBLIC_API_BASE_URL must be set: comment/reaction writes call /v1/ endpoints which require FastAPI'
-    );
     await loginAndInjectCookies(
       context,
       process.env.E2E_USER ?? 'claude-test',
