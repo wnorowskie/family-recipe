@@ -11,6 +11,19 @@ COPY package.json package-lock.json ./
 RUN apk add --no-cache python3 make g++ \
   && HUSKY=0 npm ci
 
+# Production-only dependencies for the runtime image. Keeping the dev toolchain
+# (jest/eslint/playwright/ajv/...) out of the shipped image shrinks it and keeps
+# dev-only CVEs out of the container scan. bcrypt is native, so this stage needs
+# the same build toolchain as `deps`.
+FROM base AS prod-deps
+ENV NODE_ENV=production
+COPY package.json package-lock.json ./
+# `prepare` runs husky (a devDependency, absent under --omit=dev); drop it so its
+# lifecycle run doesn't fail. Keep other scripts so bcrypt still builds natively.
+RUN apk add --no-cache python3 make g++ \
+  && npm pkg delete scripts.prepare \
+  && npm ci --omit=dev
+
 FROM base AS builder
 ARG PRISMA_SCHEMA=prisma/schema.postgres.node.prisma
 ENV PRISMA_SCHEMA=${PRISMA_SCHEMA}
@@ -32,7 +45,7 @@ RUN npm run build
 
 FROM base AS runner
 ENV NODE_ENV=production
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
