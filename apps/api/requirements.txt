@@ -13,10 +13,14 @@ rsa==4.9
 python-multipart==0.0.31
 Pillow==12.3.0
 
-# Security floors for transitive deps flagged HIGH by Trivy (both have fixes):
-# cryptography < 48.0.1 ships a vulnerable OpenSSL in its wheels (GHSA-537c-gmf6-5ccf);
-# urllib3 < 2.7.0 leaks headers on cross-origin redirect + a decompression DoS
-# (CVE-2026-44431 / CVE-2026-44432). Pinned here so the resolved version can't
-# regress below the fix; remove if a direct dep ever requires them explicitly.
-cryptography==48.0.1
+# Security floors for direct/transitive deps flagged by Trivy / pip-audit (both
+# have fixes). Pinned here so the resolved image can't regress below the fix;
+# revisit if a direct dep ever constrains them explicitly.
+#   cryptography < 50.0.0 — PYSEC-2026-3552/3553/3554 + CVE-2026-69247/69249;
+#                           the 48.0.1 floor from #267 is itself now vulnerable.
+#   urllib3      < 2.7.0  — header leak on cross-origin redirect + decompression
+#                           DoS (CVE-2026-44431 / CVE-2026-44432).
+# (msgpack / setuptools are flagged by Trivy too, but only as pip's *vendored*
+#  copies — not app deps; see the .trivyignore entry rather than pinning here.)
+cryptography==50.0.0
 urllib3==2.7.0
