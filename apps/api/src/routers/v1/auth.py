@@ -10,7 +10,7 @@ Design: docs/research/refresh-token-store.md
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
@@ -159,11 +159,37 @@ async def _build_user_response(user, membership) -> UserResponse:
     )
 
 
-async def _lookup_active_refresh_row(*, jti: str, secret: str):
+def _within_rotation_grace(row, now: datetime, grace_seconds: int) -> bool:
+    """True when `row` was revoked *specifically by rotation* within the last
+    `grace_seconds`.
+
+    Lets the non-rotating /session read tolerate a refresh cookie that a
+    concurrent /refresh has just rotated away, so a top-level navigation that
+    races the client's in-flight rotation is not spuriously bounced to
+    /login?_se=1 (issue #274). Only REVOKED_ROTATED qualifies — logout, reset,
+    admin, and reuse-detected revocations are never granted grace. This only
+    widens what /session will *read*; it never mints a token or advances the
+    chain, so reuse-detection stays exclusive to /refresh.
+    """
+    if grace_seconds <= 0:
+        return False
+    if row.revokedAt is None or row.revokedReason != REVOKED_ROTATED:
+        return False
+    return row.revokedAt > now - timedelta(seconds=grace_seconds)
+
+
+async def _lookup_active_refresh_row(
+    *, jti: str, secret: str, rotation_grace_seconds: int = 0
+):
     """DB-touching subset of refresh-cookie validation, shared between
     /v1/auth/session and (potentially) future read-only auth surfaces.
 
     Returns (row, None) on success or (None, error_response) on failure.
+
+    `rotation_grace_seconds` (default 0 = strict) lets read-only callers accept
+    a cookie that /refresh rotated away within the window — see
+    `_within_rotation_grace` and issue #274. It only ever relaxes the revoked
+    check for REVOKED_ROTATED rows; the expiry and hash checks still apply.
 
     Critically, this helper does NOT trigger reuse-detection — that side
     effect is exclusive to /refresh because rotation is the canonical reuse
@@ -182,7 +208,9 @@ async def _lookup_active_refresh_row(*, jti: str, secret: str):
     now = datetime.now(timezone.utc)
     if row.expiresAt <= now:
         return None, unauthorized("Refresh token expired")
-    if row.revokedAt is not None:
+    if row.revokedAt is not None and not _within_rotation_grace(
+        row, now, rotation_grace_seconds
+    ):
         return None, unauthorized("Refresh token revoked")
     if not constant_time_hash_eq(row.tokenHash, secret):
         return None, unauthorized("Refresh token invalid")
@@ -601,6 +629,11 @@ async def me(user: UserResponse = Depends(get_current_user_v1)):
 # repeatedly does NOT mark the row as rotated and does NOT trigger reuse
 # detection. Rotation and the reuse signal remain exclusive to /v1/auth/refresh.
 #
+# To close the reload-vs-rotation bounce (#274), a cookie that /refresh rotated
+# away within `refresh_rotation_grace_seconds` is still accepted here (read-only,
+# no chain mutation) — see `_within_rotation_grace`. Reuse-detection is
+# unaffected: a rotated cookie replayed to /refresh still burns the chain.
+#
 # IP-rate-limited at ~60/IP/min (issue #265), enforced before the CSRF/cookie
 # work. SSR hits this on every protected render via fetchUpstream, which since
 # #265 forwards the browser's X-Forwarded-For, so the bucket keys on the real
@@ -630,7 +663,11 @@ async def session(
     jti, secret = parsed
 
     try:
-        row, error_response = await _lookup_active_refresh_row(jti=jti, secret=secret)
+        row, error_response = await _lookup_active_refresh_row(
+            jti=jti,
+            secret=secret,
+            rotation_grace_seconds=settings.refresh_rotation_grace_seconds,
+        )
         if error_response is not None:
             return error_response
 

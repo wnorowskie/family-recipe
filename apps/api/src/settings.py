@@ -26,6 +26,17 @@ class Settings(BaseSettings):
     refresh_token_ttl_default_seconds: int = 7 * 24 * 60 * 60   # 7 days
     refresh_token_ttl_remember_seconds: int = 30 * 24 * 60 * 60  # 30 days
 
+    # Grace window (seconds) during which the non-rotating /v1/auth/session read
+    # still accepts a refresh cookie that /refresh has *just* rotated away. Closes
+    # the spurious "reload during an in-flight rotation bounces to /login?_se=1"
+    # race (#274): a top-level navigation carries the pre-rotation cookie while
+    # the client's background /api/auth/bootstrap rotates it. Only rotation
+    # revocations qualify — logout / reset / reuse-detected never do — and this
+    # only widens what /session will *read*, never what any endpoint mints, so
+    # reuse-detection stays exclusive to /refresh. Keep it small: it need only
+    # cover one rotation round-trip. Set to 0 to disable.
+    refresh_rotation_grace_seconds: int = 30
+
     # HMAC pepper for refresh-token hashes; required in production.
     refresh_pepper: Optional[str] = None
 

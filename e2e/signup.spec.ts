@@ -2,10 +2,6 @@ import { randomBytes } from 'crypto';
 import { expect, test } from '@playwright/test';
 
 const MASTER_KEY = process.env.FAMILY_MASTER_KEY;
-// The signup form now POSTs to /v1/auth/signup via apiClient. Without
-// NEXT_PUBLIC_API_BASE_URL set at build time the request lands on same-origin
-// Next.js which has no /v1/ routes, so the test would time out.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 /**
  * Smoke flow for #106 — the only e2e coverage of the master-key bcrypt verify
@@ -18,7 +14,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
  * Unlike the other smoke flows this one does NOT use storageState — it
  * deliberately boots from a fresh, unauthenticated context.
  *
- * Requires NEXT_PUBLIC_API_BASE_URL (FastAPI) in addition to FAMILY_MASTER_KEY.
+ * Post-cutover (#241) the signup form posts same-origin to /v1/auth/signup
+ * through the Next forwarder — no NEXT_PUBLIC_API_BASE_URL prerequisite. Still
+ * gated on FAMILY_MASTER_KEY (the CI value lives in ci.yml); the stale
+ * NEXT_PUBLIC_API_BASE_URL skip guard was removed in #273.
  */
 test(
   'signup via master key unlocks /timeline',
@@ -27,10 +26,6 @@ test(
     test.skip(
       !MASTER_KEY,
       'FAMILY_MASTER_KEY must be set for the signup flow (see ci.yml for the CI value)'
-    );
-    test.skip(
-      !API_BASE_URL,
-      'NEXT_PUBLIC_API_BASE_URL must be set: signup form calls /v1/auth/signup which requires FastAPI'
     );
 
     // username must be ≤ 30 chars (FastAPI SignupRequest.username max_length=30).

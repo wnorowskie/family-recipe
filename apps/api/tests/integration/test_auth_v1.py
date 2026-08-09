@@ -1098,26 +1098,72 @@ class TestV1Session:
         )
         assert response.status_code == 401
 
-    def test_session_revoked_rotated_token_returns_401_without_chain_burn(
+    def test_session_recently_rotated_token_within_grace_returns_user(
+        self, client, mock_prisma, mock_user, mock_family_space
+    ):
+        """#274: a refresh cookie that /refresh rotated away moments ago is
+        still accepted on /session while inside the grace window — read-only,
+        with NO chain mutation. This is what stops a top-level navigation that
+        races the client's in-flight rotation from bouncing to /login?_se=1.
+        """
+        secret = "session-secret"
+        token_hash = tokens._hash_refresh_secret(secret)
+        rotated_row = make_mock_refresh_token(
+            jti="jti_rotated_fresh",
+            tokenHash=token_hash,
+            userId=mock_user.id,
+            familySpaceId=mock_family_space.id,
+            revokedAt=datetime.now(timezone.utc),
+            revokedReason=tokens.REVOKED_ROTATED,
+        )
+        mock_prisma.refreshtoken.find_unique = AsyncMock(return_value=rotated_row)
+        self._seed_user_with_membership(mock_prisma, mock_user, mock_family_space)
+        # Arm mutations so the test fails loudly if grace ever mutates the chain.
+        mock_prisma.refreshtoken.update = AsyncMock(return_value=None)
+        mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
+        mock_prisma.refreshtoken.create = AsyncMock(return_value=None)
+
+        client.cookies.set(
+            settings.refresh_cookie_name, f"jti_rotated_fresh.{secret}"
+        )
+        client.cookies.set(settings.csrf_cookie_name, "csrf-abc")
+        response = client.get(
+            "/v1/auth/session", headers={"X-CSRF-Token": "csrf-abc"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["user"]["id"] == mock_user.id
+        # Grace only relaxes the *read*: no rotation, no chain burn, no new cookie.
+        mock_prisma.refreshtoken.update.assert_not_called()
+        mock_prisma.refreshtoken.update_many.assert_not_called()
+        mock_prisma.refreshtoken.create.assert_not_called()
+        assert settings.refresh_cookie_name not in response.headers.get(
+            "set-cookie", ""
+        )
+
+    def test_session_rotated_token_beyond_grace_returns_401_without_chain_burn(
         self, client, mock_prisma, mock_user
     ):
-        """Critical: a stale REVOKED_ROTATED cookie hitting /session must
-        NOT trigger the reuse-detection branch (which would burn the chain).
-        Reuse detection is exclusive to /refresh — /session is replay-safe.
+        """Past the grace window a rotated cookie is rejected again — and, as
+        always on /session, without triggering the chain-burn reuse signal
+        (that remains exclusive to /refresh).
         """
         secret = "secret"
         token_hash = tokens._hash_refresh_secret(secret)
         rotated_row = make_mock_refresh_token(
-            jti="jti_rotated",
+            jti="jti_rotated_stale",
             tokenHash=token_hash,
             userId=mock_user.id,
-            revokedAt=datetime.now(timezone.utc),
+            revokedAt=datetime.now(timezone.utc)
+            - timedelta(seconds=settings.refresh_rotation_grace_seconds + 60),
             revokedReason=tokens.REVOKED_ROTATED,
         )
         mock_prisma.refreshtoken.find_unique = AsyncMock(return_value=rotated_row)
         mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
 
-        client.cookies.set(settings.refresh_cookie_name, f"jti_rotated.{secret}")
+        client.cookies.set(
+            settings.refresh_cookie_name, f"jti_rotated_stale.{secret}"
+        )
         client.cookies.set(settings.csrf_cookie_name, "x")
         response = client.get(
             "/v1/auth/session", headers={"X-CSRF-Token": "x"}
