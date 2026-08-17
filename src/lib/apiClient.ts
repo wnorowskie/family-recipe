@@ -266,11 +266,33 @@ async function executeRequest(
   });
 }
 
+// Join an already in-flight refresh before issuing a request that would
+// otherwise go out unauthenticated (#276).
+//
+// AuthBootstrap kicks off a rotating refresh on mount. A request made in that
+// window read a null token, sent no Authorization header, and 401'd. The
+// refresh-and-retry loop below did recover it, but only after a second
+// round-trip — long enough that a navigation (a reload, a route change) could
+// abort the retry, silently dropping a write the user believed had landed.
+//
+// This only ever waits on a refresh that is *already* running, so it issues no
+// extra network calls and cannot stall a page with no bootstrap in progress.
+async function joinInflightRefresh(path: string): Promise<void> {
+  if (isAuthEndpoint(path)) return;
+  // A token in hand is good enough — a concurrent rotation does not invalidate
+  // it, and the 401 retry still covers the case where it has just expired.
+  if (accessTokenProvider()) return;
+  if (inflightRefresh === null) return;
+  await inflightRefresh;
+}
+
 async function request<T>(
   method: string,
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
+  await joinInflightRefresh(path);
+
   let response = await executeRequest(method, path, options);
 
   // On 401, attempt a single refresh and retry the original request once.
