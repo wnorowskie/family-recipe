@@ -325,11 +325,7 @@ jobs:
           # @smoke covers the three non-destructive flows (#103/#104/#105);
           # signup is also tagged @destructive (creates a real user row) and is
           # excluded here — that flow stays gated behind ci.yml's seeded DB.
-          # comment-reaction is @dev-quarantine: it fails against dev on a
-          # latency-only client access-token race (#276) that ci.yml can't catch;
-          # excluded here so it doesn't roll back a develop deploy, still runs in
-          # ci.yml. Remove from the grep-invert once #276 is fixed (target 3/3).
-          npx playwright test --grep @smoke --grep-invert '@destructive|@dev-quarantine'
+          npx playwright test --grep @smoke --grep-invert @destructive
 
       - name: Stop auth proxy
         if: always()
