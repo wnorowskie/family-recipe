@@ -45,6 +45,7 @@ import {
   type RecipeIngredientUnit,
 } from '@/lib/validation';
 import { mapImporterResponseToPrefill } from './importerMapping';
+import { apiClient, ApiError } from '@/lib/apiClient';
 
 const courseOptions = [
   { value: 'breakfast', label: 'Breakfast' },
@@ -502,18 +503,16 @@ export default function AddPostForm({
 
     async function fetchTags() {
       try {
-        const response = await fetch('/api/tags', { credentials: 'include' });
-        if (!response.ok) {
-          throw new Error('Unable to load tags');
-        }
-        const data = await response.json();
+        const data = await apiClient.get<{
+          groups: Record<string, { id: string; name: string }[]>;
+        }>('/v1/tags');
         if (isMounted) {
           setAvailableTags(data.groups ?? {});
         }
       } catch (error) {
         if (isMounted) {
           setTagsError(
-            error instanceof Error ? error.message : 'Unable to load tags'
+            error instanceof ApiError ? error.message : 'Unable to load tags'
           );
         }
       } finally {
@@ -890,24 +889,14 @@ export default function AddPostForm({
     setImportWarning(null);
 
     try {
-      const response = await fetch('/api/recipes/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ url: normalizedUrl }),
-      });
-
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        const message = data?.error?.message || 'Unable to import recipe.';
-        throw new Error(message);
-      }
-
+      const data = await apiClient.post<
+        Parameters<typeof mapImporterResponseToPrefill>[0]
+      >('/v1/recipes/import', { body: { url: normalizedUrl } });
       const prefill = mapImporterResponseToPrefill(data);
       applyImportedRecipe(prefill);
     } catch (error) {
       setImportError(
-        error instanceof Error ? error.message : 'Unable to import recipe.'
+        error instanceof ApiError ? error.message : 'Unable to import recipe.'
       );
     } finally {
       setIsImporting(false);
@@ -1103,20 +1092,10 @@ export default function AddPostForm({
         formData.append('photos', photo.file);
       });
 
-      const endpoint = isEditMode ? `/api/posts/${postId}` : '/api/posts';
-      const response = await fetch(endpoint, {
-        method: isEditMode ? 'PUT' : 'POST',
-        body: formData,
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        const message =
-          data?.error?.message ||
-          (isEditMode ? 'Failed to update post' : 'Failed to create post');
-        throw new Error(message);
-      }
+      const endpoint = isEditMode ? `/v1/posts/${postId}` : '/v1/posts';
+      await (isEditMode
+        ? apiClient.put(endpoint, { body: formData })
+        : apiClient.post(endpoint, { body: formData }));
 
       if (isEditMode && postId) {
         setChangeNote('');

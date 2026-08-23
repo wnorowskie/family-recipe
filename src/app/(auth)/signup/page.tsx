@@ -3,6 +3,14 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { ApiError } from '@/lib/apiClient';
+import { type AuthUser, setSession } from '@/lib/authStore';
+
+interface AuthTokenResponse {
+  accessToken: string;
+  user: AuthUser;
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -26,23 +34,33 @@ export default function SignupPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify(formData),
+        credentials: 'include',
       });
-
-      const data = await response.json();
-
+      const payload = (await response.json()) as
+        | AuthTokenResponse
+        | { error: { message?: string } };
       if (!response.ok) {
-        setError(data.error?.message || 'Something went wrong');
-        setIsLoading(false);
-        return;
+        const msg =
+          'error' in payload &&
+          typeof payload.error === 'object' &&
+          payload.error !== null
+            ? ((payload.error as { message?: string }).message ??
+              'Signup failed')
+            : 'Signup failed';
+        throw new ApiError('BAD_REQUEST' as never, msg, response.status);
       }
-
-      // Success - force a hard reload to ensure cookie is sent with next request
-      window.location.href = '/timeline';
+      const data = payload as AuthTokenResponse;
+      setSession(data.accessToken, data.user);
+      router.replace('/timeline');
     } catch (err) {
-      setError('Failed to connect to the server');
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Failed to connect to the server');
+      }
       setIsLoading(false);
     }
   };

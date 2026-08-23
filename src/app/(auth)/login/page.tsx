@@ -3,6 +3,14 @@
 import { useState, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+import { ApiError } from '@/lib/apiClient';
+import { type AuthUser, setSession } from '@/lib/authStore';
+
+interface AuthTokenResponse {
+  accessToken: string;
+  user: AuthUser;
+}
+
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -19,34 +27,43 @@ function LoginContent() {
     setError('');
     setIsLoading(true);
 
-    try {
-      const redirectParam = searchParams?.get('redirect') ?? '/timeline';
-      const safeRedirect = redirectParam.startsWith('/')
-        ? redirectParam
-        : '/timeline';
+    const redirectParam = searchParams?.get('redirect') ?? '/timeline';
+    const safeRedirect = redirectParam.startsWith('/')
+      ? redirectParam
+      : '/timeline';
 
+    try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify(formData),
+        credentials: 'include',
       });
-
-      const data = await response.json();
-
+      const payload = (await response.json()) as
+        | AuthTokenResponse
+        | { error: { message?: string } };
       if (!response.ok) {
-        setError(data.error?.message || 'Something went wrong');
-        setIsLoading(false);
-        return;
+        const msg =
+          'error' in payload &&
+          typeof payload.error === 'object' &&
+          payload.error !== null
+            ? ((payload.error as { message?: string }).message ??
+              'Login failed')
+            : 'Login failed';
+        throw new ApiError('UNAUTHORIZED' as never, msg, response.status);
       }
-
-      // Success - use Next.js navigation so middleware re-runs with fresh cookies
+      const data = payload as AuthTokenResponse;
+      setSession(data.accessToken, data.user);
       router.replace(safeRedirect);
-      router.refresh();
     } catch (err) {
-      setError('Failed to connect to the server');
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Failed to connect to the server');
+      }
       setIsLoading(false);
     }
   };

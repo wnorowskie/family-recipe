@@ -82,6 +82,12 @@ variable "family_master_key_secret_id" {
   default     = ""
 }
 
+variable "refresh_pepper_secret_id" {
+  description = "Optional Secret Manager secret ID for REFRESH_PEPPER (empty to skip). Consumed by the FastAPI service; created here so the shared runtime SA is granted access alongside the other secrets."
+  type        = string
+  default     = ""
+}
+
 variable "wif_pool_id" {
   description = "Workload Identity Pool ID for GitHub Actions"
   type        = string

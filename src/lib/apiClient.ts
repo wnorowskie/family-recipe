@@ -1,0 +1,338 @@
+import { API_ERROR_CODES, type ApiErrorCode } from '@/lib/apiErrors';
+
+export class ApiError extends Error {
+  readonly code: ApiErrorCode;
+  readonly status: number;
+
+  constructor(code: ApiErrorCode, message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
+type AccessTokenProvider = () => string | null | undefined;
+
+let accessTokenProvider: AccessTokenProvider = () => null;
+
+export function setAccessTokenProvider(provider: AccessTokenProvider): void {
+  accessTokenProvider = provider;
+}
+
+export function clearAccessTokenProvider(): void {
+  accessTokenProvider = () => null;
+}
+
+// Phase 2 refresh-and-retry hooks. The auth store registers these at module
+// load (avoids an apiClient ↔ authStore import cycle). When unset, the retry
+// loop is a no-op and 401s propagate as before.
+//
+// `user` is included in onRefreshed so the hook can seed the session even when
+// no prior snapshot exists — e.g., when a component makes an API call before
+// AuthBootstrap has completed its own /api/auth/bootstrap round-trip.
+interface RefreshHooks {
+  onRefreshed: (accessToken: string, user: unknown) => void;
+  onRefreshFailed: () => void;
+}
+
+let refreshHooks: RefreshHooks | null = null;
+
+export function setRefreshHooks(hooks: RefreshHooks): void {
+  refreshHooks = hooks;
+}
+
+export function clearRefreshHooks(): void {
+  refreshHooks = null;
+}
+
+// /api/auth/bootstrap proxies /v1/auth/refresh through Next.js so the rotated
+// refresh cookie is scoped to the Next.js origin rather than the FastAPI origin.
+const REFRESH_PATH = '/api/auth/bootstrap';
+const AUTH_BYPASS_PATHS = new Set([
+  REFRESH_PATH,
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/v1/auth/login',
+  '/v1/auth/signup',
+  '/v1/auth/logout',
+]);
+
+function isAuthEndpoint(path: string): boolean {
+  // Exact match after stripping the query string. Paths reach this function
+  // without the base URL prefix (apiClient.request passes the original path
+  // and buildUrl adds the prefix later), so a substring/endsWith check is
+  // unnecessary and would incorrectly match e.g. `/something/v1/auth/login`.
+  const withoutQuery = path.split('?')[0];
+  return AUTH_BYPASS_PATHS.has(withoutQuery);
+}
+
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const target = `${name}=`;
+  const parts = document.cookie ? document.cookie.split(';') : [];
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(target)) {
+      return decodeURIComponent(trimmed.slice(target.length));
+    }
+  }
+  return null;
+}
+
+let inflightRefresh: Promise<boolean> | null = null;
+
+// Exported so AuthBootstrap can join the same dedup promise instead of racing
+// with a concurrent tryRefresh() call that would rotate the same token twice.
+export async function tryRefresh(): Promise<boolean> {
+  if (typeof document === 'undefined') {
+    throw new Error('apiClient.tryRefresh must not run on the server');
+  }
+  if (inflightRefresh) return inflightRefresh;
+
+  const csrf = readCookie('csrf_token');
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (csrf) headers['X-CSRF-Token'] = csrf;
+
+  inflightRefresh = (async () => {
+    try {
+      // REFRESH_PATH is a same-origin Next.js route handler — never prepend
+      // the FastAPI base URL, or the cookies would be forwarded to the wrong
+      // origin and the refreshed Set-Cookie would not reach the browser.
+      const response = await fetch(REFRESH_PATH, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        refreshHooks?.onRefreshFailed();
+        return false;
+      }
+      const body = (await response.json()) as {
+        accessToken?: unknown;
+        user?: unknown;
+      };
+      if (
+        typeof body.accessToken !== 'string' ||
+        body.accessToken.length === 0
+      ) {
+        refreshHooks?.onRefreshFailed();
+        return false;
+      }
+      refreshHooks?.onRefreshed(body.accessToken, body.user);
+      return true;
+    } catch {
+      refreshHooks?.onRefreshFailed();
+      return false;
+    } finally {
+      inflightRefresh = null;
+    }
+  })();
+
+  return inflightRefresh;
+}
+
+// `NEXT_PUBLIC_*` is inlined by Next.js at build time for client bundles, not
+// read at runtime. Flipping this in env config alone won't redirect requests in
+// a deployed build — Phase 1 rollouts need a per-environment build (or a
+// runtime config endpoint).
+function getBaseUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (!raw) return '';
+  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+}
+
+function buildUrl(path: string): string {
+  const base = getBaseUrl();
+  if (!base) return path;
+  return path.startsWith('/') ? `${base}${path}` : `${base}/${path}`;
+}
+
+const STATUS_TO_CODE: Record<number, ApiErrorCode> = {
+  400: API_ERROR_CODES.VALIDATION_ERROR,
+  401: API_ERROR_CODES.UNAUTHORIZED,
+  403: API_ERROR_CODES.FORBIDDEN,
+  404: API_ERROR_CODES.NOT_FOUND,
+  409: API_ERROR_CODES.CONFLICT,
+  429: API_ERROR_CODES.RATE_LIMIT_EXCEEDED,
+};
+
+const KNOWN_CODES = new Set<string>(Object.values(API_ERROR_CODES));
+
+function fallbackCodeForStatus(status: number): ApiErrorCode {
+  return (
+    STATUS_TO_CODE[status] ??
+    (status >= 500
+      ? API_ERROR_CODES.INTERNAL_ERROR
+      : API_ERROR_CODES.BAD_REQUEST)
+  );
+}
+
+function fallbackMessageForStatus(status: number): string {
+  return `Request failed with status ${status}`;
+}
+
+async function normalizeError(response: Response): Promise<ApiError> {
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Non-JSON body — fall through to status-only mapping.
+  }
+
+  if (
+    body &&
+    typeof body === 'object' &&
+    'error' in body &&
+    body.error &&
+    typeof body.error === 'object'
+  ) {
+    const err = (body as { error: { code?: unknown; message?: unknown } })
+      .error;
+    const code =
+      typeof err.code === 'string' && KNOWN_CODES.has(err.code)
+        ? (err.code as ApiErrorCode)
+        : fallbackCodeForStatus(response.status);
+    const message =
+      typeof err.message === 'string' && err.message.length > 0
+        ? err.message
+        : fallbackMessageForStatus(response.status);
+    return new ApiError(code, message, response.status);
+  }
+
+  return new ApiError(
+    fallbackCodeForStatus(response.status),
+    fallbackMessageForStatus(response.status),
+    response.status
+  );
+}
+
+export interface RequestOptions {
+  body?: unknown;
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+  query?: Record<string, string | number | boolean | undefined | null>;
+  credentials?: RequestCredentials;
+}
+
+function appendQuery(path: string, query: RequestOptions['query']): string {
+  if (!query) return path;
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null) continue;
+    params.append(key, String(value));
+  }
+  const qs = params.toString();
+  if (!qs) return path;
+  return path.includes('?') ? `${path}&${qs}` : `${path}?${qs}`;
+}
+
+async function executeRequest(
+  method: string,
+  path: string,
+  options: RequestOptions
+): Promise<Response> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    ...(options.headers ?? {}),
+  };
+
+  let body: BodyInit | undefined;
+  if (options.body !== undefined) {
+    if (typeof FormData !== 'undefined' && options.body instanceof FormData) {
+      body = options.body;
+    } else {
+      body = JSON.stringify(options.body);
+      if (!('Content-Type' in headers) && !('content-type' in headers)) {
+        headers['Content-Type'] = 'application/json';
+      }
+    }
+  }
+
+  // Read the access token fresh on every request so a retry after refresh
+  // picks up the rotated token.
+  const token = accessTokenProvider();
+  if (token && !('Authorization' in headers) && !('authorization' in headers)) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const url = buildUrl(appendQuery(path, options.query));
+  return fetch(url, {
+    method,
+    headers,
+    body,
+    signal: options.signal,
+    credentials: options.credentials ?? 'include',
+  });
+}
+
+// Join an already in-flight refresh before issuing a request that would
+// otherwise go out unauthenticated (#276).
+//
+// AuthBootstrap kicks off a rotating refresh on mount. A request made in that
+// window read a null token, sent no Authorization header, and 401'd. The
+// refresh-and-retry loop below did recover it, but only after a second
+// round-trip — long enough that a navigation (a reload, a route change) could
+// abort the retry, silently dropping a write the user believed had landed.
+//
+// This only ever waits on a refresh that is *already* running, so it issues no
+// extra network calls and cannot stall a page with no bootstrap in progress.
+async function joinInflightRefresh(path: string): Promise<void> {
+  if (isAuthEndpoint(path)) return;
+  // A token in hand is good enough — a concurrent rotation does not invalidate
+  // it, and the 401 retry still covers the case where it has just expired.
+  if (accessTokenProvider()) return;
+  if (inflightRefresh === null) return;
+  await inflightRefresh;
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  await joinInflightRefresh(path);
+
+  let response = await executeRequest(method, path, options);
+
+  // On 401, attempt a single refresh and retry the original request once.
+  // Skip auth endpoints to avoid recursion (refresh failures must surface
+  // as 401s, not trigger another refresh).
+  if (
+    response.status === 401 &&
+    refreshHooks !== null &&
+    !isAuthEndpoint(path)
+  ) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      response = await executeRequest(method, path, options);
+    }
+  }
+
+  if (!response.ok) {
+    throw await normalizeError(response);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return (await response.json()) as T;
+  }
+  return undefined as T;
+}
+
+export const apiClient = {
+  get: <T>(path: string, options?: Omit<RequestOptions, 'body'>) =>
+    request<T>('GET', path, options),
+  post: <T>(path: string, options?: RequestOptions) =>
+    request<T>('POST', path, options),
+  patch: <T>(path: string, options?: RequestOptions) =>
+    request<T>('PATCH', path, options),
+  put: <T>(path: string, options?: RequestOptions) =>
+    request<T>('PUT', path, options),
+  del: <T>(path: string, options?: RequestOptions) =>
+    request<T>('DELETE', path, options),
+};

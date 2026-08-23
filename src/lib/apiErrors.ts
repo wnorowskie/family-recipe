@@ -7,8 +7,9 @@ import { z } from 'zod';
  */
 export const API_ERROR_CODES = {
   // 400 - Bad Request errors
-  VALIDATION_ERROR: 'VALIDATION_ERROR', // Schema validation failures
+  VALIDATION_ERROR: 'VALIDATION_ERROR', // Schema validation failures (also: malformed JSON payloads)
   BAD_REQUEST: 'BAD_REQUEST', // General bad request
+  TOO_MANY_PHOTOS: 'TOO_MANY_PHOTOS', // Per-post photo count cap exceeded (matches FastAPI mirror)
 
   // 401 - Unauthorized errors
   UNAUTHORIZED: 'UNAUTHORIZED', // Not authenticated
@@ -61,17 +62,26 @@ export function createErrorResponse(
 export function validationError(
   message: string = 'Validation failed'
 ): NextResponse<ApiErrorResponse> {
-  return createErrorResponse(
-    API_ERROR_CODES.VALIDATION_ERROR,
-    message,
-    400
-  );
+  return createErrorResponse(API_ERROR_CODES.VALIDATION_ERROR, message, 400);
 }
 
 export function badRequestError(
   message: string = 'Bad request'
 ): NextResponse<ApiErrorResponse> {
   return createErrorResponse(API_ERROR_CODES.BAD_REQUEST, message, 400);
+}
+
+/**
+ * 400 — caller exceeded the per-post photo count cap.
+ *
+ * Dedicated code so the frontend can key off `TOO_MANY_PHOTOS` (and the
+ * FastAPI mirror in apps/api/src/errors.py uses the same code) rather than
+ * the generic `BAD_REQUEST` / `VALIDATION_ERROR` buckets.
+ */
+export function tooManyPhotosError(
+  message: string = 'Too many photos'
+): NextResponse<ApiErrorResponse> {
+  return createErrorResponse(API_ERROR_CODES.TOO_MANY_PHOTOS, message, 400);
 }
 
 export function unauthorizedError(
@@ -83,11 +93,7 @@ export function unauthorizedError(
 export function invalidCredentialsError(
   message: string = 'Invalid credentials'
 ): NextResponse<ApiErrorResponse> {
-  return createErrorResponse(
-    API_ERROR_CODES.INVALID_CREDENTIALS,
-    message,
-    401
-  );
+  return createErrorResponse(API_ERROR_CODES.INVALID_CREDENTIALS, message, 401);
 }
 
 export function forbiddenError(
@@ -125,10 +131,12 @@ export function internalError(
 export function parseQueryParams<T extends z.ZodTypeAny>(
   searchParams: URLSearchParams,
   schema: T
-): { success: true; data: z.infer<T> } | { success: false; error: NextResponse<ApiErrorResponse> } {
+):
+  | { success: true; data: z.infer<T> }
+  | { success: false; error: NextResponse<ApiErrorResponse> } {
   // Build params object from URLSearchParams
   const params: Record<string, string | string[]> = {};
-  
+
   // Track which keys have multiple values
   const multiValueKeys = new Set<string>();
   searchParams.forEach((_, key) => {
@@ -136,7 +144,7 @@ export function parseQueryParams<T extends z.ZodTypeAny>(
       multiValueKeys.add(key);
     }
   });
-  
+
   // Populate params object
   searchParams.forEach((value, key) => {
     if (multiValueKeys.has(key)) {
@@ -145,9 +153,9 @@ export function parseQueryParams<T extends z.ZodTypeAny>(
       params[key] = value;
     }
   });
-  
+
   const result = schema.safeParse(params);
-  
+
   if (!result.success) {
     return {
       success: false,
@@ -156,7 +164,7 @@ export function parseQueryParams<T extends z.ZodTypeAny>(
       ),
     };
   }
-  
+
   return { success: true, data: result.data };
 }
 
@@ -166,9 +174,11 @@ export function parseQueryParams<T extends z.ZodTypeAny>(
 export function parseRouteParams<T>(
   params: unknown,
   schema: z.ZodSchema<T>
-): { success: true; data: T } | { success: false; error: NextResponse<ApiErrorResponse> } {
+):
+  | { success: true; data: T }
+  | { success: false; error: NextResponse<ApiErrorResponse> } {
   const result = schema.safeParse(params);
-  
+
   if (!result.success) {
     return {
       success: false,
@@ -177,7 +187,7 @@ export function parseRouteParams<T>(
       ),
     };
   }
-  
+
   return { success: true, data: result.data };
 }
 
@@ -187,9 +197,11 @@ export function parseRouteParams<T>(
 export function parseRequestBody<T>(
   body: unknown,
   schema: z.ZodSchema<T>
-): { success: true; data: T } | { success: false; error: NextResponse<ApiErrorResponse> } {
+):
+  | { success: true; data: T }
+  | { success: false; error: NextResponse<ApiErrorResponse> } {
   const result = schema.safeParse(body);
-  
+
   if (!result.success) {
     return {
       success: false,
@@ -198,6 +210,6 @@ export function parseRequestBody<T>(
       ),
     };
   }
-  
+
   return { success: true, data: result.data };
 }

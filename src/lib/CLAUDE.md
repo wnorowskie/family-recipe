@@ -5,13 +5,11 @@ Module map for the shared backend logic. Most of these are imported from API rou
 ## Auth & sessions
 
 - [prisma.ts](prisma.ts) — singleton `PrismaClient`. Always import `prisma` from here, never construct your own.
-- [auth.ts](auth.ts) — bcrypt password hashing/verify. Tests substitute `bcryptjs` via [jest.config.js](../../jest.config.js).
-- [jwt.ts](jwt.ts) — sign/verify the session JWT with `jose`. Tokens carry `userId`, `familySpaceId`, `role`.
-- [session-core.ts](session-core.ts) — cookie set/clear and `getSessionFromRequest`. Edge-runtime safe (used by [src/proxy.ts](../proxy.ts)).
-- [session.ts](session.ts) — Node-runtime `getCurrentUser(request)` that does the DB fetch + signed avatar URL. Re-exports the cookie helpers.
-- [apiAuth.ts](apiAuth.ts) — `withAuth` / `withRole` HOCs for route handlers. **Always use these** in API routes; don't read the session inline.
-- [permissions.ts](permissions.ts) — `canEditPost`, `canDeletePost`, `canDeleteComment`, `canRemoveMember`. Centralizes ownership/admin rules.
-- [masterKey.ts](masterKey.ts) — bcrypt hash/verify for the family master key (signup gate).
+- [session-core.ts](session-core.ts) — `hasRefreshTokenFromRequest`: Edge-safe, presence-only `refresh_token` cookie check used by [src/proxy.ts](../proxy.ts). No JWT decode. (Phase 4.4 deleted the legacy `session` cookie set/clear/verify helpers.)
+- [session.ts](session.ts) — `resolvePageUser()`: resolves the `(app)` page user via FastAPI's non-rotating `/v1/auth/session` (delegates to [auth/bootstrapFromCookies.ts](auth/bootstrapFromCookies.ts)). Returns `null` on failure so the caller redirects to `/login`.
+- [auth/bootstrapFromCookies.ts](auth/bootstrapFromCookies.ts) — `fetchSessionUser` (non-rotating `/v1/auth/session`, used by SSR) and `bootstrapAccessToken` (rotating `/v1/auth/refresh` + `/v1/auth/me`, used only by the `/api/auth/bootstrap` route). See issue #173.
+
+> Password hashing, the master-key signup gate, and ownership/admin authorization all live in FastAPI now (`apps/api/src/security.py`, `apps/api/src/permissions.py`). The old Next-side `auth.ts` / `masterKey.ts` / `permissions.ts` were removed in #243.
 
 ## Validation & errors
 
@@ -35,6 +33,8 @@ Module map for the shared backend logic. Most of these are imported from API rou
 
 ## Infrastructure
 
+- [apiUpstream.ts](apiUpstream.ts) — **server-side** client for FastAPI. `fetchUpstream(path, init)` resolves the origin (`API_INTERNAL_URL`, falling back to `NEXT_PUBLIC_API_BASE_URL` locally) and attaches a Google ID token on `X-Serverless-Authorization`, leaving `Authorization` free for the user's access token. Every server→FastAPI call goes through it: the four `auth/*` proxies, [auth/bootstrapFromCookies.ts](auth/bootstrapFromCookies.ts), and the `/v1/*` passthrough at [src/app/v1/[...path]/route.ts](../app/v1/%5B...path%5D/route.ts). See issue #241.
+- [apiClient.ts](apiClient.ts) — shared `fetch` wrapper used by frontend (client components). Honors `NEXT_PUBLIC_API_BASE_URL` (unset = same-origin), normalizes non-2xx responses to `ApiError` carrying the codes from [apiErrors.ts](apiErrors.ts), and exposes `setAccessTokenProvider` for the FastAPI token flow ([docs/API_BACKEND_MIGRATION_PLAN.md](../../docs/API_BACKEND_MIGRATION_PLAN.md)). Phase 0: provider stays unset, behavior unchanged.
 - [uploads.ts](uploads.ts) — dual-mode photo storage. Local disk under `public/uploads` when `UPLOADS_BUCKET` is unset; GCS with signed URLs otherwise. **DB stores `storageKey`, never URLs** — resolve at read time via `getSignedUploadUrl` or `createSignedUrlResolver`. Enforces 8MB cap and JPEG/PNG/WEBP/GIF only.
 - [rateLimit.ts](rateLimit.ts) — in-process LRU limiters: `signupLimiter`, `loginLimiter`, `postCreationLimiter`, `commentLimiter`, `reactionLimiter`, `cookedEventLimiter`. Globally mocked in [jest.setup.js](../../jest.setup.js). Per-instance — does not share across replicas.
 - [logger.ts](logger.ts) — `logError`, `logWarn`. Use these instead of `console.*`; tests silence console by default (override with `ALLOW_TEST_LOGS=true`).

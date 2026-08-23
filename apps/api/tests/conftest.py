@@ -28,8 +28,28 @@ def _make_prisma_stub():
 
 prisma_stub = types.ModuleType("prisma")
 prisma_stub.Prisma = _make_prisma_stub
+
+
+# Mirrors prisma.Json — handlers wrap Json-column payloads with it
+# (e.g. `Json({"commentText": ...})` in routers/comments.py).
+class _Json:
+    def __init__(self, data):
+        self.data = data
+
+
+prisma_stub.Json = _Json
 errors_stub = types.ModuleType("prisma.errors")
 errors_stub.PrismaError = Exception
+
+
+# Subclass mirrors prisma.errors.UniqueViolationError so tests that raise it
+# from a mocked AsyncMock side_effect get caught by the handler's
+# `except UniqueViolationError` clause and surfaced as 409 CONFLICT.
+class _UniqueViolationError(errors_stub.PrismaError):
+    pass
+
+
+errors_stub.UniqueViolationError = _UniqueViolationError
 models_stub = types.ModuleType("prisma.models")
 
 
@@ -123,24 +143,29 @@ def mock_prisma(mocker):
             # ... test code
     """
     mock = MagicMock()
-    
+
     # Set up common async methods
-    for model in ["user", "post", "comment", "reaction", "favorite", 
-                  "cookedevent", "familyspace", "familymembership", "tag"]:
+    for model in ["user", "post", "comment", "reaction", "favorite",
+                  "cookedevent", "familyspace", "familymembership", "tag",
+                  "idempotencykey", "notification"]:
         model_mock = MagicMock()
         model_mock.find_unique = AsyncMock(return_value=None)
         model_mock.find_first = AsyncMock(return_value=None)
         model_mock.find_many = AsyncMock(return_value=[])
         model_mock.create = AsyncMock(return_value=None)
         model_mock.update = AsyncMock(return_value=None)
+        model_mock.upsert = AsyncMock(return_value=None)
         model_mock.delete = AsyncMock(return_value=None)
         model_mock.delete_many = AsyncMock(return_value=None)
         model_mock.count = AsyncMock(return_value=0)
         setattr(mock, model, model_mock)
-    
-    # Patch the prisma instance in the db module
+
+    # Patch the prisma instance in the db module AND any module that
+    # captured a reference at import time (e.g. `from .db import prisma`
+    # in src/idempotency.py rebinds prisma into that module's namespace).
     mocker.patch("src.db.prisma", mock)
-    
+    mocker.patch("src.idempotency.prisma", mock)
+
     return mock
 
 

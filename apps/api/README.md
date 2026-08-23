@@ -89,4 +89,4 @@ pytest tests/unit/ --cov=src --cov-report=term-missing
 
 - Session cookies, JWT payload/TTL, and auth flows match the monolith.
 - Signed URL support (GCS) is scaffolded; ensure `UPLOADS_BUCKET` and `UPLOADS_SIGNED_URL_TTL_SECONDS` are set when wiring uploads.
-- Rate limiting is intentionally omitted for the first cut; can be added later if needed.
+- Rate limiting is in-process and per-endpoint (`src/rate_limit.py`, mirrors `src/lib/rateLimit.ts`). `feedback` is user-keyed (20/hour, #183); the unauthenticated auth surface is IP-keyed (#175): `login` 5/15min, `signup` 3/hour, `reset` 5/15min. `refresh`/`session` are deliberately **not** limited — they are called server-to-server from Next SSR without a forwarded client IP, so a per-IP bucket would throttle the whole family at once (see the notes on those handlers in `src/routers/v1/auth.py`). A shared multi-instance store is tracked in #33.

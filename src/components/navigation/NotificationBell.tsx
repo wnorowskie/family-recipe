@@ -4,8 +4,14 @@ import { Bell } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { apiClient, ApiError } from '@/lib/apiClient';
+
 interface NotificationBellProps {
   initialCount: number;
+}
+
+interface UnreadCountResponse {
+  unreadCount: number;
 }
 
 export default function NotificationBell({
@@ -16,18 +22,21 @@ export default function NotificationBell({
   useEffect(() => {
     const refresh = async () => {
       try {
-        const response = await fetch('/api/notifications/unread-count', {
-          cache: 'no-store',
-        });
-        if (!response.ok) return;
-        const data = await response.json();
+        const data = await apiClient.get<UnreadCountResponse>(
+          '/v1/notifications/unread-count'
+        );
         setUnreadCount(
           typeof data.unreadCount === 'number' ? data.unreadCount : 0
         );
       } catch (error) {
+        // Ignore 401s: AuthBootstrap may not have minted the access token
+        // yet on first render. The 60s interval below will retry.
+        if (error instanceof ApiError && error.status === 401) return;
         console.error('Failed to fetch unread notifications', error);
       }
     };
+
+    refresh();
     const interval = setInterval(refresh, 60000);
     return () => clearInterval(interval);
   }, []);

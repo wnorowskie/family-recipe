@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Image from 'next/image';
 
+import { apiClient, ApiError } from '@/lib/apiClient';
+
 interface FamilyMemberSummary {
   userId: string;
   membershipId: string;
@@ -42,17 +44,12 @@ export default function FamilyMembersAdmin({
     setLoadingId(userId);
     setError(null);
     try {
-      const response = await fetch(`/api/family/members/${userId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Unable to remove member');
-      }
+      await apiClient.del(`/v1/family/members/${userId}`);
       setMembers((prev) => prev.filter((member) => member.userId !== userId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to remove member');
+      setError(
+        err instanceof ApiError ? err.message : 'Unable to remove member'
+      );
     } finally {
       setLoadingId(null);
     }

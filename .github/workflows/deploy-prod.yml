@@ -22,9 +22,11 @@ jobs:
       CLOUD_RUN_SERVICE: ${{ secrets.PROD_CLOUD_RUN_SERVICE }}
       ARTIFACT_REGISTRY_REPO: ${{ secrets.PROD_ARTIFACT_REGISTRY_REPO }}
       INSTANCE_CONNECTION_NAME: ${{ secrets.PROD_INSTANCE_CONNECTION_NAME }}
+      # FastAPI backend (#241). Its URL is resolved at deploy time and injected
+      # as API_INTERNAL_URL so src/app/v1/[...path] can forward /v1/* to it.
+      API_CLOUD_RUN_SERVICE: ${{ secrets.PROD_API_CLOUD_RUN_SERVICE || 'family-recipe-api-prod' }}
       RUNTIME_SERVICE_ACCOUNT: ${{ secrets.PROD_RUNTIME_SERVICE_ACCOUNT }}
       DATABASE_URL_SECRET: ${{ secrets.PROD_DATABASE_URL_SECRET }}
-      JWT_SECRET_NAME: ${{ secrets.PROD_JWT_SECRET_NAME }}
       FAMILY_MASTER_KEY_SECRET_NAME: ${{ secrets.PROD_FAMILY_MASTER_KEY_SECRET_NAME }}
       UPLOADS_BUCKET: ${{ secrets.PROD_UPLOADS_BUCKET }}
       UPLOADS_BASE_URL: ${{ secrets.PROD_UPLOADS_BASE_URL }}
@@ -130,6 +132,23 @@ jobs:
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
 
+      - name: Resolve FastAPI service URL
+        run: |
+          # Deployed by .github/workflows/deploy-api.yml. Resolved here rather
+          # than hardcoded so the run.app hostname can never drift out of sync.
+          API_INTERNAL_URL="$(gcloud run services describe "$API_CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --format='value(status.url)' 2>/dev/null || true)"
+          if [ -z "$API_INTERNAL_URL" ]; then
+            echo "FastAPI service '$API_CLOUD_RUN_SERVICE' not found in $PROJECT_ID/$REGION." >&2
+            echo "Deploy it first (workflow: Deploy API (Cloud Run)) — without it the" >&2
+            echo "Next service has no backend and every page would redirect to /login." >&2
+            exit 1
+          fi
+          echo "FastAPI URL: $API_INTERNAL_URL"
+          echo "API_INTERNAL_URL=$API_INTERNAL_URL" >> "$GITHUB_ENV"
+
       - name: Build image
         run: |
           if [ -z "${ARTIFACT_REGISTRY_REPO:-}" ]; then
@@ -138,7 +157,14 @@ jobs:
           fi
           IMAGE="${ARTIFACT_REGISTRY_REPO}:${GITHUB_SHA}"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
-          docker build -t "$IMAGE" -f Dockerfile .
+          # NEXT_PUBLIC_API_BASE_URL is intentionally EMPTY: Next inlines
+          # NEXT_PUBLIC_* at build time, and an empty value makes the client
+          # issue same-origin /v1/* requests that src/app/v1/[...path] forwards
+          # to FastAPI. Passing the FastAPI URL here instead would send the
+          # browser cross-origin to an IAM-private service. See #241.
+          docker build \
+            --build-arg NEXT_PUBLIC_API_BASE_URL= \
+            -t "$IMAGE" -f Dockerfile .
 
       - name: Push image
         run: docker push "$IMAGE"
@@ -164,8 +190,8 @@ jobs:
             --no-traffic \
             --tag candidate \
             --add-cloudsql-instances "$INSTANCE_CONNECTION_NAME" \
-            --set-secrets DATABASE_URL=${DATABASE_URL_SECRET}:latest,JWT_SECRET=${JWT_SECRET_NAME}:latest,FAMILY_MASTER_KEY=${FAMILY_MASTER_KEY_SECRET_NAME}:latest \
-            --set-env-vars PRISMA_SCHEMA=${PRISMA_SCHEMA},UPLOADS_BUCKET=${UPLOADS_BUCKET},UPLOADS_BASE_URL=${UPLOADS_BASE_URL},RECIPE_IMPORTER_URL=${RECIPE_IMPORTER_URL},RECIPE_IMPORTER_AUDIENCE=${RECIPE_IMPORTER_AUDIENCE},RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL=${RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL} \
+            --set-secrets DATABASE_URL=${DATABASE_URL_SECRET}:latest,FAMILY_MASTER_KEY=${FAMILY_MASTER_KEY_SECRET_NAME}:latest \
+            --set-env-vars PRISMA_SCHEMA=${PRISMA_SCHEMA},UPLOADS_BUCKET=${UPLOADS_BUCKET},UPLOADS_BASE_URL=${UPLOADS_BASE_URL},API_INTERNAL_URL=${API_INTERNAL_URL},API_INTERNAL_AUDIENCE=${API_INTERNAL_URL},API_INTERNAL_SERVICE_ACCOUNT_EMAIL=${RUNTIME_SERVICE_ACCOUNT},RECIPE_IMPORTER_URL=${RECIPE_IMPORTER_URL},RECIPE_IMPORTER_AUDIENCE=${RECIPE_IMPORTER_AUDIENCE},RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL=${RECIPE_IMPORTER_SERVICE_ACCOUNT_EMAIL} \
             --ingress all \
             --allow-unauthenticated
 

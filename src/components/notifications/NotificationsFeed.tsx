@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import NotificationCard from './NotificationCard';
+import { apiClient } from '@/lib/apiClient';
 
 export type NotificationResponseItem = {
   id: string;
@@ -59,26 +60,22 @@ export default function NotificationsFeed({
   useEffect(() => {
     // Fire-and-forget: mark notifications read once the feed has been opened.
     // No state is set in this effect body; the bell refreshes via its own poll.
-    fetch('/api/notifications/mark-read', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    }).catch((err) => {
-      console.error('Failed to mark notifications as read', err);
-    });
+    const markRead = async () => {
+      try {
+        await apiClient.post('/v1/notifications/mark-read', { body: {} });
+      } catch (err) {
+        console.error('Failed to mark notifications as read', err);
+      }
+    };
+    markRead();
   }, []);
 
   const handleLoadMore = async () => {
     setIsLoadingMore(true);
     try {
-      const response = await fetch(
-        `/api/notifications?limit=${PAGE_SIZE}&offset=${offset}`,
-        { cache: 'no-store' }
-      );
-      if (!response.ok) {
-        throw new Error('Failed to fetch notifications');
-      }
-      const data: ApiResponse = await response.json();
+      const data = await apiClient.get<ApiResponse>('/v1/notifications', {
+        query: { limit: PAGE_SIZE, offset },
+      });
       setNotifications((prev) => [...prev, ...data.notifications]);
       setHasMore(data.hasMore);
       setOffset(data.nextOffset);

@@ -1,11 +1,26 @@
-fastapi==0.125.0
+fastapi==0.139.0
+starlette==1.3.1
 uvicorn[standard]==0.32.0
 prisma==0.15.0
-PyJWT==2.12.0
+email-validator==2.2.0
+PyJWT==2.13.0
 bcrypt==4.1.2
 pydantic-settings==2.7.0
 google-cloud-storage==2.18.2
 python-dotenv==1.2.2
 httpx==0.27.2
 rsa==4.9
-python-multipart==0.0.26
+python-multipart==0.0.31
+Pillow==12.3.0
+
+# Security floors for direct/transitive deps flagged by Trivy / pip-audit (both
+# have fixes). Pinned here so the resolved image can't regress below the fix;
+# revisit if a direct dep ever constrains them explicitly.
+#   cryptography < 50.0.0 — PYSEC-2026-3552/3553/3554 + CVE-2026-69247/69249;
+#                           the 48.0.1 floor from #267 is itself now vulnerable.
+#   urllib3      < 2.7.0  — header leak on cross-origin redirect + decompression
+#                           DoS (CVE-2026-44431 / CVE-2026-44432).
+# (msgpack / setuptools are flagged by Trivy too, but only as pip's *vendored*
+#  copies — not app deps; see the .trivyignore entry rather than pinning here.)
+cryptography==50.0.0
+urllib3==2.7.0

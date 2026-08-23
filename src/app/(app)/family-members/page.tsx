@@ -1,27 +1,15 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import FamilyMembersAdmin from '@/components/family/FamilyMembersAdmin';
-import { getCurrentUser } from '@/lib/session';
+import { resolvePageUser } from '@/lib/session';
 import { getFamilyMembers } from '@/lib/family';
 
 export default async function FamilyMembersPage() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('session');
-
-  if (!sessionCookie) {
-    redirect('/login');
-  }
-
-  const mockRequest = {
-    cookies: {
-      get: () => sessionCookie,
-    },
-  } as any;
-
-  const user = await getCurrentUser(mockRequest);
+  const user = await resolvePageUser();
 
   if (!user) {
-    redirect('/login');
+    // `_se=1` marks a session error so the middleware lets /login through;
+    // see resolvePageUser in src/lib/session.ts.
+    redirect('/login?_se=1');
   }
 
   const isAdminUser = user.role === 'owner' || user.role === 'admin';
@@ -30,7 +18,9 @@ export default async function FamilyMembersPage() {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-wide text-gray-500">Family space</p>
+        <p className="text-xs uppercase tracking-wide text-gray-500">
+          Family space
+        </p>
         <h2 className="text-2xl font-semibold text-gray-900">Members</h2>
         <p className="text-sm text-gray-500">
           {isAdminUser

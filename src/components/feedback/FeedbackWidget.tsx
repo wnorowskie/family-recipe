@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 
+import { apiClient, ApiError } from '@/lib/apiClient';
+
 type Category = 'bug' | 'suggestion';
 
 interface CurrentUser {
@@ -31,11 +33,7 @@ export default function FeedbackWidget() {
 
     async function fetchUser() {
       try {
-        const response = await fetch('/api/auth/me', {
-          credentials: 'include',
-        });
-        if (!response.ok) return;
-        const data = await response.json();
+        const data = await apiClient.get<{ user: CurrentUser }>('/v1/auth/me');
         if (isActive && data?.user) {
           const nextUser: CurrentUser = {
             id: data.user.id,
@@ -88,27 +86,14 @@ export default function FeedbackWidget() {
 
     try {
       setIsSubmitting(true);
-      const response = await fetch('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
+      await apiClient.post('/v1/feedback', {
+        body: {
           category,
           message: trimmedMessage,
           email: trimmedEmail || undefined,
           pageUrl: pageUrl || undefined,
-        }),
+        },
       });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        const msg =
-          data?.error?.message || 'Something went wrong. Please try again.';
-        setError(msg);
-        setToast({ type: 'error', message: msg });
-        return;
-      }
-
       setToast({ type: 'success', message: 'Thanks! We received your note.' });
       setMessage('');
       if (!user) {
@@ -116,12 +101,12 @@ export default function FeedbackWidget() {
       }
       setOpen(false);
     } catch (err) {
-      setToast({
-        type: 'error',
-        message:
-          err instanceof Error ? err.message : 'Unable to send right now.',
-      });
-      setError('Unable to send right now. Please try again in a moment.');
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to send right now. Please try again in a moment.';
+      setError(msg);
+      setToast({ type: 'error', message: msg });
     } finally {
       setIsSubmitting(false);
     }

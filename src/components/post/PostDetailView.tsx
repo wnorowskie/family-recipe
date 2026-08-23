@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import Image from 'next/image';
@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { formatRelativeTime } from '@/lib/timeline';
 import type { PostDetailComment, PostDetailData } from '@/lib/posts';
 import { formatIngredientUnit } from '@/lib/ingredients';
+import { apiClient, ApiError } from '@/lib/apiClient';
 
 interface PostDetailViewProps {
   post: PostDetailData;
@@ -30,7 +31,9 @@ const COMMENT_PAGE_SIZE = 20;
 const COOKED_PAGE_SIZE = 5;
 const COOKED_RATINGS = [1, 2, 3, 4, 5];
 
-type RecipeIngredient = NonNullable<PostDetailData['recipe']>['ingredients'][number];
+type RecipeIngredient = NonNullable<
+  PostDetailData['recipe']
+>['ingredients'][number];
 
 function formatQuantity(value: number): string {
   if (Number.isInteger(value)) {
@@ -46,9 +49,7 @@ function formatIngredientLine(ingredient: RecipeIngredient): string {
   }
 
   const unitLabel =
-    ingredient.unit === 'unitless'
-      ? ''
-      : formatIngredientUnit(ingredient.unit);
+    ingredient.unit === 'unitless' ? '' : formatIngredientUnit(ingredient.unit);
 
   if (unitLabel) {
     parts.push(unitLabel);
@@ -86,7 +87,9 @@ function formatServings(servings: number | null): string {
   return `${servings} ${servings === 1 ? 'person' : 'people'}`;
 }
 
-function formatReactionParticipants(users: Array<{ name: string }> = []): string {
+function formatReactionParticipants(
+  users: Array<{ name: string }> = []
+): string {
   if (!users.length) {
     return '';
   }
@@ -99,7 +102,11 @@ function formatReactionParticipants(users: Array<{ name: string }> = []): string
   return `${users[0].name}, ${users[1].name} +${users.length - 2}`;
 }
 
-export default function PostDetailView({ post, canEdit, currentUser }: PostDetailViewProps) {
+export default function PostDetailView({
+  post,
+  canEdit,
+  currentUser,
+}: PostDetailViewProps) {
   const createdDate = new Date(post.createdAt);
   const lastEditDate = post.lastEditAt ? new Date(post.lastEditAt) : null;
   const router = useRouter();
@@ -107,21 +114,26 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
   const [reactions, setReactions] = useState(post.reactionSummary);
   const [cookedStats, setCookedStats] = useState(post.cookedStats);
   const [recentCooked, setRecentCooked] = useState(post.recentCooked);
-  const [cookedPagination, setCookedPagination] = useState(() =>
-    post.recentCookedPage ?? {
-      hasMore: false,
-      nextOffset: post.recentCooked.length,
-    }
+  const [cookedPagination, setCookedPagination] = useState(
+    () =>
+      post.recentCookedPage ?? {
+        hasMore: false,
+        nextOffset: post.recentCooked.length,
+      }
   );
   const [isLoadingOlderCooked, setIsLoadingOlderCooked] = useState(false);
   const [olderCookedError, setOlderCookedError] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
   const [commentPhoto, setCommentPhoto] = useState<File | null>(null);
-  const [commentPhotoPreview, setCommentPhotoPreview] = useState<string | null>(null);
+  const [commentPhotoPreview, setCommentPhotoPreview] = useState<string | null>(
+    null
+  );
   const [commentError, setCommentError] = useState<string | null>(null);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isReacting, setIsReacting] = useState(false);
-  const [commentReactionTarget, setCommentReactionTarget] = useState<string | null>(null);
+  const [commentReactionTarget, setCommentReactionTarget] = useState<
+    string | null
+  >(null);
   const [deleteInFlight, setDeleteInFlight] = useState<string | null>(null);
   const [isCookedModalOpen, setIsCookedModalOpen] = useState(false);
   const [cookedRating, setCookedRating] = useState<number | null>(null);
@@ -133,14 +145,17 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [commentPagination, setCommentPagination] = useState(() =>
-    post.commentsPage ?? {
-      hasMore: false,
-      nextOffset: post.comments.length,
-    }
+  const [commentPagination, setCommentPagination] = useState(
+    () =>
+      post.commentsPage ?? {
+        hasMore: false,
+        nextOffset: post.comments.length,
+      }
   );
   const [isLoadingOlderComments, setIsLoadingOlderComments] = useState(false);
-  const [olderCommentsError, setOlderCommentsError] = useState<string | null>(null);
+  const [olderCommentsError, setOlderCommentsError] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     return () => {
@@ -185,18 +200,10 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
         formData.append('photo', commentPhoto);
       }
 
-      const response = await fetch(`/api/posts/${post.id}/comments`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Failed to add comment');
-      }
-
-      const data = await response.json();
+      const data = await apiClient.post<{ comment: PostDetailComment }>(
+        `/v1/posts/${post.id}/comments`,
+        { body: formData }
+      );
       const nextComment = {
         ...data.comment,
         reactions: data.comment.reactions ?? [],
@@ -216,7 +223,9 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
       }
       setCommentPhotoPreview(null);
     } catch (error) {
-      setCommentError(error instanceof Error ? error.message : 'Failed to add comment');
+      setCommentError(
+        error instanceof ApiError ? error.message : 'Failed to add comment'
+      );
     } finally {
       setIsSubmittingComment(false);
     }
@@ -225,15 +234,7 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
   const handleDeleteComment = async (commentId: string) => {
     try {
       setDeleteInFlight(commentId);
-      const response = await fetch(`/api/comments/${commentId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Unable to delete comment');
-      }
+      await apiClient.del(`/v1/comments/${commentId}`);
 
       setComments((prev) => {
         const updated = prev.filter((comment) => comment.id !== commentId);
@@ -244,7 +245,9 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
         return updated;
       });
     } catch (error) {
-      setCommentError(error instanceof Error ? error.message : 'Unable to delete comment');
+      setCommentError(
+        error instanceof ApiError ? error.message : 'Unable to delete comment'
+      );
     } finally {
       setDeleteInFlight(null);
     }
@@ -258,24 +261,16 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
     try {
       setIsLoadingOlderComments(true);
       setOlderCommentsError(null);
-      const params = new URLSearchParams();
-      params.set('offset', String(commentPagination.nextOffset));
-      params.set('limit', String(COMMENT_PAGE_SIZE));
-      const response = await fetch(`/api/posts/${post.id}/comments?${params.toString()}`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Failed to load comments');
-      }
-
-      const data: {
+      const data = await apiClient.get<{
         comments: PostDetailComment[];
         hasMore: boolean;
         nextOffset: number;
-      } = await response.json();
+      }>(`/v1/posts/${post.id}/comments`, {
+        query: {
+          offset: commentPagination.nextOffset,
+          limit: COMMENT_PAGE_SIZE,
+        },
+      });
 
       setComments((prev) => {
         const merged = [...data.comments, ...prev];
@@ -287,7 +282,7 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
       });
     } catch (error) {
       setOlderCommentsError(
-        error instanceof Error ? error.message : 'Failed to load comments'
+        error instanceof ApiError ? error.message : 'Failed to load comments'
       );
     } finally {
       setIsLoadingOlderComments(false);
@@ -302,25 +297,16 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
     try {
       setIsLoadingOlderCooked(true);
       setOlderCookedError(null);
-      const params = new URLSearchParams();
-      params.set('offset', String(cookedPagination.nextOffset));
-      params.set('limit', String(COOKED_PAGE_SIZE));
-
-      const response = await fetch(`/api/posts/${post.id}/cooked?${params.toString()}`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Failed to load cooked history');
-      }
-
-      const data: {
+      const data = await apiClient.get<{
         cookedEvents: PostDetailData['recentCooked'];
         hasMore: boolean;
         nextOffset: number;
-      } = await response.json();
+      }>(`/v1/posts/${post.id}/cooked`, {
+        query: {
+          offset: cookedPagination.nextOffset,
+          limit: COOKED_PAGE_SIZE,
+        },
+      });
 
       setRecentCooked((prev) => {
         const existingIds = new Set(prev.map((entry) => entry.id));
@@ -338,7 +324,9 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
       });
     } catch (error) {
       setOlderCookedError(
-        error instanceof Error ? error.message : 'Failed to load cooked history'
+        error instanceof ApiError
+          ? error.message
+          : 'Failed to load cooked history'
       );
     } finally {
       setIsLoadingOlderCooked(false);
@@ -348,55 +336,31 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
   const handleReactionClick = async (emoji: string) => {
     try {
       setIsReacting(true);
-      const response = await fetch('/api/reactions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          targetType: 'post',
-          targetId: post.id,
-          emoji,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Failed to react');
-      }
-
-      const data = await response.json();
+      const data = await apiClient.post<{ reactions: typeof reactions }>(
+        '/v1/reactions',
+        { body: { targetType: 'post', targetId: post.id, emoji } }
+      );
       setReactions(data.reactions);
     } catch (error) {
-      setCommentError(error instanceof Error ? error.message : 'Failed to react');
+      setCommentError(
+        error instanceof ApiError ? error.message : 'Failed to react'
+      );
     } finally {
       setIsReacting(false);
     }
   };
 
-  const handleCommentReactionClick = async (commentId: string, emoji: string) => {
+  const handleCommentReactionClick = async (
+    commentId: string,
+    emoji: string
+  ) => {
     try {
       setCommentReactionTarget(commentId);
-      const response = await fetch('/api/reactions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          targetType: 'comment',
-          targetId: commentId,
-          emoji,
-        }),
+      const data = await apiClient.post<{
+        reactions: PostDetailComment['reactions'];
+      }>('/v1/reactions', {
+        body: { targetType: 'comment', targetId: commentId, emoji },
       });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Failed to react to comment');
-      }
-
-      const data = await response.json();
       setComments((prev) =>
         prev.map((comment) =>
           comment.id === commentId
@@ -405,7 +369,9 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
         )
       );
     } catch (error) {
-      setCommentError(error instanceof Error ? error.message : 'Failed to react to comment');
+      setCommentError(
+        error instanceof ApiError ? error.message : 'Failed to react to comment'
+      );
     } finally {
       setCommentReactionTarget(null);
     }
@@ -427,25 +393,11 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
         payload.note = trimmedNote;
       }
 
-      const response = await fetch(`/api/posts/${post.id}/cooked`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Failed to save cooked event');
-      }
-
-      const data: {
+      const data = await apiClient.post<{
         cookedStats: PostDetailData['cookedStats'];
         recentCooked?: PostDetailData['recentCooked'];
         recentCookedPage?: { hasMore: boolean; nextOffset: number };
-      } = await response.json();
+      }>(`/v1/posts/${post.id}/cooked`, { body: payload });
 
       setCookedStats(data.cookedStats);
       if (data.recentCooked) {
@@ -464,7 +416,11 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
       setCookedRating(null);
       setCookedNote('');
     } catch (error) {
-      setCookedError(error instanceof Error ? error.message : 'Failed to save cooked event');
+      setCookedError(
+        error instanceof ApiError
+          ? error.message
+          : 'Failed to save cooked event'
+      );
     } finally {
       setIsSubmittingCooked(false);
     }
@@ -474,20 +430,16 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
     try {
       setIsFavoriteLoading(true);
       setFavoriteError(null);
-      const method = isFavorited ? 'DELETE' : 'POST';
-      const response = await fetch(`/api/posts/${post.id}/favorite`, {
-        method,
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Unable to update favorite');
+      if (isFavorited) {
+        await apiClient.del(`/v1/posts/${post.id}/favorite`);
+      } else {
+        await apiClient.post(`/v1/posts/${post.id}/favorite`);
       }
-
       setIsFavorited((prev) => !prev);
     } catch (error) {
-      setFavoriteError(error instanceof Error ? error.message : 'Unable to update favorite');
+      setFavoriteError(
+        error instanceof ApiError ? error.message : 'Unable to update favorite'
+      );
     } finally {
       setIsFavoriteLoading(false);
     }
@@ -511,20 +463,13 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
     try {
       setIsDeletingPost(true);
       setDeleteError(null);
-      const response = await fetch(`/api/posts/${post.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Unable to delete post');
-      }
-
+      await apiClient.del(`/v1/posts/${post.id}`);
       router.replace('/timeline');
       router.refresh();
     } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : 'Unable to delete post');
+      setDeleteError(
+        error instanceof ApiError ? error.message : 'Unable to delete post'
+      );
     } finally {
       setIsDeletingPost(false);
     }
@@ -554,7 +499,10 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
               <div>
                 <p className="text-sm text-gray-900">
                   <span className="font-semibold">{post.author.name}</span>
-                  <span className="text-gray-500"> · {formatRelativeTime(createdDate)}</span>
+                  <span className="text-gray-500">
+                    {' '}
+                    · {formatRelativeTime(createdDate)}
+                  </span>
                 </p>
                 <p className="text-xs text-gray-500">
                   Posted on {formatDateTime(createdDate)}
@@ -605,7 +553,9 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
           </div>
         </div>
         {post.caption && (
-          <p className="text-lg text-gray-700 whitespace-pre-line">{post.caption}</p>
+          <p className="text-lg text-gray-700 whitespace-pre-line">
+            {post.caption}
+          </p>
         )}
       </header>
 
@@ -624,7 +574,10 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
           {post.photos.length > 1 && (
             <div className="grid grid-cols-3 gap-3">
               {post.photos.slice(1).map((photo) => (
-                <div key={photo.id} className="relative h-32 rounded-xl overflow-hidden">
+                <div
+                  key={photo.id}
+                  className="relative h-32 rounded-xl overflow-hidden"
+                >
                   <Image
                     src={photo.url}
                     alt={post.title}
@@ -646,8 +599,8 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
             {(post.recipe.courses.length > 0
               ? post.recipe.courses
               : post.recipe.primaryCourse
-              ? [post.recipe.primaryCourse]
-              : []
+                ? [post.recipe.primaryCourse]
+                : []
             ).map((course) => (
               <span
                 key={course}
@@ -695,21 +648,29 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">Ingredients</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">
+                Ingredients
+              </h2>
               <div className="bg-gray-50 rounded-2xl p-4 text-gray-800">
                 {post.recipe.ingredients.length > 0 ? (
                   <ul className="space-y-2 text-sm md:text-base">
                     {post.recipe.ingredients.map((ingredient, index) => (
-                      <li key={`${ingredient.name}-${index}`}>{formatIngredientLine(ingredient)}</li>
+                      <li key={`${ingredient.name}-${index}`}>
+                        {formatIngredientLine(ingredient)}
+                      </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-gray-500">No ingredients listed.</p>
+                  <p className="text-sm text-gray-500">
+                    No ingredients listed.
+                  </p>
                 )}
               </div>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">Steps</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">
+                Steps
+              </h2>
               <div className="bg-gray-50 rounded-2xl p-4 text-gray-800">
                 {post.recipe.steps.length > 0 ? (
                   <ol className="space-y-3 list-decimal list-inside text-sm md:text-base">
@@ -758,7 +719,10 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
               {post.editor && (
                 <>
                   {' '}
-                  by <span className="font-semibold text-gray-900">{post.editor.name}</span>
+                  by{' '}
+                  <span className="font-semibold text-gray-900">
+                    {post.editor.name}
+                  </span>
                 </>
               )}
             </p>
@@ -790,7 +754,9 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
             )}
           </div>
         </div>
-        {olderCookedError && <p className="text-sm text-red-600">{olderCookedError}</p>}
+        {olderCookedError && (
+          <p className="text-sm text-red-600">{olderCookedError}</p>
+        )}
         {recentCooked.length > 0 ? (
           <div className="space-y-3">
             {recentCooked.map((entry) => (
@@ -827,7 +793,9 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
                     )}
                   </div>
                   {entry.note && (
-                    <p className="mt-2 text-gray-800 whitespace-pre-line">{entry.note}</p>
+                    <p className="mt-2 text-gray-800 whitespace-pre-line">
+                      {entry.note}
+                    </p>
                   )}
                 </div>
               </div>
@@ -860,9 +828,14 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
         <div className="flex flex-col gap-2">
           {reactions.length > 0 ? (
             reactions.map((reaction) => {
-              const participantLabel = formatReactionParticipants(reaction.users);
+              const participantLabel = formatReactionParticipants(
+                reaction.users
+              );
               return (
-                <div key={reaction.emoji} className="flex flex-wrap items-center gap-3">
+                <div
+                  key={reaction.emoji}
+                  className="flex flex-wrap items-center gap-3"
+                >
                   <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-700">
                     <span>{reaction.emoji}</span>
                     <span>{reaction.count}</span>
@@ -956,7 +929,9 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
                         <button
                           key={emoji}
                           type="button"
-                          onClick={() => handleCommentReactionClick(comment.id, emoji)}
+                          onClick={() =>
+                            handleCommentReactionClick(comment.id, emoji)
+                          }
                           disabled={commentReactionTarget === comment.id}
                           className={`rounded-full border px-3 py-1 text-sm transition ${
                             commentReactionTarget === comment.id
@@ -971,9 +946,14 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
                     <div className="flex flex-col gap-1">
                       {comment.reactions.length > 0 ? (
                         comment.reactions.map((reaction) => {
-                          const participantLabel = formatReactionParticipants(reaction.users);
+                          const participantLabel = formatReactionParticipants(
+                            reaction.users
+                          );
                           return (
-                            <div key={reaction.emoji} className="flex flex-wrap items-center gap-2">
+                            <div
+                              key={reaction.emoji}
+                              className="flex flex-wrap items-center gap-2"
+                            >
                               <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
                                 <span>{reaction.emoji}</span>
                                 <span>{reaction.count}</span>
@@ -987,7 +967,9 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
                           );
                         })
                       ) : (
-                        <p className="text-xs text-gray-400">No reactions yet</p>
+                        <p className="text-xs text-gray-400">
+                          No reactions yet
+                        </p>
                       )}
                     </div>
                   </div>
@@ -998,9 +980,14 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
             <p className="text-sm text-gray-500">No comments yet</p>
           )}
         </div>
-        <form className="border-t border-gray-100 pt-4 space-y-4" onSubmit={handleCommentSubmit}>
+        <form
+          className="border-t border-gray-100 pt-4 space-y-4"
+          onSubmit={handleCommentSubmit}
+        >
           <div>
-            <label className="text-sm font-semibold text-gray-700">Add a comment</label>
+            <label className="text-sm font-semibold text-gray-700">
+              Add a comment
+            </label>
             <textarea
               className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
               placeholder="Share your thoughts"
@@ -1011,7 +998,12 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
           </div>
           <div className="flex items-center justify-between gap-3">
             <label className="flex items-center gap-2 text-sm font-semibold text-blue-600 cursor-pointer">
-              <input type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
               Add photo
             </label>
             {commentPhotoPreview && (
@@ -1062,7 +1054,9 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm text-gray-500">Cooked this!</p>
-                <h3 className="text-xl font-semibold text-gray-900">Tell the family how it went</h3>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Tell the family how it went
+                </h3>
               </div>
               <button
                 type="button"
@@ -1074,13 +1068,19 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
             </div>
             <form className="mt-6 space-y-6" onSubmit={handleCookedSubmit}>
               <div>
-                <p className="text-sm font-semibold text-gray-900 mb-3">Rating (optional)</p>
+                <p className="text-sm font-semibold text-gray-900 mb-3">
+                  Rating (optional)
+                </p>
                 <div className="flex gap-2">
                   {COOKED_RATINGS.map((rating) => (
                     <button
                       key={rating}
                       type="button"
-                      onClick={() => setCookedRating((prev) => (prev === rating ? null : rating))}
+                      onClick={() =>
+                        setCookedRating((prev) =>
+                          prev === rating ? null : rating
+                        )
+                      }
                       className={`flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
                         cookedRating === rating
                           ? 'border-gray-900 bg-gray-900 text-white'
@@ -1093,7 +1093,10 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
                 </div>
               </div>
               <div>
-                <label className="text-sm font-semibold text-gray-900" htmlFor="cooked-note">
+                <label
+                  className="text-sm font-semibold text-gray-900"
+                  htmlFor="cooked-note"
+                >
                   Notes (optional)
                 </label>
                 <textarea
@@ -1105,7 +1108,9 @@ export default function PostDetailView({ post, canEdit, currentUser }: PostDetai
                   onChange={(event) => setCookedNote(event.target.value)}
                 />
               </div>
-              {cookedError && <p className="text-sm text-red-600">{cookedError}</p>}
+              {cookedError && (
+                <p className="text-sm text-red-600">{cookedError}</p>
+              )}
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"

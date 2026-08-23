@@ -5,15 +5,17 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 
+from src.gcs_client import (
+    _fetch_metadata,
+    get_gcp_access_token,
+    _sign_string_with_iam,
+    _generate_signed_url_v4,
+    upload_to_gcs,
+)
 from src.uploads import (
     MAX_FILE_SIZE_BYTES,
     ALLOWED_MIME_TYPES,
     MAX_PHOTO_COUNT,
-    _fetch_metadata,
-    _get_gcp_access_token,
-    _sign_string_with_iam,
-    _generate_signed_url_v4,
-    _upload_to_gcs,
     create_signed_url_resolver,
     get_signed_upload_url,
     save_photo_file,
@@ -48,7 +50,7 @@ class TestConstants:
 
 class TestEncodeRfc3986:
     """Test RFC3986 encoding helper.
-    
+
     Note: The _encode_rfc3986 function uses httpx.QueryParams which may have
     compatibility issues across versions. These tests verify the function exists
     and mock its behavior where needed.
@@ -56,19 +58,19 @@ class TestEncodeRfc3986:
 
     def test_function_exists(self):
         """Verify the function is importable."""
-        from src.uploads import _encode_rfc3986
+        from src.gcs_client import _encode_rfc3986
         assert callable(_encode_rfc3986)
 
 
 class TestEncodePath:
     """Test path encoding for GCS URLs.
-    
+
     Note: Uses _encode_rfc3986 internally which may have httpx version issues.
     """
 
     def test_function_exists(self):
         """Verify the function is importable."""
-        from src.uploads import _encode_path
+        from src.gcs_client import _encode_path
         assert callable(_encode_path)
 
 
@@ -85,7 +87,7 @@ class TestFetchMetadata:
         mock_response.text = "test-email@project.iam.gserviceaccount.com"
         mock_response.raise_for_status = MagicMock()
 
-        with patch("src.uploads.httpx.AsyncClient") as mock_client:
+        with patch("src.gcs_client.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.get = AsyncMock(return_value=mock_response)
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
@@ -102,7 +104,7 @@ class TestFetchMetadata:
             "Not Found", request=MagicMock(), response=MagicMock()
         )
 
-        with patch("src.uploads.httpx.AsyncClient") as mock_client:
+        with patch("src.gcs_client.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.get = AsyncMock(return_value=mock_response)
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
@@ -122,14 +124,14 @@ class TestGetGcpAccessToken:
         mock_response.json.return_value = {"access_token": "ya29.test-token"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("src.uploads.httpx.AsyncClient") as mock_client:
+        with patch("src.gcs_client.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.get = AsyncMock(return_value=mock_response)
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock(return_value=None)
             mock_client.return_value = mock_instance
 
-            result = await _get_gcp_access_token()
+            result = await get_gcp_access_token()
             assert result == "ya29.test-token"
 
     @pytest.mark.asyncio
@@ -138,7 +140,7 @@ class TestGetGcpAccessToken:
         mock_response.json.return_value = {}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("src.uploads.httpx.AsyncClient") as mock_client:
+        with patch("src.gcs_client.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.get = AsyncMock(return_value=mock_response)
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
@@ -146,7 +148,7 @@ class TestGetGcpAccessToken:
             mock_client.return_value = mock_instance
 
             with pytest.raises(RuntimeError, match="METADATA_TOKEN_MISSING"):
-                await _get_gcp_access_token()
+                await get_gcp_access_token()
 
 
 class TestSignStringWithIam:
@@ -158,14 +160,14 @@ class TestSignStringWithIam:
         mock_response.json.return_value = {"signedBlob": "c2lnbmVkLWRhdGE="}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("src.uploads.httpx.AsyncClient") as mock_client:
+        with patch("src.gcs_client.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.post = AsyncMock(return_value=mock_response)
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock(return_value=None)
             mock_client.return_value = mock_instance
 
-            with patch("src.uploads._encode_rfc3986", side_effect=lambda x: x):
+            with patch("src.gcs_client._encode_rfc3986", side_effect=lambda x: x):
                 result = await _sign_string_with_iam(
                     "string-to-sign",
                     "access-token",
@@ -179,14 +181,14 @@ class TestSignStringWithIam:
         mock_response.json.return_value = {}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("src.uploads.httpx.AsyncClient") as mock_client:
+        with patch("src.gcs_client.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.post = AsyncMock(return_value=mock_response)
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock(return_value=None)
             mock_client.return_value = mock_instance
 
-            with patch("src.uploads._encode_rfc3986", side_effect=lambda x: x):
+            with patch("src.gcs_client._encode_rfc3986", side_effect=lambda x: x):
                 with pytest.raises(RuntimeError, match="SIGN_BLOB_MISSING"):
                     await _sign_string_with_iam(
                         "string-to-sign",
@@ -207,15 +209,15 @@ class TestUploadToGcs:
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
 
-        with patch("src.uploads.httpx.AsyncClient") as mock_client:
+        with patch("src.gcs_client.httpx.AsyncClient") as mock_client:
             mock_instance = AsyncMock()
             mock_instance.post = AsyncMock(return_value=mock_response)
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock(return_value=None)
             mock_client.return_value = mock_instance
 
-            with patch("src.uploads._encode_rfc3986", side_effect=lambda x: x):
-                await _upload_to_gcs(
+            with patch("src.gcs_client._encode_rfc3986", side_effect=lambda x: x):
+                await upload_to_gcs(
                     bucket="test-bucket",
                     object_key="uploads/test.jpg",
                     buffer=b"fake image data",
@@ -237,12 +239,12 @@ class TestGenerateSignedUrlV4:
 
     @pytest.mark.asyncio
     async def test_generates_signed_url_with_iam(self):
-        with patch("src.uploads._sign_string_with_iam") as mock_sign:
+        with patch("src.gcs_client._sign_string_with_iam") as mock_sign:
             # Return base64 encoded signature
             mock_sign.return_value = "c2lnbmVkLWRhdGE="
 
-            with patch("src.uploads._encode_rfc3986", side_effect=lambda x: x.replace(" ", "%20")):
-                with patch("src.uploads._encode_path", side_effect=lambda x: x):
+            with patch("src.gcs_client._encode_rfc3986", side_effect=lambda x: x.replace(" ", "%20")):
+                with patch("src.gcs_client._encode_path", side_effect=lambda x: x):
                     result = await _generate_signed_url_v4(
                         bucket="test-bucket",
                         object_key="uploads/photo.jpg",
@@ -259,11 +261,11 @@ class TestGenerateSignedUrlV4:
 
     @pytest.mark.asyncio
     async def test_includes_expiry_parameter(self):
-        with patch("src.uploads._sign_string_with_iam") as mock_sign:
+        with patch("src.gcs_client._sign_string_with_iam") as mock_sign:
             mock_sign.return_value = "c2lnbmVkLWRhdGE="
 
-            with patch("src.uploads._encode_rfc3986", side_effect=lambda x: x.replace(" ", "%20")):
-                with patch("src.uploads._encode_path", side_effect=lambda x: x):
+            with patch("src.gcs_client._encode_rfc3986", side_effect=lambda x: x.replace(" ", "%20")):
+                with patch("src.gcs_client._encode_path", side_effect=lambda x: x):
                     result = await _generate_signed_url_v4(
                         bucket="test-bucket",
                         object_key="photo.jpg",
@@ -442,9 +444,9 @@ class TestSavePhotoFile:
             mock_settings.uploads_bucket = "test-bucket"
             mock_settings.uploads_signed_url_ttl_seconds = 3600
 
-            with patch("src.uploads._get_gcp_access_token", return_value="token"):
+            with patch("src.uploads.get_gcp_access_token", return_value="token"):
                 with patch("src.uploads._fetch_metadata", return_value="sa@gcp.com"):
-                    with patch("src.uploads._upload_to_gcs") as mock_upload:
+                    with patch("src.uploads.upload_to_gcs") as mock_upload:
                         with patch("src.uploads._generate_signed_url_v4", return_value="https://signed.url"):
                             result = await save_photo_file(mock_file)
 
@@ -459,7 +461,7 @@ class TestSavePhotoFile:
         with patch("src.uploads.settings") as mock_settings:
             mock_settings.uploads_bucket = "test-bucket"
 
-            with patch("src.uploads._get_gcp_access_token", side_effect=Exception("GCP Error")):
+            with patch("src.uploads.get_gcp_access_token", side_effect=Exception("GCP Error")):
                 with patch.object(Path, "mkdir"):
                     with patch.object(Path, "write_bytes"):
                         result = await save_photo_file(mock_file)
@@ -532,7 +534,8 @@ class TestDeleteUploads:
         with patch("src.uploads.settings") as mock_settings:
             mock_settings.uploads_bucket = "test-bucket"
 
-            with patch("src.uploads._get_gcp_access_token", return_value="token"):
+            with patch("src.uploads.get_gcp_access_token", return_value="token"):
+                # Patch where each name is used (uploads.py), not where it's defined.
                 with patch("src.uploads._encode_rfc3986", side_effect=lambda x: x):
                     with patch("src.uploads.httpx.AsyncClient") as mock_client:
                         mock_instance = AsyncMock()
@@ -553,7 +556,7 @@ class TestDeleteUploads:
         with patch("src.uploads.settings") as mock_settings:
             mock_settings.uploads_bucket = "test-bucket"
 
-            with patch("src.uploads._get_gcp_access_token", side_effect=Exception("GCP Error")):
+            with patch("src.uploads.get_gcp_access_token", side_effect=Exception("GCP Error")):
                 with patch.object(Path, "unlink") as mock_unlink:
                     await delete_uploads(["/uploads/test.jpg"])
 
@@ -669,7 +672,7 @@ class TestGetSignedUploadUrl:
             mock_settings.uploads_bucket = "test-bucket"
             mock_settings.uploads_signed_url_ttl_seconds = 3600
 
-            with patch("src.uploads._get_gcp_access_token", return_value="token"):
+            with patch("src.uploads.get_gcp_access_token", return_value="token"):
                 with patch("src.uploads._fetch_metadata", return_value="sa@gcp.com"):
                     with patch(
                         "src.uploads._generate_signed_url_v4",

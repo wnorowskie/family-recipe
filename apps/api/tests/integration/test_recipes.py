@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock
 import pytest
 from prisma.errors import PrismaError
 
+from tests.helpers.error_envelope import assert_error_envelope
+
 
 pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership")
 
@@ -38,7 +40,7 @@ def _make_post(**overrides) -> SimpleNamespace:
     data = {
         "id": "recipe-1",
         "title": "Tomato Soup",
-        "mainPhotoUrl": "https://cdn.test/recipe.jpg",
+        "mainPhotoStorageKey": "https://cdn.test/recipe.jpg",
         "author": _make_author(),
         "recipeDetails": _make_recipe_details(),
         "tags": [],
@@ -60,7 +62,7 @@ def test_browse_recipes_success(client, mock_prisma, member_auth):
     post = _make_post(tags=[_make_tag("spicy")])
     _setup_posts(mock_prisma, [post])
 
-    response = client.get("/recipes", headers=member_auth)
+    response = client.get("/v1/recipes", headers=member_auth)
 
     assert response.status_code == 200, response.json()
     body = response.json()
@@ -72,7 +74,7 @@ def test_browse_recipes_pagination(client, mock_prisma, member_auth):
     posts = [_make_post(id="recipe-1"), _make_post(id="recipe-2")]
     _setup_posts(mock_prisma, posts)
 
-    response = client.get("/recipes?limit=1&offset=2", headers=member_auth)
+    response = client.get("/v1/recipes?limit=1&offset=2", headers=member_auth)
 
     assert response.status_code == 200
     data = response.json()
@@ -84,7 +86,7 @@ def test_browse_recipes_pagination(client, mock_prisma, member_auth):
 def test_browse_recipes_only_has_recipe_details(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes", headers=member_auth)
+    response = client.get("/v1/recipes", headers=member_auth)
 
     assert response.status_code == 200
     where = mock_prisma.post.find_many.await_args.kwargs["where"]
@@ -97,7 +99,7 @@ def test_browse_recipes_includes_cooked_stats(client, mock_prisma, member_auth):
     cooked = [SimpleNamespace(postId="recipe-10", rating=5), SimpleNamespace(postId="recipe-10", rating=3), SimpleNamespace(postId="recipe-10", rating=None)]
     _setup_posts(mock_prisma, [post], cooked_events=cooked)
 
-    response = client.get("/recipes", headers=member_auth)
+    response = client.get("/v1/recipes", headers=member_auth)
 
     assert response.status_code == 200
     stats = response.json()["items"][0]["cookedStats"]
@@ -109,7 +111,7 @@ def test_browse_recipes_includes_courses(client, mock_prisma, member_auth):
     post = _make_post(recipeDetails=details)
     _setup_posts(mock_prisma, [post])
 
-    response = client.get("/recipes", headers=member_auth)
+    response = client.get("/v1/recipes", headers=member_auth)
 
     assert response.status_code == 200
     item = response.json()["items"][0]
@@ -122,14 +124,14 @@ def test_browse_recipes_includes_tags(client, mock_prisma, member_auth):
     post = _make_post(tags=tags)
     _setup_posts(mock_prisma, [post])
 
-    response = client.get("/recipes", headers=member_auth)
+    response = client.get("/v1/recipes", headers=member_auth)
 
     assert response.status_code == 200
     assert response.json()["items"][0]["tags"] == ["spicy", "quick"]
 
 
 def test_browse_recipes_requires_auth(client):
-    response = client.get("/recipes")
+    response = client.get("/v1/recipes")
 
     assert response.status_code == 401
 
@@ -137,7 +139,7 @@ def test_browse_recipes_requires_auth(client):
 def test_browse_recipes_prisma_error(client, mock_prisma, member_auth):
     mock_prisma.post.find_many = AsyncMock(side_effect=PrismaError("err", "msg"))
 
-    response = client.get("/recipes", headers=member_auth)
+    response = client.get("/v1/recipes", headers=member_auth)
 
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "INTERNAL_ERROR"
@@ -146,7 +148,7 @@ def test_browse_recipes_prisma_error(client, mock_prisma, member_auth):
 def test_browse_recipes_search_by_title(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?q=Soup", headers=member_auth)
+    response = client.get("/v1/recipes?q=Soup", headers=member_auth)
 
     assert response.status_code == 200
     where = mock_prisma.post.find_many.await_args.kwargs["where"]
@@ -156,7 +158,7 @@ def test_browse_recipes_search_by_title(client, mock_prisma, member_auth):
 def test_browse_recipes_search_case_insensitive(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?q=%20SpIcE%20%20", headers=member_auth)
+    response = client.get("/v1/recipes?q=%20SpIcE%20%20", headers=member_auth)
 
     assert response.status_code == 200
     where = mock_prisma.post.find_many.await_args.kwargs["where"]
@@ -167,7 +169,7 @@ def test_browse_recipes_search_case_insensitive(client, mock_prisma, member_auth
 def test_browse_recipes_filter_single_course(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?course=breakfast", headers=member_auth)
+    response = client.get("/v1/recipes?course=breakfast", headers=member_auth)
 
     assert response.status_code == 200
     course_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -177,7 +179,7 @@ def test_browse_recipes_filter_single_course(client, mock_prisma, member_auth):
 def test_browse_recipes_filter_multiple_courses(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?course=breakfast&course=dinner", headers=member_auth)
+    response = client.get("/v1/recipes?course=breakfast&course=dinner", headers=member_auth)
 
     assert response.status_code == 200
     course_clause = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -187,7 +189,7 @@ def test_browse_recipes_filter_multiple_courses(client, mock_prisma, member_auth
 def test_browse_recipes_invalid_course_ignored(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?course=invalid", headers=member_auth)
+    response = client.get("/v1/recipes?course=invalid", headers=member_auth)
 
     assert response.status_code == 200
     where = mock_prisma.post.find_many.await_args.kwargs["where"]
@@ -197,7 +199,7 @@ def test_browse_recipes_invalid_course_ignored(client, mock_prisma, member_auth)
 def test_browse_recipes_filter_single_tag(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?tags=spicy", headers=member_auth)
+    response = client.get("/v1/recipes?tags=spicy", headers=member_auth)
 
     assert response.status_code == 200
     tag_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -207,7 +209,7 @@ def test_browse_recipes_filter_single_tag(client, mock_prisma, member_auth):
 def test_browse_recipes_filter_multiple_tags(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?tags=spicy&tags=quick", headers=member_auth)
+    response = client.get("/v1/recipes?tags=spicy&tags=quick", headers=member_auth)
 
     assert response.status_code == 200
     filters = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"]
@@ -220,7 +222,7 @@ def test_browse_recipes_filter_multiple_tags(client, mock_prisma, member_auth):
 def test_browse_recipes_filter_tags_deduplicate_values(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?tags=spicy&tags=spicy", headers=member_auth)
+    response = client.get("/v1/recipes?tags=spicy&tags=spicy", headers=member_auth)
 
     assert response.status_code == 200
     filters = mock_prisma.post.find_many.await_args.kwargs["where"].get("AND", [])
@@ -230,7 +232,7 @@ def test_browse_recipes_filter_tags_deduplicate_values(client, mock_prisma, memb
 def test_browse_recipes_filter_tags_ignores_empty_values(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?tags=&tags=quick", headers=member_auth)
+    response = client.get("/v1/recipes?tags=&tags=quick", headers=member_auth)
 
     assert response.status_code == 200
     filters = mock_prisma.post.find_many.await_args.kwargs["where"].get("AND", [])
@@ -240,7 +242,7 @@ def test_browse_recipes_filter_tags_ignores_empty_values(client, mock_prisma, me
 def test_browse_recipes_filter_difficulty(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?difficulty=hard", headers=member_auth)
+    response = client.get("/v1/recipes?difficulty=hard", headers=member_auth)
 
     assert response.status_code == 200
     difficulty_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -250,7 +252,7 @@ def test_browse_recipes_filter_difficulty(client, mock_prisma, member_auth):
 def test_browse_recipes_filter_multiple_difficulties(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?difficulty=easy&difficulty=medium", headers=member_auth)
+    response = client.get("/v1/recipes?difficulty=easy&difficulty=medium", headers=member_auth)
 
     assert response.status_code == 200
     difficulty_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -260,7 +262,7 @@ def test_browse_recipes_filter_multiple_difficulties(client, mock_prisma, member
 def test_browse_recipes_filter_author(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?authorId=author-1", headers=member_auth)
+    response = client.get("/v1/recipes?authorId=author-1", headers=member_auth)
 
     assert response.status_code == 200
     author_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -270,7 +272,7 @@ def test_browse_recipes_filter_author(client, mock_prisma, member_auth):
 def test_browse_recipes_filter_multiple_authors(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?authorId=author-1&authorId=author-2", headers=member_auth)
+    response = client.get("/v1/recipes?authorId=author-1&authorId=author-2", headers=member_auth)
 
     assert response.status_code == 200
     author_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -280,7 +282,7 @@ def test_browse_recipes_filter_multiple_authors(client, mock_prisma, member_auth
 def test_browse_recipes_filter_time_range(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?totalTimeMin=10&totalTimeMax=50", headers=member_auth)
+    response = client.get("/v1/recipes?totalTimeMin=10&totalTimeMax=50", headers=member_auth)
 
     assert response.status_code == 200
     time_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -290,7 +292,7 @@ def test_browse_recipes_filter_time_range(client, mock_prisma, member_auth):
 def test_browse_recipes_filter_time_min_only(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?totalTimeMin=15", headers=member_auth)
+    response = client.get("/v1/recipes?totalTimeMin=15", headers=member_auth)
 
     assert response.status_code == 200
     time_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -300,7 +302,7 @@ def test_browse_recipes_filter_time_min_only(client, mock_prisma, member_auth):
 def test_browse_recipes_filter_time_max_only(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?totalTimeMax=90", headers=member_auth)
+    response = client.get("/v1/recipes?totalTimeMax=90", headers=member_auth)
 
     assert response.status_code == 200
     time_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -310,7 +312,7 @@ def test_browse_recipes_filter_time_max_only(client, mock_prisma, member_auth):
 def test_browse_recipes_filter_servings_range(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?servingsMin=2&servingsMax=6", headers=member_auth)
+    response = client.get("/v1/recipes?servingsMin=2&servingsMax=6", headers=member_auth)
 
     assert response.status_code == 200
     servings_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -320,7 +322,7 @@ def test_browse_recipes_filter_servings_range(client, mock_prisma, member_auth):
 def test_browse_recipes_filter_servings_min_only(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?servingsMin=3", headers=member_auth)
+    response = client.get("/v1/recipes?servingsMin=3", headers=member_auth)
 
     assert response.status_code == 200
     servings_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -330,7 +332,7 @@ def test_browse_recipes_filter_servings_min_only(client, mock_prisma, member_aut
 def test_browse_recipes_filter_servings_max_only(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?servingsMax=8", headers=member_auth)
+    response = client.get("/v1/recipes?servingsMax=8", headers=member_auth)
 
     assert response.status_code == 200
     servings_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -340,7 +342,7 @@ def test_browse_recipes_filter_servings_max_only(client, mock_prisma, member_aut
 def test_browse_recipes_filter_ingredient(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?ingredients=garlic", headers=member_auth)
+    response = client.get("/v1/recipes?ingredients=garlic", headers=member_auth)
 
     assert response.status_code == 200
     ingredient_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -350,7 +352,7 @@ def test_browse_recipes_filter_ingredient(client, mock_prisma, member_auth):
 def test_browse_recipes_filter_multiple_ingredients(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?ingredients=garlic&ingredients=onion", headers=member_auth)
+    response = client.get("/v1/recipes?ingredients=garlic&ingredients=onion", headers=member_auth)
 
     assert response.status_code == 200
     filters = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"]
@@ -364,7 +366,7 @@ def test_browse_recipes_max_5_ingredients(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
     query = "&".join(f"ingredients=ing{i}" for i in range(6))
 
-    response = client.get(f"/recipes?{query}", headers=member_auth)
+    response = client.get(f"/v1/recipes?{query}", headers=member_auth)
 
     assert response.status_code == 200
     filters = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"]
@@ -374,7 +376,7 @@ def test_browse_recipes_max_5_ingredients(client, mock_prisma, member_auth):
 def test_browse_recipes_sort_recent(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?sort=recent", headers=member_auth)
+    response = client.get("/v1/recipes?sort=recent", headers=member_auth)
 
     assert response.status_code == 200
     order = mock_prisma.post.find_many.await_args.kwargs["order"]
@@ -384,7 +386,7 @@ def test_browse_recipes_sort_recent(client, mock_prisma, member_auth):
 def test_browse_recipes_sort_alpha(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?sort=alpha", headers=member_auth)
+    response = client.get("/v1/recipes?sort=alpha", headers=member_auth)
 
     assert response.status_code == 200
     order = mock_prisma.post.find_many.await_args.kwargs["order"]
@@ -412,7 +414,7 @@ def test_browse_recipes_sort_rating_orders_unrated_last(client, mock_prisma, mem
     ]
     _setup_posts(mock_prisma, posts, cooked_events=cooked)
 
-    response = client.get("/recipes?sort=rating", headers=member_auth)
+    response = client.get("/v1/recipes?sort=rating", headers=member_auth)
 
     assert response.status_code == 200
     ids = [item["id"] for item in response.json()["items"]]
@@ -437,8 +439,8 @@ def test_browse_recipes_sort_rating_pagination(client, mock_prisma, member_auth)
     ]
     _setup_posts(mock_prisma, posts, cooked_events=cooked)
 
-    page1 = client.get("/recipes?sort=rating&limit=2&offset=0", headers=member_auth)
-    page2 = client.get("/recipes?sort=rating&limit=2&offset=2", headers=member_auth)
+    page1 = client.get("/v1/recipes?sort=rating&limit=2&offset=0", headers=member_auth)
+    page2 = client.get("/v1/recipes?sort=rating&limit=2&offset=2", headers=member_auth)
 
     assert page1.status_code == 200
     assert page2.status_code == 200
@@ -451,9 +453,9 @@ def test_browse_recipes_sort_rating_pagination(client, mock_prisma, member_auth)
 def test_browse_recipes_sort_rating_rejects_invalid_pattern(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?sort=popularity", headers=member_auth)
+    response = client.get("/v1/recipes?sort=popularity", headers=member_auth)
 
-    assert response.status_code == 422
+    assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
 
 
 def test_browse_recipes_sort_rating_caps_candidate_fetch(client, mock_prisma, member_auth):
@@ -461,7 +463,7 @@ def test_browse_recipes_sort_rating_caps_candidate_fetch(client, mock_prisma, me
     # services in lockstep so pagination stays identical past the cap.
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?sort=rating", headers=member_auth)
+    response = client.get("/v1/recipes?sort=rating", headers=member_auth)
 
     assert response.status_code == 200
     assert mock_prisma.post.find_many.await_args.kwargs["take"] == 500
@@ -474,7 +476,7 @@ def test_browse_recipes_multiple_filters(client, mock_prisma, member_auth):
         "totalTimeMin=10&servingsMin=2&ingredients=garlic"
     )
 
-    response = client.get(f"/recipes?{params}", headers=member_auth)
+    response = client.get(f"/v1/recipes?{params}", headers=member_auth)
 
     assert response.status_code == 200
     and_filters = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"]
@@ -490,7 +492,7 @@ def test_browse_recipes_multiple_filters(client, mock_prisma, member_auth):
 def test_browse_recipes_limit_parameter_uses_take_plus_one(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?limit=5", headers=member_auth)
+    response = client.get("/v1/recipes?limit=5", headers=member_auth)
 
     assert response.status_code == 200
     assert mock_prisma.post.find_many.await_args.kwargs["take"] == 6
@@ -499,7 +501,7 @@ def test_browse_recipes_limit_parameter_uses_take_plus_one(client, mock_prisma, 
 def test_browse_recipes_offset_parameter_passed_to_skip(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?offset=10", headers=member_auth)
+    response = client.get("/v1/recipes?offset=10", headers=member_auth)
 
     assert response.status_code == 200
     assert mock_prisma.post.find_many.await_args.kwargs["skip"] == 10
@@ -508,7 +510,7 @@ def test_browse_recipes_offset_parameter_passed_to_skip(client, mock_prisma, mem
 def test_browse_recipes_author_filter_dedupes_ids(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?authorId=author-1&authorId=author-1", headers=member_auth)
+    response = client.get("/v1/recipes?authorId=author-1&authorId=author-1", headers=member_auth)
 
     assert response.status_code == 200
     author_filter = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"][0]
@@ -518,7 +520,7 @@ def test_browse_recipes_author_filter_dedupes_ids(client, mock_prisma, member_au
 def test_browse_recipes_ingredients_deduplicate_values(client, mock_prisma, member_auth):
     _setup_posts(mock_prisma, [])
 
-    response = client.get("/recipes?ingredients=garlic&ingredients=garlic", headers=member_auth)
+    response = client.get("/v1/recipes?ingredients=garlic&ingredients=garlic", headers=member_auth)
 
     assert response.status_code == 200
     filters = mock_prisma.post.find_many.await_args.kwargs["where"]["AND"]
@@ -530,7 +532,7 @@ def test_browse_recipes_primary_course_fallback(client, mock_prisma, member_auth
     post = _make_post(recipeDetails=details)
     _setup_posts(mock_prisma, [post])
 
-    response = client.get("/recipes", headers=member_auth)
+    response = client.get("/v1/recipes", headers=member_auth)
 
     assert response.status_code == 200
     item = response.json()["items"][0]

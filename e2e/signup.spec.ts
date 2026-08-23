@@ -13,6 +13,11 @@ const MASTER_KEY = process.env.FAMILY_MASTER_KEY;
  *
  * Unlike the other smoke flows this one does NOT use storageState — it
  * deliberately boots from a fresh, unauthenticated context.
+ *
+ * Post-cutover (#241) the signup form posts same-origin to /v1/auth/signup
+ * through the Next forwarder — no NEXT_PUBLIC_API_BASE_URL prerequisite. Still
+ * gated on FAMILY_MASTER_KEY (the CI value lives in ci.yml); the stale
+ * NEXT_PUBLIC_API_BASE_URL skip guard was removed in #273.
  */
 test(
   'signup via master key unlocks /timeline',
@@ -23,9 +28,13 @@ test(
       'FAMILY_MASTER_KEY must be set for the signup flow (see ci.yml for the CI value)'
     );
 
-    const stamp = `${Date.now()}_${randomBytes(3).toString('hex')}`;
+    // username must be ≤ 30 chars (FastAPI SignupRequest.username max_length=30).
+    // "e2e_signup_" (11) + 7 timestamp digits + 6 hex = 24 chars.
+    const stamp = `${Date.now().toString().slice(-7)}${randomBytes(3).toString('hex')}`;
     const username = `e2e_signup_${stamp}`;
-    const email = `e2e-signup-${stamp}@example.local`;
+    // @example.com, not @example.local — FastAPI's EmailStr (email-validator)
+    // rejects special-use domains like .local that Zod's .email() accepted.
+    const email = `e2e-signup-${stamp}@example.com`;
     const password = 'e2e-signup-password';
 
     await page.goto('/signup');
@@ -45,8 +54,8 @@ test(
     await expect(page).toHaveURL(/\/timeline$/);
 
     const cookies = await context.cookies();
-    const session = cookies.find((c) => c.name === 'session');
-    // JWTs signed with jose always start with the base64-encoded header `eyJ`.
-    expect(session?.value).toMatch(/^eyJ/);
+    const refreshToken = cookies.find((c) => c.name === 'refresh_token');
+    // FastAPI mints a refresh token in the format "{jti}.{secret}".
+    expect(refreshToken?.value).toMatch(/^[^.]+\.[^.]+$/);
   }
 );

@@ -1,5 +1,10 @@
 # V1 Summary
 
+> Product overview plus the current architecture after the Phase 4 FastAPI
+> cutover (#38, #244). See [V1_DETAILED_SUMMARY.md](V1_DETAILED_SUMMARY.md) for
+> the full narrative and the root [CLAUDE.md](../CLAUDE.md) for authoritative
+> architecture.
+
 ## Product Overview
 
 - Private, single-family app to share cooking, preserve recipes, and keep everything inside one Family Space protected by a Family Master Key.
@@ -8,10 +13,10 @@
 
 ## Architecture & Tech Stack
 
-- Next.js App Router with React + TypeScript, mobile-first UI styled with Tailwind utility classes and shared bottom navigation; mix of server components for data loading and client components for interactivity.
-- Backend is a REST-ish JSON API implemented with Next.js route handlers under `src/app/api`, consumed via `fetch` from client components. Eventually the goal is to move this to its own application.
-- Prisma ORM with Postgres (locally and in production) models the domain; routes use typed Zod validation.
-- Auth: credentials (email/username + password) plus Family Master Key on signup; passwords and master key stored as hashes; JWT issued to an HTTP-only `session` cookie; roles cover owner/admin/member; `(app)` layout redirects unauthenticated users.
+- Next.js App Router with React + TypeScript, mobile-first UI styled with Tailwind utility classes and shared bottom navigation; a mix of server components for data loading and client components for interactivity.
+- The JSON API backend is the **FastAPI** service under `apps/api/` (routers under `apps/api/src/routers/v1/`, served at `/v1`), called from client components via `src/lib/apiClient.ts` with an in-memory Bearer token. Next.js server components additionally read initial page data straight from Postgres via Prisma. The former Next `src/app/api/**` data routes were removed in the Phase 4 cutover — only the `auth/*` proxies, `auth/bootstrap`, and `health` remain.
+- Prisma ORM with Postgres models the domain via two field-identical schemas — a JS client for the Next runtime, a Python client for FastAPI; inputs are validated with Zod (Next) / Pydantic (FastAPI).
+- Auth: credentials (email/username + password) plus Family Master Key on signup; passwords and master key stored as hashes. FastAPI owns auth — it signs the tokens and sets an HTTP-only rotating `refresh_token` cookie plus a `csrf_token` cookie, while the client holds a short-lived in-memory access token minted per page load via `/api/auth/bootstrap`. Roles cover owner/admin/member; the `(app)` layout redirects unauthenticated users.
 
 ## Core Domain Model
 
@@ -23,11 +28,11 @@
 
 ## Implementation Highlights
 
-- Signup/login routes validate the master key, hash credentials, assign owner to the first member, and set JWT cookies; app layout uses `getCurrentUser` from the cookie to guard pages.
-- Post create/update (`/api/posts`, `/api/posts/[id]`) handle multipart payloads, photo uploads/order, optional recipe block (ingredients/steps/time/servings/course/difficulty/tags), and change notes to stamp editor + `lastEditAt`.
-- Post detail endpoint enriches responses with reactions, tags, cooked aggregates + recent entries, favorites flag, comments (with reaction summary), and edit metadata; delete/edit limited to author or owner/admin.
-- Timeline endpoint builds the feed on the fly from posts, comments, post reactions, cooked events, and edit events (with change notes) instead of a dedicated event table.
-- Recipes browse endpoint filters by title, author, course(s), tags, difficulty, time, servings, and up to five ingredient keywords; favorites and cooked history endpoints power profile tabs; reactions toggle on/off; “Cooked this” writes `CookedEvent` and returns refreshed stats.
+- Signup/login are thin Next proxies (`src/app/api/auth/{signup,login}/route.ts`) to FastAPI `/v1/auth/*`, which validate the master key, hash credentials, assign owner to the first member, and set the `refresh_token`/`csrf_token` cookies; SSR pages guard access via `resolvePageUser` → FastAPI `/v1/auth/session`.
+- Post create/update (`POST`/`PUT /v1/posts`, `apps/api/src/routers/v1/posts.py`) handle multipart payloads, photo uploads/order, an optional recipe block (ingredients/steps/time/servings/course/difficulty/tags), and change notes that stamp editor + `lastEditAt`.
+- The post detail endpoint enriches responses with reactions, tags, cooked aggregates + recent entries, favorites flag, comments (with reaction summary), and edit metadata; delete/edit are limited to author or owner/admin. The detail page server-renders via `getPostDetail` (`src/lib/posts.ts`).
+- The timeline builds the feed on the fly from posts, comments, post reactions, cooked events, and edit events (with change notes) — SSR via `getTimelineFeed` (`src/lib/timeline-data.ts`), pagination via `/v1/timeline` — instead of a dedicated event table.
+- The recipes endpoint filters by title, author, course(s), tags, difficulty, time, servings, and up to five ingredient keywords; favorites and cooked-history endpoints power the profile tabs; reactions toggle on/off; “Cooked this” writes `CookedEvent` and returns refreshed stats.
 
 ## Out-of-Scope / Future
 

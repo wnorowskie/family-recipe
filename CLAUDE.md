@@ -16,7 +16,7 @@ Before doing any work, a new Claude session should:
 
 Private family-only web app for sharing recipes and cooking activity. Single `FamilySpace` model with members joining via a hashed master key. Currently in **testing with real family users**, so prefer minimal, non-breaking changes and protect existing data flows.
 
-The product/domain truth lives in [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md), [docs/USER_STORIES.md](docs/USER_STORIES.md), and [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md). The most up-to-date narrative is [docs/V1_DETAILED_SUMMARY.md](docs/V1_DETAILED_SUMMARY.md).
+The product/domain truth lives in [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md), [docs/USER_STORIES.md](docs/USER_STORIES.md), and [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md). The fullest **product/feature** narrative is [docs/V1_DETAILED_SUMMARY.md](docs/V1_DETAILED_SUMMARY.md); its architecture sections were refreshed for the Phase 4 FastAPI cutover (#244). For the authoritative backend architecture, trust this file and [docs/API_BACKEND_MIGRATION_PLAN.md](docs/API_BACKEND_MIGRATION_PLAN.md).
 
 ## Commands
 
@@ -51,13 +51,13 @@ Spin up local Postgres with the one-liner in [docs/verification/next-api.md](doc
 
 **Three concurrent runtimes share one database.** Code lives in three places that must stay schema-consistent:
 
-1. **Next.js monolith** ([src/](src/)) — App Router UI + REST-ish API under [src/app/api/](src/app/api/). Today this is the production backend.
-2. **FastAPI service** ([apps/api/](apps/api/)) — Python re-implementation of the same auth/session/JSON contract. Mid-migration target per [docs/API_BACKEND_MIGRATION_PLAN.md](docs/API_BACKEND_MIGRATION_PLAN.md). When changing an endpoint in `src/app/api/`, check whether the equivalent router in `apps/api/src/routers/` needs the same change.
-3. **Recipe URL Importer** ([apps/recipe-url-importer/](apps/recipe-url-importer/)) — standalone Python service called by the Next backend (see [apps/recipe-url-importer/SPEC.md](apps/recipe-url-importer/SPEC.md)). Does not touch the database.
+1. **Next.js frontend** ([src/](src/)) — App Router UI. The only routes left under [src/app/api/](src/app/api/) are the auth proxies (`login`/`logout`/`signup`/`bootstrap`) that forward to FastAPI and a `health` check; all data routes were removed in the Phase 4 cutover (#231).
+2. **FastAPI service** ([apps/api/](apps/api/)) — the sole backend for the auth/session/JSON contract, per [docs/API_BACKEND_MIGRATION_PLAN.md](docs/API_BACKEND_MIGRATION_PLAN.md). Handlers live under [apps/api/src/routers/v1/](apps/api/src/routers/v1/) — this is where API behavior changes go.
+3. **Recipe URL Importer** ([apps/recipe-url-importer/](apps/recipe-url-importer/)) — standalone Python service called by FastAPI ([apps/api/src/recipe_importer.py](apps/api/src/recipe_importer.py), from the recipes router; see [apps/recipe-url-importer/SPEC.md](apps/recipe-url-importer/SPEC.md)). Does not touch the database.
 
 **Three Prisma schemas** describe the same domain for different deploy targets — [prisma/CLAUDE.md](prisma/CLAUDE.md) explains when to edit which.
 
-**Auth flow.** Credentials login → bcrypt verify → JWT signed with `jose` ([src/lib/jwt.ts](src/lib/jwt.ts)) → HTTP-only `session` cookie. [src/proxy.ts](src/proxy.ts) gates the `(app)` route group; API routes use `withAuth`/`withRole` wrappers from [src/lib/apiAuth.ts](src/lib/apiAuth.ts). See [src/app/api/CLAUDE.md](src/app/api/CLAUDE.md) for the handler pattern.
+**Auth flow (FastAPI-only since Phase 4.4).** Login/signup/logout POST to same-origin Next proxy routes under [src/app/api/auth/](src/app/api/auth/) that forward to FastAPI `/v1/auth/*`; FastAPI sets HTTP-only `refresh_token` + `csrf_token` cookies (no Next-signed `session` JWT anymore). [src/proxy.ts](src/proxy.ts) (the Next 16 middleware entry) gates the `(app)` route group with a presence-only `refresh_token` check ([`hasRefreshTokenFromRequest`](src/lib/session-core.ts)). SSR pages resolve the user via [`resolvePageUser`](src/lib/session.ts) → FastAPI `/v1/auth/session`; the client mints an in-memory access token via `/api/auth/bootstrap`. The legacy `jwt.ts`/`apiAuth.ts`/`getCurrentUser` cookie helpers were deleted.
 
 **Family scoping is implicit.** Every authenticated handler receives `user.familySpaceId`. All Post/Comment/Reaction/etc. queries must filter by it — there is no row-level enforcement in Prisma, so a missing filter leaks data across families. (V1 only has one family, but the schema is multi-tenant-ready and tests assume the filter is present.)
 
@@ -73,7 +73,7 @@ Spin up local Postgres with the one-liner in [docs/verification/next-api.md](doc
 - [src/lib/CLAUDE.md](src/lib/CLAUDE.md) — what each lib/ module is for
 - [prisma/CLAUDE.md](prisma/CLAUDE.md) — schema variants and migration rules
 - [**tests**/CLAUDE.md](__tests__/CLAUDE.md) — global mocks and helper conventions
-- [apps/api/CLAUDE.md](apps/api/CLAUDE.md) — FastAPI mirror service
+- [apps/api/CLAUDE.md](apps/api/CLAUDE.md) — FastAPI backend service
 - [apps/recipe-url-importer/CLAUDE.md](apps/recipe-url-importer/CLAUDE.md) — importer service
 
 ## Conventions worth knowing
@@ -84,7 +84,7 @@ Spin up local Postgres with the one-liner in [docs/verification/next-api.md](doc
 - **Error responses**: use the helpers in [src/lib/apiErrors.ts](src/lib/apiErrors.ts) (`validationError`, `notFoundError`, etc.) — never construct `NextResponse.json({ error: ... })` ad-hoc.
 - **Logger**: use `logError`/`logWarn` from [src/lib/logger.ts](src/lib/logger.ts). Tests silence `console.*` by default; set `ALLOW_TEST_LOGS=true` to see output.
 - **`bcrypt` vs `bcryptjs`**: prod uses native `bcrypt`; jest aliases it to `bcryptjs` (see [jest.config.js](jest.config.js)) so tests don't need native compilation. Don't import `bcryptjs` directly in app code.
-- **Server vs client components**: default to server components for data fetching; mark `'use client'` only for interactive forms/state. Server components reuse `getCurrentUser` by passing a `NextRequest`-shaped object.
+- **Server vs client components**: default to server components for data fetching; mark `'use client'` only for interactive forms/state. Server components in the `(app)` group resolve the user via `resolvePageUser()` from [src/lib/session.ts](src/lib/session.ts).
 
 ## Before opening a PR
 

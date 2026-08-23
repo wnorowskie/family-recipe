@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from tests.helpers.error_envelope import assert_error_envelope
+
 
 pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership")
 
@@ -20,7 +22,7 @@ def _make_post(idx: int = 1, **overrides) -> SimpleNamespace:
     data = {
         "id": overrides.get("id", f"post-{idx}"),
         "title": overrides.get("title", f"Favorite Dish {idx}"),
-        "mainPhotoUrl": overrides.get("mainPhotoUrl", f"https://cdn.test/favorite-{idx}.jpg"),
+        "mainPhotoStorageKey": overrides.get("mainPhotoStorageKey", f"https://cdn.test/favorite-{idx}.jpg"),
         "author": overrides.get("author", _make_author()),
     }
     data.update(overrides)
@@ -47,7 +49,7 @@ def test_me_favorites_success(client, mock_prisma, member_auth):
     favorite = _make_favorite()
     mock_prisma.favorite.find_many = AsyncMock(return_value=[favorite])
 
-    response = client.get("/me/favorites", headers=member_auth)
+    response = client.get("/v1/me/favorites", headers=member_auth)
 
     assert response.status_code == 200
     assert response.json() == {
@@ -58,7 +60,7 @@ def test_me_favorites_success(client, mock_prisma, member_auth):
                 "post": {
                     "id": favorite.post.id,
                     "title": favorite.post.title,
-                    "mainPhotoUrl": favorite.post.mainPhotoUrl,
+                    "mainPhotoUrl": favorite.post.mainPhotoStorageKey,
                     "authorName": favorite.post.author.name,
                 },
             }
@@ -72,7 +74,7 @@ def test_me_favorites_pagination(client, mock_prisma, member_auth):
     favorites = [_make_favorite(idx=i) for i in range(3)]
     mock_prisma.favorite.find_many = AsyncMock(return_value=favorites)
 
-    response = client.get("/me/favorites?limit=2&offset=4", headers=member_auth)
+    response = client.get("/v1/me/favorites?limit=2&offset=4", headers=member_auth)
 
     assert response.status_code == 200
     payload = response.json()
@@ -88,20 +90,20 @@ def test_me_favorites_shape_handles_missing_author(client, mock_prisma, member_a
     favorite = _make_favorite(post=_make_post(author=None))
     mock_prisma.favorite.find_many = AsyncMock(return_value=[favorite])
 
-    response = client.get("/me/favorites", headers=member_auth)
+    response = client.get("/v1/me/favorites", headers=member_auth)
 
     assert response.status_code == 200
     post_summary = response.json()["items"][0]["post"]
     assert post_summary == {
         "id": favorite.post.id,
         "title": favorite.post.title,
-        "mainPhotoUrl": favorite.post.mainPhotoUrl,
+        "mainPhotoUrl": favorite.post.mainPhotoStorageKey,
         "authorName": None,
     }
 
 
 def test_me_favorites_requires_auth(client):
-    response = client.get("/me/favorites")
+    response = client.get("/v1/me/favorites")
 
     assert response.status_code == 401
 
@@ -117,11 +119,12 @@ def test_update_profile_success(client, mock_prisma, member_auth):
         name="New Name",
         email="new@example.com",
         username="newname",
+        avatarStorageKey=None,
     )
     mock_prisma.user.update = AsyncMock(return_value=updated_user)
 
     response = client.put(
-        "/me/profile",
+        "/v1/me/profile",
         headers=member_auth,
         json={
             "name": "  New Name  ",
@@ -149,7 +152,7 @@ def test_update_profile_success(client, mock_prisma, member_auth):
 
 def test_update_profile_missing_name_400(client, member_auth):
     response = client.put(
-        "/me/profile",
+        "/v1/me/profile",
         headers=member_auth,
         json={"email": "test@example.com", "username": "testuser"},
     )
@@ -160,7 +163,7 @@ def test_update_profile_missing_name_400(client, member_auth):
 
 def test_update_profile_missing_email_400(client, member_auth):
     response = client.put(
-        "/me/profile",
+        "/v1/me/profile",
         headers=member_auth,
         json={"name": "Test", "username": "testuser"},
     )
@@ -171,7 +174,7 @@ def test_update_profile_missing_email_400(client, member_auth):
 
 def test_update_profile_missing_username_400(client, member_auth):
     response = client.put(
-        "/me/profile",
+        "/v1/me/profile",
         headers=member_auth,
         json={"name": "Test", "email": "test@example.com"},
     )
@@ -186,11 +189,12 @@ def test_update_profile_returns_updated_user_shape(client, mock_prisma, member_a
         name="Tester",
         email="tester@example.com",
         username="tester",
+        avatarStorageKey=None,
     )
     mock_prisma.user.update = AsyncMock(return_value=updated_user)
 
     response = client.put(
-        "/me/profile",
+        "/v1/me/profile",
         headers=member_auth,
         json={"name": "Tester", "email": "tester@example.com", "username": "tester"},
     )
@@ -210,7 +214,7 @@ def test_update_profile_returns_updated_user_shape(client, mock_prisma, member_a
 
 def test_update_profile_requires_auth(client):
     response = client.put(
-        "/me/profile",
+        "/v1/me/profile",
         json={"name": "Test", "email": "test@example.com", "username": "test"},
     )
 
@@ -243,20 +247,23 @@ def test_change_password_success(client, mock_prisma, member_auth, prisma_user_w
         captured["hashed"] = f"hashed:{password}"
         return captured["hashed"]
 
-    monkeypatch.setattr("src.routers.me.verify_password", fake_verify)
-    monkeypatch.setattr("src.routers.me.hash_password", fake_hash)
+    monkeypatch.setattr("src.routers.v1.me.verify_password", fake_verify)
+    monkeypatch.setattr("src.routers.v1.me.hash_password", fake_hash)
 
-    response = client.put(
-        "/me/password",
+    response = client.post(
+        "/v1/me/password",
         headers=member_auth,
         json={"currentPassword": "oldpass", "newPassword": "newpassword"},
     )
 
     assert response.status_code == 200
-    assert response.json() == {"message": "Password updated"}
+    # Response shape mirrors Next's `{ status: 'updated' }` (see #188).
+    assert response.json() == {"status": "updated"}
     assert captured["verified"] == ("oldpass", "stored")
     updated_data = mock_prisma.user.update.await_args.kwargs["data"]
     assert updated_data["passwordHash"] == "hashed:newpassword"
+    # Session cookie is cleared on success, matching Next's clearSessionCookie.
+    assert "session=" in response.headers.get("set-cookie", "")
 
 
 def test_change_password_wrong_current_400(client, mock_prisma, member_auth, prisma_user_with_membership, monkeypatch):
@@ -273,10 +280,10 @@ def test_change_password_wrong_current_400(client, mock_prisma, member_auth, pri
     def fake_verify(password: str, hashed: str) -> bool:
         return False
 
-    monkeypatch.setattr("src.routers.me.verify_password", fake_verify)
+    monkeypatch.setattr("src.routers.v1.me.verify_password", fake_verify)
 
-    response = client.put(
-        "/me/password",
+    response = client.post(
+        "/v1/me/password",
         headers=member_auth,
         json={"currentPassword": "oldpass", "newPassword": "newpassword"},
     )
@@ -287,39 +294,38 @@ def test_change_password_wrong_current_400(client, mock_prisma, member_auth, pri
 
 
 def test_change_password_too_short_400(client, member_auth):
-    response = client.put(
-        "/me/password",
+    response = client.post(
+        "/v1/me/password",
         headers=member_auth,
         json={"currentPassword": "oldpass", "newPassword": "short"},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["message"] == "New password must be at least 8 characters"
+    # Schema-level rejection now flows through `_validation_error_handler`
+    # rather than the legacy hand-rolled `bad_request` (see #216).
+    assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
 
 
 def test_change_password_missing_current_400(client, member_auth):
-    response = client.put(
-        "/me/password",
+    response = client.post(
+        "/v1/me/password",
         headers=member_auth,
         json={"newPassword": "newpassword"},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["message"] == "Current password is required"
+    assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
 
 
 def test_change_password_missing_new_400(client, member_auth):
-    response = client.put(
-        "/me/password",
+    response = client.post(
+        "/v1/me/password",
         headers=member_auth,
         json={"currentPassword": "oldpass"},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"]["message"] == "New password must be at least 8 characters"
+    assert_error_envelope(response, status_code=400, code="VALIDATION_ERROR")
 
 
 def test_change_password_requires_auth(client):
-    response = client.put("/me/password", json={"currentPassword": "old", "newPassword": "newpassword"})
+    response = client.post("/v1/me/password", json={"currentPassword": "old", "newPassword": "newpassword"})
 
     assert response.status_code == 401

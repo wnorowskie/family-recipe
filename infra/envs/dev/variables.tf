@@ -213,6 +213,49 @@ variable "family_master_key_secret_id" {
   default     = "family-recipe-dev-family-master-key"
 }
 
+variable "refresh_pepper_secret_id" {
+  description = "Secret Manager secret ID for REFRESH_PEPPER (FastAPI refresh-token HMAC pepper)"
+  type        = string
+  default     = "family-recipe-dev-refresh-pepper"
+}
+
+# FastAPI backend (apps/api)
+variable "api_service_name" {
+  description = "Cloud Run service name for the FastAPI backend"
+  type        = string
+  default     = "family-recipe-api-dev"
+}
+
+variable "api_artifact_registry_repo_id" {
+  description = "Artifact Registry repository ID for FastAPI images"
+  type        = string
+  default     = "family-recipe-api-dev"
+}
+
+variable "api_min_instance_count" {
+  description = "Minimum FastAPI instances to keep warm"
+  type        = number
+  default     = 0
+}
+
+variable "api_max_instance_count" {
+  description = "Maximum FastAPI instances"
+  type        = number
+  default     = 5
+}
+
+variable "api_environment" {
+  description = "ENVIRONMENT for apps/api ('production' enables secure cookies + fail-fast config validation)"
+  type        = string
+  default     = "production"
+}
+
+variable "api_trusted_proxy_hops" {
+  description = "TRUSTED_PROXY_HOPS for apps/api — trusted X-Forwarded-For hops (browser → GFE(Next) → Next proxy → GFE(FastAPI) = 2; issue #246)"
+  type        = number
+  default     = 2
+}
+
 variable "wif_pool_id" {
   description = "Workload Identity Pool ID"
   type        = string

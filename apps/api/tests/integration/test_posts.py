@@ -10,7 +10,9 @@ from prisma.errors import PrismaError
 
 import pytest
 
+from src.multipart_uploads import ProcessedUpload
 from src.uploads import MAX_PHOTO_COUNT
+from tests.helpers.error_envelope import assert_error_envelope
 
 pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership")
 POST_ID = "ckpost1234567890123456789"
@@ -29,15 +31,67 @@ def _make_recipe_payload():
     }
 
 
+def _stub_create_hydration(
+    mock_prisma,
+    *,
+    post_id: str,
+    title: str = "Hello",
+    caption: Optional[str] = "Hi",
+    main_photo_storage_key: Optional[str] = None,
+    photo_storage_keys: Optional[list] = None,
+    tags: Optional[list] = None,
+    author_id: str = "user_test_123",
+    recipe_details=None,
+):
+    """Wire up the mocks needed for `create_post` and `update_post` to call
+    `_load_post_detail` after the underlying `prisma.post.create`.
+
+    Post-#187 the create/update handlers re-hydrate via the same detail-load
+    used by `GET /v1/posts/{id}` so the response carries resolved photo URLs
+    and the standard nested shape (comments, cookedStats, reactions, etc.).
+    Tests that previously asserted against the raw create return value now
+    need the hydration path stubbed.
+    """
+    now = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    photo_keys = list(photo_storage_keys or [])
+    hydrated = SimpleNamespace(
+        id=post_id,
+        title=title,
+        caption=caption,
+        createdAt=now,
+        updatedAt=now,
+        mainPhotoStorageKey=main_photo_storage_key,
+        authorId=author_id,
+        author=SimpleNamespace(id=author_id, name="Alice", avatarStorageKey=None),
+        editor=None,
+        lastEditNote=None,
+        lastEditAt=None,
+        photos=[
+            SimpleNamespace(id=f"ph{i}", storageKey=key, sortOrder=i)
+            for i, key in enumerate(photo_keys)
+        ],
+        recipeDetails=recipe_details,
+        tags=tags or [],
+    )
+    mock_prisma.post.find_first = AsyncMock(return_value=hydrated)
+    mock_prisma.comment.find_many = AsyncMock(return_value=[])
+    mock_prisma.cookedevent.find_many = AsyncMock(return_value=[])
+    mock_prisma.favorite.find_unique = AsyncMock(return_value=None)
+    mock_prisma.reaction.find_many = AsyncMock(return_value=[])
+
+
 class TestCreatePost:
     def test_create_text_post(self, client, mock_prisma, member_auth):
+        # Post-#187 `create_post` re-hydrates via `_load_post_detail` so the
+        # response shape matches GET /posts/{id} and mirrors Next's
+        # `getPostDetail` call. `_stub_create_hydration` wires up the
+        # find_first + cooked/comments/favorites mocks the hydration touches.
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
-        mock_prisma.post.create = AsyncMock(
-            return_value={"id": "post-1", "title": "Hello", "caption": "Hi", "photos": [], "recipeDetails": None, "tags": []}
-        )
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-1"))
+        _stub_create_hydration(mock_prisma, post_id="post-1", title="Hello", caption="Hi")
 
         payload = {"title": "Hello", "caption": "Hi"}
-        response = client.post("/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.post("/v1/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 201, response.json()
         body = response.json()
@@ -46,143 +100,284 @@ class TestCreatePost:
 
     def test_create_recipe_post(self, client, mock_prisma, member_auth):
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
-        mock_prisma.post.create = AsyncMock(
-            return_value={
-                "id": "post-2",
-                "title": "Pasta",
-                "caption": "Yum",
-                "photos": [],
-                "recipeDetails": {
-                    "origin": "Italy",
-                    "ingredients": json.dumps([{"name": "Tomato", "unit": "pcs", "quantity": 2}]),
-                    "steps": json.dumps([{"text": "Chop"}]),
-                    "totalTime": 30,
-                    "servings": 4,
-                    "courses": json.dumps(["dinner"]),
-                    "course": "dinner",
-                    "difficulty": "easy",
-                },
-                "tags": [],
-            }
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-2"))
+        # The hydrated detail response shape uses `recipe` (the friendlier
+        # key built by `_load_post_detail`), not the raw Prisma
+        # `recipeDetails`. The recipe-detail SimpleNamespace below feeds
+        # that shape so the test assertion targets the response-side key.
+        recipe = SimpleNamespace(
+            origin="Italy",
+            ingredients=json.dumps([{"name": "Tomato", "unit": "pcs", "quantity": 2}]),
+            steps=json.dumps([{"text": "Chop"}]),
+            totalTime=30,
+            servings=4,
+            courses=json.dumps(["dinner"]),
+            course="dinner",
+            difficulty="easy",
+        )
+        _stub_create_hydration(
+            mock_prisma,
+            post_id="post-2",
+            title="Pasta",
+            caption="Yum",
+            recipe_details=recipe,
         )
 
         payload = {"title": "Pasta", "caption": "Yum", "recipe": _make_recipe_payload()}
-        response = client.post("/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.post("/v1/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 201, response.json()
         body = response.json()["post"]
-        assert body["recipeDetails"] is not None
-        assert json.loads(body["recipeDetails"]["courses"])[0] == "dinner"
+        assert body["recipe"] is not None
+        assert body["recipe"]["courses"][0] == "dinner"
 
     def test_create_post_with_photos(self, client, mock_prisma, member_auth, monkeypatch):
+        # Storage keys post-#187. Strings are intentionally short labels (not
+        # the `<ms-timestamp>-<uuid>.<ext>` shape `process_upload` actually
+        # generates) so they don't trip the gitleaks `generic-api-key` rule —
+        # the resolver and DB layer treat them as opaque, so the test value
+        # doesn't need to look real.
+        key_1, key_2 = "fixture-a.jpg", "fixture-b.jpg"
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
-        mock_prisma.post.create = AsyncMock(
-            return_value={
-                "id": "post-3",
-                "title": "Photo Post",
-                "caption": None,
-                "photos": [
-                    {"id": "ph1", "url": "https://cdn.test/p1.jpg", "sortOrder": 0},
-                    {"id": "ph2", "url": "https://cdn.test/p2.jpg", "sortOrder": 1},
-                ],
-                "mainPhotoUrl": "https://cdn.test/p1.jpg",
-                "recipeDetails": None,
-                "tags": [],
-            }
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-3"))
+        _stub_create_hydration(
+            mock_prisma,
+            post_id="post-3",
+            title="Photo Post",
+            caption=None,
+            main_photo_storage_key=key_1,
+            photo_storage_keys=[key_1, key_2],
         )
-        monkeypatch.setattr("src.routers.posts.save_photo_file", AsyncMock(side_effect=[{"url": "https://cdn.test/p1.jpg"}, {"url": "https://cdn.test/p2.jpg"}]))
+        monkeypatch.setattr(
+            "src.routers.v1.posts.process_upload",
+            AsyncMock(
+                side_effect=[
+                    ProcessedUpload(storage_key=key_1, size_bytes=10, content_type="image/jpeg"),
+                    ProcessedUpload(storage_key=key_2, size_bytes=10, content_type="image/jpeg"),
+                ]
+            ),
+        )
 
         payload = {"title": "Photo Post"}
         files = [
             ("photos", ("p1.jpg", b"data1", "image/jpeg")),
             ("photos", ("p2.jpg", b"data2", "image/jpeg")),
         ]
-        response = client.post("/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth)
+        response = client.post("/v1/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth)
 
         assert response.status_code == 201, response.json()
         body = response.json()["post"]
-        assert body["mainPhotoUrl"] == "https://cdn.test/p1.jpg"
+        # Without UPLOADS_BUCKET set in tests, the resolver returns
+        # `/uploads/<storage_key>` for keys (the local-disk path); the
+        # passthrough only fires for already-URL-like values.
+        assert body["mainPhotoUrl"] == f"/uploads/{key_1}"
         assert len(body["photos"]) == 2
+        assert body["photos"][0]["url"] == f"/uploads/{key_1}"
 
     def test_create_post_with_tags(self, client, mock_prisma, member_auth):
         mock_prisma.tag.find_many = AsyncMock(
             return_value=[SimpleNamespace(id="t1", name="spicy"), SimpleNamespace(id="t2", name="quick")]
         )
-        mock_prisma.post.create = AsyncMock(
-            return_value={
-                "id": "post-4",
-                "title": "Tagged",
-                "caption": None,
-                "photos": [],
-                "recipeDetails": None,
-                "tags": [
-                    {"tag": {"id": "t1", "name": "spicy"}},
-                    {"tag": {"id": "t2", "name": "quick"}},
-                ],
-            }
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-4"))
+        # Hydrated detail response surfaces tags as a flat name list (not
+        # the Prisma `{tag: {id, name}}` shape); update the assertion to
+        # match.
+        _stub_create_hydration(
+            mock_prisma,
+            post_id="post-4",
+            title="Tagged",
+            caption=None,
+            tags=[
+                SimpleNamespace(tag=SimpleNamespace(id="t1", name="spicy")),
+                SimpleNamespace(tag=SimpleNamespace(id="t2", name="quick")),
+            ],
         )
 
         payload = {"title": "Tagged", "recipe": {"tags": ["spicy", "quick"]}}
-        response = client.post("/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.post("/v1/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 201, response.json()
-        tag_names = [t["tag"]["name"] for t in response.json()["post"]["tags"]]
-        assert tag_names == ["spicy", "quick"]
+        assert response.json()["post"]["tags"] == ["spicy", "quick"]
 
-    def test_create_post_invalid_tag_409(self, client, mock_prisma, member_auth):
+    def test_create_post_invalid_tag_400(self, client, mock_prisma, member_auth):
+        # Matches Next handler at src/app/api/posts/route.ts: 400 INVALID_TAG
+        # ("One or more tags are not available"). Previously 409 CONFLICT on
+        # the FastAPI side; aligned in #200.
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
 
         payload = {"title": "Bad Tags", "recipe": {"tags": ["missing"]}}
-        response = client.post("/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.post("/v1/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
 
-        assert response.status_code == 409, response.json()
-        assert response.json()["error"]["code"] == "CONFLICT"
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="INVALID_TAG",
+            message_contains="not available",
+        )
 
-    def test_create_post_max_photos_exceeded_409(self, client, member_auth):
+    def test_create_post_max_photos_exceeded_400(self, client, member_auth):
+        # Matches Next POST + PATCH handlers' TOO_MANY_PHOTOS canonical code
+        # (see src/app/api/posts/route.ts and src/app/api/posts/[postId]/route.ts;
+        # reconciled in #202).
         files = [("photos", (f"p{i}.jpg", b"data", "image/jpeg")) for i in range(MAX_PHOTO_COUNT + 1)]
         payload = {"title": "Too many"}
 
-        response = client.post("/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth)
+        response = client.post("/v1/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth)
 
-        assert response.status_code == 409
-        assert "upload up to" in response.json()["error"]["message"].lower()
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="TOO_MANY_PHOTOS",
+            message_contains="upload up to",
+        )
 
-    def test_create_post_invalid_mime_type_409(self, client, mock_prisma, member_auth):
+    def test_create_post_invalid_mime_type_400(self, client, mock_prisma, member_auth):
+        # Matches Next handler's UNSUPPORTED_FILE_TYPE
+        # (src/app/api/posts/route.ts catches savePhotoFile's throw).
+        # Post-#187 the message is generated by `process_upload` and lists
+        # the allowed mime types explicitly; the substring check is
+        # narrowed to a stable fragment.
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
         payload = {"title": "Bad mime"}
         files = [("photos", ("bad.txt", b"data", "text/plain"))]
 
-        response = client.post("/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth)
+        response = client.post("/v1/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth)
 
-        assert response.status_code == 409
-        assert "only jpeg" in response.json()["error"]["message"].lower()
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="UNSUPPORTED_FILE_TYPE",
+            message_contains="image/jpeg",
+        )
+
+    def test_create_post_malformed_payload_json_400(self, client, member_auth):
+        # Previously 409 CONFLICT; aligned to 400 VALIDATION_ERROR in #200 so
+        # malformed JSON returns the canonical bad-input envelope.
+        response = client.post(
+            "/v1/posts", data={"payload": "{not-json"}, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="VALIDATION_ERROR",
+            message_contains="valid json",
+        )
 
     def test_create_post_requires_auth(self, client):
         payload = {"title": "No auth"}
 
-        response = client.post("/posts", data={"payload": json.dumps(payload)})
+        response = client.post("/v1/posts", data={"payload": json.dumps(payload)})
 
         assert response.status_code == 401
 
-    def test_create_post_returns_post_shape(self, client, mock_prisma, member_auth):
+    def test_create_post_oversized_single_file_400(self, client, mock_prisma, member_auth, monkeypatch):
+        """Per-file size cap (POSTS_MEDIA_MAX_BYTES = 10MB) triggers a
+        `FILE_TOO_LARGE` 400 from `process_upload`. The mock raises
+        `UploadError` to simulate the cap hit so we don't have to assemble
+        an actual 10MB byte payload in the test body."""
+        from src.multipart_uploads import UploadError
+
         mock_prisma.tag.find_many = AsyncMock(return_value=[])
-        mock_prisma.post.create = AsyncMock(
-            return_value={
-                "id": "post-5",
-                "title": "Shape",
-                "caption": None,
-                "photos": [],
-                "recipeDetails": None,
-                "tags": [],
-            }
+        monkeypatch.setattr(
+            "src.routers.v1.posts.process_upload",
+            AsyncMock(side_effect=UploadError("FILE_TOO_LARGE", "File exceeds the 10MB limit for post-media")),
         )
 
+        payload = {"title": "Big"}
+        files = [("photos", ("big.jpg", b"d", "image/jpeg"))]
+        response = client.post(
+            "/v1/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="FILE_TOO_LARGE",
+            message_contains="10MB",
+        )
+
+    def test_create_post_oversized_aggregate_request_400(self, client, mock_prisma, member_auth, monkeypatch):
+        """Aggregate-request cap (50MB total across all `photos` after
+        processing) — enforced in `_process_photo_uploads` by summing each
+        ProcessedUpload's `size_bytes`. We feed it three "files" whose
+        mocked processed sizes sum to >50MB and assert the rejection.
+
+        The cap is on *processed* bytes (post EXIF strip / resize), so this
+        also documents that the check fires after individual files have
+        already passed the per-file cap."""
+        mock_prisma.tag.find_many = AsyncMock(return_value=[])
+        twenty_mb = 20 * 1024 * 1024
+        monkeypatch.setattr(
+            "src.routers.v1.posts.process_upload",
+            AsyncMock(
+                side_effect=[
+                    ProcessedUpload(storage_key="k1.jpg", size_bytes=twenty_mb, content_type="image/jpeg"),
+                    ProcessedUpload(storage_key="k2.jpg", size_bytes=twenty_mb, content_type="image/jpeg"),
+                    ProcessedUpload(storage_key="k3.jpg", size_bytes=twenty_mb, content_type="image/jpeg"),
+                ]
+            ),
+        )
+
+        payload = {"title": "Big stack"}
+        files = [("photos", (f"p{i}.jpg", b"d", "image/jpeg")) for i in range(3)]
+        response = client.post(
+            "/v1/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="FILE_TOO_LARGE",
+            message_contains="50mb",
+        )
+
+    def test_create_post_max_files_boundary(self, client, mock_prisma, member_auth, monkeypatch):
+        """MAX_PHOTO_COUNT files exactly is accepted (boundary check —
+        anything <= the cap should succeed)."""
+        mock_prisma.tag.find_many = AsyncMock(return_value=[])
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-many"))
+        photo_keys = [f"key-{i}.jpg" for i in range(MAX_PHOTO_COUNT)]
+        _stub_create_hydration(
+            mock_prisma,
+            post_id="post-many",
+            title="Maxed",
+            main_photo_storage_key=photo_keys[0],
+            photo_storage_keys=photo_keys,
+        )
+        monkeypatch.setattr(
+            "src.routers.v1.posts.process_upload",
+            AsyncMock(
+                side_effect=[
+                    ProcessedUpload(storage_key=key, size_bytes=10, content_type="image/jpeg")
+                    for key in photo_keys
+                ]
+            ),
+        )
+
+        payload = {"title": "Maxed"}
+        files = [("photos", (f"p{i}.jpg", b"d", "image/jpeg")) for i in range(MAX_PHOTO_COUNT)]
+        response = client.post(
+            "/v1/posts", data={"payload": json.dumps(payload)}, files=files, headers=member_auth
+        )
+
+        assert response.status_code == 201, response.json()
+        assert len(response.json()["post"]["photos"]) == MAX_PHOTO_COUNT
+
+    def test_create_post_returns_post_shape(self, client, mock_prisma, member_auth):
+        # Post-#187 the response is the hydrated detail shape, which uses
+        # `recipe` (computed) rather than the raw Prisma `recipeDetails`
+        # field — assert against the documented response keys.
+        mock_prisma.tag.find_many = AsyncMock(return_value=[])
+        mock_prisma.post.create = AsyncMock(return_value=SimpleNamespace(id="post-5"))
+        _stub_create_hydration(mock_prisma, post_id="post-5", title="Shape", caption=None)
+
         payload = {"title": "Shape"}
-        response = client.post("/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.post("/v1/posts", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 201, response.json()
         post = response.json()["post"]
-        for key in ["id", "title", "photos", "recipeDetails", "tags"]:
+        for key in ["id", "title", "photos", "recipe", "tags", "comments", "cookedStats"]:
             assert key in post
 
 
@@ -195,7 +390,7 @@ class TestGetPostDetail:
             caption="Cap",
             createdAt=now,
             updatedAt=now,
-            mainPhotoUrl=None,
+            mainPhotoStorageKey=None,
             authorId=author_id,
             author=SimpleNamespace(id=author_id, name="Alice", avatarStorageKey=None),
             editor=None,
@@ -213,7 +408,7 @@ class TestGetPostDetail:
         mock_prisma.favorite.find_unique = AsyncMock(return_value=None)
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        response = client.get(f"/posts/{POST_ID}", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         body = response.json()
@@ -223,12 +418,12 @@ class TestGetPostDetail:
     def test_get_post_not_found_404(self, client, mock_prisma, member_auth):
         mock_prisma.post.find_first = AsyncMock(return_value=None)
 
-        response = client.get(f"/posts/{POST_ID}", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}", headers=member_auth)
 
         assert response.status_code == 404
 
     def test_get_post_invalid_cuid_404(self, client, member_auth):
-        response = client.get("/posts/not-cuid", headers=member_auth)
+        response = client.get("/v1/posts/not-cuid", headers=member_auth)
 
         assert response.status_code == 404
 
@@ -240,14 +435,14 @@ class TestGetPostDetail:
                 SimpleNamespace(
                     id="c1",
                     text="Nice",
-                    photoUrl=None,
+                    photoStorageKey=None,
                     createdAt=now,
                     author=SimpleNamespace(id="u1", name="Bob", avatarStorageKey=None),
                 ),
                 SimpleNamespace(
                     id="c2",
                     text="Great",
-                    photoUrl=None,
+                    photoStorageKey=None,
                     createdAt=now,
                     author=SimpleNamespace(id="u2", name="Ann", avatarStorageKey=None),
                 ),
@@ -257,7 +452,7 @@ class TestGetPostDetail:
         mock_prisma.favorite.find_unique = AsyncMock(return_value=None)
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        response = client.get(f"/posts/{POST_ID}", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}", headers=member_auth)
 
         assert response.status_code == 200
         comments = response.json()["post"]["comments"]
@@ -277,7 +472,7 @@ class TestGetPostDetail:
             ]
         )
 
-        response = client.get(f"/posts/{POST_ID}", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}", headers=member_auth)
 
         assert response.status_code == 200
         summary = response.json()["post"]["reactionSummary"]
@@ -292,7 +487,7 @@ class TestGetPostDetail:
         mock_prisma.favorite.find_unique = AsyncMock(return_value=SimpleNamespace(id="fav1"))
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        response = client.get(f"/posts/{POST_ID}", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}", headers=member_auth)
 
         assert response.status_code == 200
         assert response.json()["post"]["isFavorited"] is True
@@ -313,7 +508,7 @@ class TestGetPostDetail:
         mock_prisma.favorite.find_unique = AsyncMock(return_value=None)
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        response = client.get(f"/posts/{POST_ID}", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}", headers=member_auth)
 
         assert response.status_code == 200
         stats = response.json()["post"]["cookedStats"]
@@ -325,15 +520,15 @@ class TestGetPostDetail:
         mock_prisma.post.find_first = AsyncMock(return_value=self._base_post())
         mock_prisma.comment.find_many = AsyncMock(
             return_value=[
-                SimpleNamespace(id="c1", text="A", photoUrl=None, createdAt=now, author=None),
-                SimpleNamespace(id="c2", text="B", photoUrl=None, createdAt=now, author=None),
+                SimpleNamespace(id="c1", text="A", photoStorageKey=None, createdAt=now, author=None),
+                SimpleNamespace(id="c2", text="B", photoStorageKey=None, createdAt=now, author=None),
             ]
         )
         mock_prisma.cookedevent.find_many = AsyncMock(return_value=[])
         mock_prisma.favorite.find_unique = AsyncMock(return_value=None)
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        response = client.get(f"/posts/{POST_ID}?commentLimit=1", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}?commentLimit=1", headers=member_auth)
 
         assert response.status_code == 200
         page = response.json()["post"]["commentsPage"]
@@ -356,7 +551,7 @@ class TestGetPostDetail:
         mock_prisma.favorite.find_unique = AsyncMock(return_value=None)
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        response = client.get(f"/posts/{POST_ID}?cookedLimit=1", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}?cookedLimit=1", headers=member_auth)
 
         assert response.status_code == 200
         page = response.json()["post"]["recentCookedPage"]
@@ -370,13 +565,13 @@ class TestGetPostDetail:
         mock_prisma.favorite.find_unique = AsyncMock(return_value=None)
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        response = client.get(f"/posts/{POST_ID}", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}", headers=member_auth)
 
         assert response.status_code == 200
         assert response.json()["canEdit"] is False
 
     def test_get_post_requires_auth(self, client):
-        response = client.get("/posts/post-1")
+        response = client.get("/v1/posts/post-1")
 
         assert response.status_code == 401
 
@@ -402,7 +597,7 @@ class TestUpdatePost:
             caption=caption,
             createdAt=now,
             updatedAt=now,
-            mainPhotoUrl=main_photo_url,
+            mainPhotoStorageKey=main_photo_url,
             authorId=author_id,
             author=SimpleNamespace(id=author_id, name="Alice", avatarStorageKey=None),
             editor=None,
@@ -414,7 +609,7 @@ class TestUpdatePost:
         )
 
     def _photo(self, photo_id: str, sort_order: int = 0):
-        return SimpleNamespace(id=photo_id, url=f"https://cdn.test/{photo_id}.jpg", sortOrder=sort_order)
+        return SimpleNamespace(id=photo_id, storageKey=f"https://cdn.test/{photo_id}.jpg", sortOrder=sort_order)
 
     def _recipe_details(self):
         return SimpleNamespace(
@@ -437,7 +632,7 @@ class TestUpdatePost:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         payload = {"title": "Updated Title", "caption": "New"}
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["post"]["title"] == "Updated Title"
@@ -456,7 +651,7 @@ class TestUpdatePost:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         payload = {"title": "Admin Edit"}
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=admin_auth)
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=admin_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["post"]["title"] == "Admin Edit"
@@ -475,7 +670,7 @@ class TestUpdatePost:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         payload = {"title": "Owner Edit"}
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=owner_auth)
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=owner_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["post"]["title"] == "Owner Edit"
@@ -485,7 +680,7 @@ class TestUpdatePost:
         mock_prisma.post.find_first = AsyncMock(return_value=initial)
 
         payload = {"title": "Nope"}
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 403
 
@@ -493,22 +688,34 @@ class TestUpdatePost:
         mock_prisma.post.find_first = AsyncMock(return_value=None)
 
         payload = {"title": "Missing"}
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 404
 
     def test_update_post_add_photos(self, client, mock_prisma, member_auth, monkeypatch):
         initial = self._post(photos=[])
         updated_photos = [self._photo("ph_new_1", 0), self._photo("ph_new_2", 1)]
-        updated = self._post(photos=updated_photos, main_photo_url=updated_photos[0].url)
+        updated = self._post(photos=updated_photos, main_photo_url=updated_photos[0].storageKey)
 
         mock_prisma.post.find_first = AsyncMock(side_effect=[initial, updated])
         mock_prisma.comment.find_many = AsyncMock(return_value=[])
         mock_prisma.cookedevent.find_many = AsyncMock(return_value=[])
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        monkeypatch.setattr("src.routers.posts.save_photo_file", AsyncMock(side_effect=[{"url": updated_photos[0].url}, {"url": updated_photos[1].url}]))
-        monkeypatch.setattr("src.routers.posts.delete_uploads", AsyncMock())
+        # Post-#187: photo writes go through `multipart_uploads.process_upload`
+        # and the DB stores storage keys rather than resolved URLs. The mock
+        # returns `ProcessedUpload` dataclasses whose `storage_key` flows into
+        # the DB column via `_process_photo_uploads`.
+        monkeypatch.setattr(
+            "src.routers.v1.posts.process_upload",
+            AsyncMock(
+                side_effect=[
+                    ProcessedUpload(storage_key=updated_photos[0].storageKey, size_bytes=10, content_type="image/jpeg"),
+                    ProcessedUpload(storage_key=updated_photos[1].storageKey, size_bytes=10, content_type="image/jpeg"),
+                ]
+            ),
+        )
+        monkeypatch.setattr("src.routers.v1.posts.delete_uploads", AsyncMock())
 
         payload = {
             "title": "Photos",
@@ -523,19 +730,19 @@ class TestUpdatePost:
         ]
 
         response = client.put(
-            f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, files=files, headers=member_auth
+            f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, files=files, headers=member_auth
         )
 
         assert response.status_code == 200, response.json()
         body = response.json()["post"]
         assert len(body["photos"]) == 2
-        assert body["mainPhotoUrl"] == updated_photos[0].url
+        assert body["mainPhotoUrl"] == updated_photos[0].storageKey
 
     def test_update_post_remove_photos(self, client, mock_prisma, member_auth, monkeypatch):
         existing_photos = [self._photo("ph1", 0), self._photo("ph2", 1)]
-        initial = self._post(photos=existing_photos, main_photo_url=existing_photos[0].url)
+        initial = self._post(photos=existing_photos, main_photo_url=existing_photos[0].storageKey)
         kept = self._photo("ph2", 0)
-        updated = self._post(photos=[kept], main_photo_url=kept.url)
+        updated = self._post(photos=[kept], main_photo_url=kept.storageKey)
 
         mock_prisma.post.find_first = AsyncMock(side_effect=[initial, updated])
         mock_prisma.comment.find_many = AsyncMock(return_value=[])
@@ -543,31 +750,31 @@ class TestUpdatePost:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         delete_mock = AsyncMock()
-        monkeypatch.setattr("src.routers.posts.delete_uploads", delete_mock)
+        monkeypatch.setattr("src.routers.v1.posts.delete_uploads", delete_mock)
         # Force router to respect explicit photo order by lowering max count so unreferenced photos are removed
-        monkeypatch.setattr("src.routers.posts.MAX_PHOTO_COUNT", 1)
+        monkeypatch.setattr("src.routers.v1.posts.MAX_PHOTO_COUNT", 1)
 
         payload = {"title": "Keep one", "photoOrder": [{"type": "existing", "id": "ph2"}]}
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 200, response.json()
         photos = response.json()["post"]["photos"]
         assert len(photos) == 1
-        assert photos[0]["url"] == kept.url
-        delete_mock.assert_awaited_with([existing_photos[0].url])
+        assert photos[0]["url"] == kept.storageKey
+        delete_mock.assert_awaited_with([existing_photos[0].storageKey])
 
     def test_update_post_reorder_photos(self, client, mock_prisma, member_auth, monkeypatch):
         existing_photos = [self._photo("ph1", 0), self._photo("ph2", 1)]
-        initial = self._post(photos=existing_photos, main_photo_url=existing_photos[0].url)
+        initial = self._post(photos=existing_photos, main_photo_url=existing_photos[0].storageKey)
         reordered = [self._photo("ph2", 0), self._photo("ph1", 1)]
-        updated = self._post(photos=reordered, main_photo_url=reordered[0].url)
+        updated = self._post(photos=reordered, main_photo_url=reordered[0].storageKey)
 
         mock_prisma.post.find_first = AsyncMock(side_effect=[initial, updated])
         mock_prisma.comment.find_many = AsyncMock(return_value=[])
         mock_prisma.cookedevent.find_many = AsyncMock(return_value=[])
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
-        monkeypatch.setattr("src.routers.posts.delete_uploads", AsyncMock())
+        monkeypatch.setattr("src.routers.v1.posts.delete_uploads", AsyncMock())
 
         payload = {
             "title": "Reorder",
@@ -576,12 +783,12 @@ class TestUpdatePost:
                 {"type": "existing", "id": "ph1"},
             ],
         }
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 200, response.json()
         photos = response.json()["post"]["photos"]
         assert [p["id"] for p in photos] == ["ph2", "ph1"]
-        assert response.json()["post"]["mainPhotoUrl"] == reordered[0].url
+        assert response.json()["post"]["mainPhotoUrl"] == reordered[0].storageKey
 
     def test_update_post_change_tags(self, client, mock_prisma, member_auth):
         initial = self._post(tags=[SimpleNamespace(tag=SimpleNamespace(id="old", name="old"))])
@@ -593,7 +800,7 @@ class TestUpdatePost:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         payload = {"title": "Tags", "recipe": {"tags": ["spicy"]}}
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["post"]["tags"] == ["spicy"]
@@ -609,7 +816,7 @@ class TestUpdatePost:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         payload = {"title": "Add recipe", "recipe": _make_recipe_payload()}
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 200, response.json()
         recipe = response.json()["post"]["recipe"]
@@ -627,7 +834,7 @@ class TestUpdatePost:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         payload = {"title": "Remove recipe"}
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["post"]["recipe"] is None
@@ -641,15 +848,74 @@ class TestUpdatePost:
         mock_prisma.reaction.find_many = AsyncMock(return_value=[])
 
         payload = {"title": "Note", "changeNote": "  Fixed typo  "}
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["post"]["lastEditNote"] == "Fixed typo"
 
+    def test_update_post_invalid_tag_400(self, client, mock_prisma, member_auth):
+        # Matches Next PUT handler at src/app/api/posts/[postId]/route.ts: 400
+        # INVALID_TAG when a requested tag name doesn't resolve. Previously
+        # 409 CONFLICT on the FastAPI side; aligned in #200.
+        initial = self._post()
+        mock_prisma.post.find_first = AsyncMock(return_value=initial)
+        mock_prisma.tag.find_many = AsyncMock(return_value=[])  # no tag matches "missing"
+
+        payload = {"title": "Bad Tags", "recipe": {"tags": ["missing"]}}
+        response = client.put(
+            f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="INVALID_TAG",
+            message_contains="not available",
+        )
+
+    def test_update_post_photo_order_exceeds_max_400(self, client, mock_prisma, member_auth):
+        # Matches Next PUT handler's TOO_MANY_PHOTOS guard on `photoOrder`
+        # length. Previously 409 CONFLICT on the FastAPI side; aligned in #200.
+        initial = self._post()
+        mock_prisma.post.find_first = AsyncMock(return_value=initial)
+
+        payload = {
+            "title": "Too many ordered",
+            "photoOrder": [
+                {"type": "new", "fileIndex": i} for i in range(MAX_PHOTO_COUNT + 1)
+            ],
+        }
+        response = client.put(
+            f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)}, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="TOO_MANY_PHOTOS",
+            message_contains="include up to",
+        )
+
+    def test_update_post_malformed_payload_json_400(self, client, mock_prisma, member_auth):
+        # Previously 409 CONFLICT; aligned to 400 VALIDATION_ERROR in #200.
+        initial = self._post()
+        mock_prisma.post.find_first = AsyncMock(return_value=initial)
+
+        response = client.put(
+            f"/v1/posts/{POST_ID}", data={"payload": "{not-json"}, headers=member_auth
+        )
+
+        assert_error_envelope(
+            response,
+            status_code=400,
+            code="VALIDATION_ERROR",
+            message_contains="valid json",
+        )
+
     def test_update_post_requires_auth(self, client):
         payload = {"title": "No auth"}
 
-        response = client.put(f"/posts/{POST_ID}", data={"payload": json.dumps(payload)})
+        response = client.put(f"/v1/posts/{POST_ID}", data={"payload": json.dumps(payload)})
 
         assert response.status_code == 401
 
@@ -667,10 +933,10 @@ class TestDeletePost:
         )
 
     def _photo(self, photo_id: str):
-        return SimpleNamespace(id=photo_id, url=f"https://cdn.test/{photo_id}.jpg")
+        return SimpleNamespace(id=photo_id, storageKey=f"https://cdn.test/{photo_id}.jpg")
 
     def _comment(self, comment_id: str, photo_url: Optional[str] = None):
-        return SimpleNamespace(id=comment_id, photoUrl=photo_url)
+        return SimpleNamespace(id=comment_id, photoStorageKey=photo_url)
 
     def test_delete_post_author_can_delete(self, client, mock_prisma, member_auth, monkeypatch):
         photos = [self._photo("ph1"), self._photo("ph2")]
@@ -679,9 +945,9 @@ class TestDeletePost:
         mock_prisma.post.find_first = AsyncMock(return_value=post)
         mock_prisma.post.delete = AsyncMock(return_value=None)
         delete_mock = AsyncMock()
-        monkeypatch.setattr("src.routers.posts.delete_uploads", delete_mock)
+        monkeypatch.setattr("src.routers.v1.posts.delete_uploads", delete_mock)
 
-        response = client.delete(f"/posts/{POST_ID}", headers=member_auth)
+        response = client.delete(f"/v1/posts/{POST_ID}", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         delete_mock.assert_awaited_once()
@@ -698,9 +964,9 @@ class TestDeletePost:
         post = self._post(author_id="someone_else")
         mock_prisma.post.find_first = AsyncMock(return_value=post)
         mock_prisma.post.delete = AsyncMock(return_value=None)
-        monkeypatch.setattr("src.routers.posts.delete_uploads", AsyncMock())
+        monkeypatch.setattr("src.routers.v1.posts.delete_uploads", AsyncMock())
 
-        response = client.delete(f"/posts/{POST_ID}", headers=admin_auth)
+        response = client.delete(f"/v1/posts/{POST_ID}", headers=admin_auth)
 
         assert response.status_code == 200, response.json()
 
@@ -708,19 +974,19 @@ class TestDeletePost:
         post = self._post(author_id="other")
         mock_prisma.post.find_first = AsyncMock(return_value=post)
 
-        response = client.delete(f"/posts/{POST_ID}", headers=member_auth)
+        response = client.delete(f"/v1/posts/{POST_ID}", headers=member_auth)
 
         assert response.status_code == 403
 
     def test_delete_post_not_found_404(self, client, mock_prisma, member_auth):
         mock_prisma.post.find_first = AsyncMock(return_value=None)
 
-        response = client.delete(f"/posts/{POST_ID}", headers=member_auth)
+        response = client.delete(f"/v1/posts/{POST_ID}", headers=member_auth)
 
         assert response.status_code == 404
 
     def test_delete_post_requires_auth(self, client):
-        response = client.delete(f"/posts/{POST_ID}")
+        response = client.delete(f"/v1/posts/{POST_ID}")
 
         assert response.status_code == 401
 
@@ -730,7 +996,7 @@ class TestFavoritePost:
         mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123"))
         mock_prisma.favorite.create = AsyncMock(return_value=None)
 
-        response = client.post(f"/posts/{POST_ID}/favorite", headers=member_auth)
+        response = client.post(f"/v1/posts/{POST_ID}/favorite", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["favorited"] is True
@@ -739,7 +1005,7 @@ class TestFavoritePost:
         mock_prisma.post.find_unique = AsyncMock(return_value=SimpleNamespace(id=POST_ID, familySpaceId="family_test_123"))
         mock_prisma.favorite.create = AsyncMock(side_effect=PrismaError("already favorited"))
 
-        response = client.post(f"/posts/{POST_ID}/favorite", headers=member_auth)
+        response = client.post(f"/v1/posts/{POST_ID}/favorite", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["favorited"] is True
@@ -747,19 +1013,19 @@ class TestFavoritePost:
     def test_favorite_post_not_found_404(self, client, mock_prisma, member_auth):
         mock_prisma.post.find_unique = AsyncMock(return_value=None)
 
-        response = client.post(f"/posts/{POST_ID}/favorite", headers=member_auth)
+        response = client.post(f"/v1/posts/{POST_ID}/favorite", headers=member_auth)
 
         assert response.status_code == 404
 
     def test_favorite_post_requires_auth(self, client):
-        response = client.post(f"/posts/{POST_ID}/favorite")
+        response = client.post(f"/v1/posts/{POST_ID}/favorite")
 
         assert response.status_code == 401
 
     def test_unfavorite_post_success(self, client, mock_prisma, member_auth):
         mock_prisma.favorite.delete_many = AsyncMock(return_value=None)
 
-        response = client.delete(f"/posts/{POST_ID}/favorite", headers=member_auth)
+        response = client.delete(f"/v1/posts/{POST_ID}/favorite", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["favorited"] is False
@@ -785,7 +1051,7 @@ class TestCookedEvents:
             ]
         )
 
-        response = client.post(f"/posts/{POST_ID}/cooked", json={"rating": None, "note": None}, headers=member_auth)
+        response = client.post(f"/v1/posts/{POST_ID}/cooked", json={"rating": None, "note": None}, headers=member_auth)
 
         assert response.status_code == 200, response.json()
         stats = response.json()["cookedStats"]
@@ -802,7 +1068,7 @@ class TestCookedEvents:
             ]
         )
 
-        response = client.post(f"/posts/{POST_ID}/cooked", json={"rating": 5, "note": None}, headers=member_auth)
+        response = client.post(f"/v1/posts/{POST_ID}/cooked", json={"rating": 5, "note": None}, headers=member_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["cookedStats"]["averageRating"] == 4
@@ -818,7 +1084,7 @@ class TestCookedEvents:
             ]
         )
 
-        response = client.post(f"/posts/{POST_ID}/cooked", json={"note": "Great"}, headers=member_auth)
+        response = client.post(f"/v1/posts/{POST_ID}/cooked", json={"note": "Great"}, headers=member_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["recentCooked"][0]["note"] == "Great"
@@ -833,7 +1099,7 @@ class TestCookedEvents:
             ]
         )
 
-        response = client.post(f"/posts/{POST_ID}/cooked", json={"rating": 4}, headers=member_auth)
+        response = client.post(f"/v1/posts/{POST_ID}/cooked", json={"rating": 4}, headers=member_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["cookedStats"]["averageRating"] == pytest.approx(10 / 3)
@@ -842,7 +1108,7 @@ class TestCookedEvents:
     def test_log_cooked_not_found_404(self, client, mock_prisma, member_auth):
         mock_prisma.post.find_unique = AsyncMock(return_value=None)
 
-        response = client.post(f"/posts/{POST_ID}/cooked", json={}, headers=member_auth)
+        response = client.post(f"/v1/posts/{POST_ID}/cooked", json={}, headers=member_auth)
 
         assert response.status_code == 404
 
@@ -864,7 +1130,7 @@ class TestCookedEvents:
             ]
         )
 
-        response = client.get(f"/posts/{POST_ID}/cooked", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}/cooked", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         body = response.json()
@@ -890,7 +1156,7 @@ class TestCookedEvents:
             ]
         )
 
-        response = client.get(f"/posts/{POST_ID}/cooked?limit=1", headers=member_auth)
+        response = client.get(f"/v1/posts/{POST_ID}/cooked?limit=1", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         body = response.json()
@@ -900,7 +1166,7 @@ class TestCookedEvents:
     def test_unfavorite_post_idempotent(self, client, mock_prisma, member_auth):
         mock_prisma.favorite.delete_many = AsyncMock(return_value=None)
 
-        response = client.delete(f"/posts/{POST_ID}/favorite", headers=member_auth)
+        response = client.delete(f"/v1/posts/{POST_ID}/favorite", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         assert response.json()["favorited"] is False

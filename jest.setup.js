@@ -2,11 +2,6 @@
 // The Prisma client is globally mocked below, so this URL is never actually
 // dialed — it just satisfies code paths that assert DATABASE_URL is set.
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
-// Use env value if provided; otherwise generate a throwaway test secret to avoid hardcoding
-if (!process.env.JWT_SECRET) {
-  const { randomBytes } = require('crypto');
-  process.env.JWT_SECRET = randomBytes(32).toString('hex');
-}
 process.env.NODE_ENV = 'test';
 
 // Mock Prisma Client globally

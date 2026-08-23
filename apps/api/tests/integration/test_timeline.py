@@ -30,7 +30,7 @@ class TestTimelineRouter:
         return SimpleNamespace(
             id=post_id,
             title=title or f"Post {post_id}",
-            mainPhotoUrl=main_photo,
+            mainPhotoStorageKey=main_photo,
             familySpaceId="family_test_123",
             createdAt=created_at or self._ts(),
             author=author or self._actor(post_id),
@@ -40,7 +40,7 @@ class TestTimelineRouter:
         )
 
     def _post_summary(self, post_id: str = "post-s", title: str | None = None) -> SimpleNamespace:
-        return SimpleNamespace(id=post_id, title=title or f"Post {post_id}", mainPhotoUrl="https://cdn.test/post.jpg", familySpaceId="family_test_123")
+        return SimpleNamespace(id=post_id, title=title or f"Post {post_id}", mainPhotoStorageKey="https://cdn.test/post.jpg", familySpaceId="family_test_123")
 
     def _comment(
         self,
@@ -113,7 +113,7 @@ class TestTimelineRouter:
         cooked = self._cooked(cooked_id="cooked-mixed", created_at=self._ts(7))
         self._mock_events(mock_prisma, posts=[post], comments=[comment], reactions=[reaction], cooked=[cooked])
 
-        response = client.get("/timeline", headers=member_auth)
+        response = client.get("/v1/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         body = response.json()
@@ -124,7 +124,7 @@ class TestTimelineRouter:
         post = self._post(post_id="post-created", created_at=self._ts(5), title="Fresh Post")
         self._mock_events(mock_prisma, posts=[post])
 
-        response = client.get("/timeline", headers=member_auth)
+        response = client.get("/v1/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         item = response.json()["items"][0]
@@ -135,7 +135,7 @@ class TestTimelineRouter:
         comment = self._comment(comment_id="comment-2", text="Great work", created_at=self._ts(6))
         self._mock_events(mock_prisma, comments=[comment])
 
-        response = client.get("/timeline", headers=member_auth)
+        response = client.get("/v1/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         item = response.json()["items"][0]
@@ -146,7 +146,7 @@ class TestTimelineRouter:
         reaction = self._reaction(emoji="thumbs-up", created_at=self._ts(6))
         self._mock_events(mock_prisma, reactions=[reaction])
 
-        response = client.get("/timeline", headers=member_auth)
+        response = client.get("/v1/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         item = response.json()["items"][0]
@@ -157,7 +157,7 @@ class TestTimelineRouter:
         cooked = self._cooked(rating=3, note="Could be spicier", created_at=self._ts(6))
         self._mock_events(mock_prisma, cooked=[cooked])
 
-        response = client.get("/timeline", headers=member_auth)
+        response = client.get("/v1/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         item = response.json()["items"][0]
@@ -169,7 +169,7 @@ class TestTimelineRouter:
         newer = self._post(post_id="post-new", created_at=self._ts(5))
         self._mock_events(mock_prisma, posts=[older, newer])
 
-        response = client.get("/timeline", headers=member_auth)
+        response = client.get("/v1/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         items = response.json()["items"]
@@ -180,7 +180,7 @@ class TestTimelineRouter:
         posts = [self._post(post_id=f"post-{i}", created_at=self._ts(10 - i)) for i in range(3)]
         self._mock_events(mock_prisma, posts=posts)
 
-        response = client.get("/timeline?limit=2", headers=member_auth)
+        response = client.get("/v1/timeline?limit=2", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         body = response.json()
@@ -192,7 +192,7 @@ class TestTimelineRouter:
         posts = [self._post(post_id="post-limit", created_at=self._ts(4))]
         self._mock_events(mock_prisma, posts=posts)
 
-        response = client.get("/timeline?limit=1", headers=member_auth)
+        response = client.get("/v1/timeline?limit=1", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         post_calls = mock_prisma.post.find_many.await_args_list
@@ -203,7 +203,7 @@ class TestTimelineRouter:
         posts = [self._post(post_id=f"post-{i}", created_at=self._ts(10 - i)) for i in range(3)]
         self._mock_events(mock_prisma, posts=posts)
 
-        response = client.get("/timeline?offset=1", headers=member_auth)
+        response = client.get("/v1/timeline?offset=1", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         body = response.json()
@@ -217,7 +217,7 @@ class TestTimelineRouter:
         cooked = self._cooked(cooked_id="cooked-action", created_at=self._ts(8))
         self._mock_events(mock_prisma, posts=[post], comments=[comment], reactions=[reaction], cooked=[cooked])
 
-        response = client.get("/timeline", headers=member_auth)
+        response = client.get("/v1/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         mapping = {item["type"]: item["actionText"] for item in response.json()["items"]}
@@ -231,7 +231,7 @@ class TestTimelineRouter:
         post = self._post(post_id="post-actor", author=actor, created_at=self._ts(3))
         self._mock_events(mock_prisma, posts=[post])
 
-        response = client.get("/timeline", headers=member_auth)
+        response = client.get("/v1/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         item = response.json()["items"][0]
@@ -245,7 +245,7 @@ class TestTimelineRouter:
         reaction = self._reaction(post=self._post_summary("post-summary", "Summary"), created_at=self._ts(4))
         self._mock_events(mock_prisma, reactions=[reaction])
 
-        response = client.get("/timeline", headers=member_auth)
+        response = client.get("/v1/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         post = response.json()["items"][0]["post"]
@@ -254,7 +254,7 @@ class TestTimelineRouter:
     def test_timeline_family_scoped(self, client, mock_prisma, member_auth):
         self._mock_events(mock_prisma)
 
-        response = client.get("/timeline", headers=member_auth)
+        response = client.get("/v1/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         post_calls = mock_prisma.post.find_many.await_args_list
@@ -264,14 +264,14 @@ class TestTimelineRouter:
         assert mock_prisma.cookedevent.find_many.await_args.kwargs["where"]["post"]["familySpaceId"] == "family_test_123"
 
     def test_timeline_requires_auth(self, client):
-        response = client.get("/timeline")
+        response = client.get("/v1/timeline")
 
         assert response.status_code == 401
 
     def test_timeline_empty_returns_empty_array(self, client, mock_prisma, member_auth):
         self._mock_events(mock_prisma)
 
-        response = client.get("/timeline", headers=member_auth)
+        response = client.get("/v1/timeline", headers=member_auth)
 
         assert response.status_code == 200, response.json()
         body = response.json()

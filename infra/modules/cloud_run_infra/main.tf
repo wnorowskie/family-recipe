@@ -127,6 +127,10 @@ locals {
       var.jwt_secret_id,
     ],
     var.family_master_key_secret_id == "" ? [] : [var.family_master_key_secret_id],
+    # Consumed by the FastAPI service (cloud_run_api), not by Next. It is
+    # managed here because this module owns the shared runtime service account
+    # that both services run as, and therefore owns its secretAccessor grants.
+    var.refresh_pepper_secret_id == "" ? [] : [var.refresh_pepper_secret_id],
   )
 }
 
@@ -218,16 +222,10 @@ resource "google_cloud_run_v2_service" "app" {
         }
       }
 
-      env {
-        name = "JWT_SECRET"
-
-        value_source {
-          secret_key_ref {
-            secret  = var.jwt_secret_id
-            version = "latest"
-          }
-        }
-      }
+      # JWT_SECRET is intentionally NOT injected into the Next service: auth is
+      # owned by FastAPI (cloud_run_api) since the Phase 4 cutover and nothing in
+      # Next reads it. The secret itself and its runtime-SA secretAccessor grant
+      # are still managed here via local.managed_secret_ids for FastAPI's use. #243
 
       dynamic "env" {
         for_each = var.family_master_key_secret_id != "" ? [1] : []

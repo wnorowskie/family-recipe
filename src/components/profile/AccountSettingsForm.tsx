@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
+import { apiClient, ApiError } from '@/lib/apiClient';
+
 interface AccountSettingsFormProps {
   user: {
     id: string;
@@ -100,16 +102,7 @@ export default function AccountSettingsForm({
         formData.append('avatar', avatarFile);
       }
 
-      const response = await fetch('/api/me/profile', {
-        method: 'PATCH',
-        body: formData,
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Failed to update profile');
-      }
+      await apiClient.patch('/v1/me/profile', { body: formData });
 
       setProfileSuccess(
         requiresPassword
@@ -124,7 +117,7 @@ export default function AccountSettingsForm({
       router.refresh();
     } catch (error) {
       setProfileError(
-        error instanceof Error ? error.message : 'Failed to update profile'
+        error instanceof ApiError ? error.message : 'Failed to update profile'
       );
     } finally {
       setIsSavingProfile(false);
@@ -140,20 +133,9 @@ export default function AccountSettingsForm({
     setIsSavingPassword(true);
 
     try {
-      const response = await fetch('/api/me/password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ currentPassword, newPassword }),
+      await apiClient.post('/v1/me/password', {
+        body: { currentPassword, newPassword },
       });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Failed to update password');
-      }
-
       setPasswordSuccess('Password updated. Please log in again.');
       setCurrentPassword('');
       setNewPassword('');
@@ -161,7 +143,7 @@ export default function AccountSettingsForm({
       window.location.href = '/login';
     } catch (error) {
       setPasswordError(
-        error instanceof Error ? error.message : 'Failed to update password'
+        error instanceof ApiError ? error.message : 'Failed to update password'
       );
     } finally {
       setIsSavingPassword(false);
@@ -183,30 +165,19 @@ export default function AccountSettingsForm({
     }
 
     try {
-      const response = await fetch('/api/me/delete', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
+      await apiClient.del('/v1/me/delete', {
+        body: {
           currentPassword: deletePassword,
           confirmation: deleteConfirmation,
-        }),
+        },
       });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error?.message ?? 'Failed to delete account');
-      }
-
       setDeleteSuccess('Account deleted. Redirecting…');
       setTimeout(() => {
         window.location.href = '/login';
       }, 800);
     } catch (error) {
       setDeleteError(
-        error instanceof Error ? error.message : 'Failed to delete account'
+        error instanceof ApiError ? error.message : 'Failed to delete account'
       );
     } finally {
       setIsDeleting(false);

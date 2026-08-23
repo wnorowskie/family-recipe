@@ -9,3 +9,16 @@ prisma/test.db
 npm-debug.log*
 Dockerfile
 docker-compose.yml
+
+# Python dev artifacts — must never enter an image. `COPY apps/api` would
+# otherwise ship a local .venv (with its own, possibly-stale dependency tree)
+# and the gitignored generated prisma-client into the FastAPI image, bloating
+# it and tripping the container CVE scan on packages the app never runs.
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+apps/api/prisma-client

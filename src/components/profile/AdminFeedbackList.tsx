@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import type { FeedbackListItem } from '@/lib/feedback';
 
+import { apiClient, ApiError } from '@/lib/apiClient';
+
 interface AdminFeedbackListProps {
   initialItems: FeedbackListItem[];
   initialHasMore: boolean;
@@ -41,13 +43,10 @@ export default function AdminFeedbackList({
       if (category !== 'all') {
         params.set('category', category);
       }
-      const response = await fetch(`/api/feedback?${params.toString()}`, {
-        credentials: 'include',
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error?.message || 'Unable to load feedback');
-      }
+      const data = await apiClient.get<{
+        items: FeedbackListItem[];
+        page: { hasMore: boolean; nextOffset: number };
+      }>(`/v1/feedback?${params.toString()}`);
       const nextItems: FeedbackListItem[] = data?.items ?? [];
       setItems((prev) =>
         options.append ? [...prev, ...nextItems] : nextItems
@@ -55,7 +54,9 @@ export default function AdminFeedbackList({
       setHasMore(Boolean(data?.page?.hasMore));
       setNextOffset(Number(data?.page?.nextOffset ?? 0));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load feedback');
+      setError(
+        err instanceof ApiError ? err.message : 'Unable to load feedback'
+      );
     } finally {
       setLoading(false);
     }

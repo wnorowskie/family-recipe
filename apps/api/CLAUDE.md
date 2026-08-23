@@ -15,18 +15,33 @@ When you change an endpoint here, check whether the equivalent in `src/app/api/`
 - The same JWT format and `session` cookie semantics
 - The same request/response shapes (the migration plan is explicit that the contract should not change during the cutover, except for the planned `/v1/` prefix and access/refresh-token split)
 
-The Python Prisma client is generated from the postgres schema:
+The Python Prisma client is generated from the postgres schema into the active Python environment's `site-packages` (no committed `prisma-client/` directory — it's gitignored). Use the **Python** CLI so the engine version matches what `prisma-client-py` (v0.15.0) expects; `npx prisma generate` will fail with a version-mismatch error against current Node Prisma releases:
 
 ```bash
-npx prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy
+# from apps/api/, with the project venv active
+python -m prisma generate --schema ../../prisma/schema.postgres.prisma --generator clientPy
 ```
+
+After regenerating, handler code can import models directly (`from prisma.models import User` etc.) and reach all canonical fields — including the StorageKey columns renamed from the legacy `*Url` names. See [scripts/local-stack-up.sh](../../scripts/local-stack-up.sh) for the equivalent step in the local dev flow.
+
+## Auth endpoint roles
+
+`/v1/auth/*` exposes four read paths and one rotating mutation. Keep this split intact when changing anything in [src/routers/v1/auth.py](src/routers/v1/auth.py):
+
+- **`POST /v1/auth/refresh`** is the **only** endpoint that rotates the refresh-token chain. Reuse-detection (chain-burn on a stale `REVOKED_ROTATED` cookie) is exclusive to this path. The double-submit CSRF check applies.
+- **`GET /v1/auth/session`** is a **non-rotating** verify-and-return-user path. Used by Next SSR ([src/lib/auth/bootstrapFromCookies.ts](../../src/lib/auth/bootstrapFromCookies.ts)) so server components can prefetch the user on every page render without burning the chain. Replay-safe by design — calling it repeatedly with the same cookie does not mutate the DB. CSRF check applies; reuse-detection does NOT (replaying a `REVOKED_ROTATED` cookie never escalates the chain). **Rotation grace (#274):** a cookie that `/refresh` rotated away within `refresh_rotation_grace_seconds` (default 30s) is still accepted here as a read — this closes the spurious `/login?_se=1` bounce when a top-level navigation races the client's in-flight rotation, without mutating the chain. Only `REVOKED_ROTATED` qualifies (logout / reset / reuse-detected never do); past the window it returns 401. The grace lives in `_within_rotation_grace` / `_lookup_active_refresh_row`.
+- **`GET /v1/auth/me`** returns the user via `Authorization: Bearer <accessToken>`. Used after a successful login/signup/refresh, when the client already holds an access token.
+- **`POST /v1/auth/login` / `POST /v1/auth/signup`** mint a fresh chain.
+- **`POST /v1/auth/logout`** revokes the current chain link (no rotation, no reuse-detection).
+
+Validation logic for the cookie + CSRF gate is shared via `_validate_refresh_cookie` in [src/routers/v1/auth.py](src/routers/v1/auth.py). The `/refresh` handler keeps its own copy because the reuse-detection branch is intertwined with the rejection logic — splitting it would obscure the security-critical control flow.
 
 ## Module layout
 
 - [src/main.py](src/main.py) — FastAPI app, includes routers, manages prisma connect/disconnect lifespan
 - [src/routers/](src/routers/) — one file per resource, mirrors [src/app/api/](../../src/app/api/) structure
 - [src/dependencies.py](src/dependencies.py) — auth dependency injectors (the FastAPI equivalent of `withAuth`)
-- [src/permissions.py](src/permissions.py) — mirrors [src/lib/permissions.ts](../../src/lib/permissions.ts)
+- [src/permissions.py](src/permissions.py) — ownership/admin authorization rules (`canEditPost`/`canDeletePost`/`canDeleteComment`/`canRemoveMember`). Sole owner since the Next-side `permissions.ts` mirror was removed in #243.
 - [src/security.py](src/security.py) — JWT verify, password hashing
 - [src/schemas/](src/schemas/) — Pydantic request/response models (mirrors `validation.ts` + `apiErrors.ts`)
 - [src/uploads.py](src/uploads.py) — signed URL resolution for GCS
@@ -47,6 +62,8 @@ python scripts/dump_openapi.py > openapi.snapshot.json
 ```
 
 The script stubs `prisma` in-process (no client generation or DB needed) and writes deterministic, sort-key JSON. Reviewers should treat snapshot diffs as the contract changelog.
+
+The Next side validates its `/v1/*` requests against this snapshot via [\_\_tests\_\_/integration/openapi-contract.test.ts](../../__tests__/integration/openapi-contract.test.ts). When the frontend adds a new `/v1/*` call, append an entry to the `FRONTEND_CALLS` manifest in that file so the contract test guards it.
 
 ## Verification
 

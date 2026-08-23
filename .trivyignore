@@ -2,3 +2,16 @@
 # Dev DB currently keeps a public IP for proxy-less access; plan documented to move to private IP + TLS-only.
 AVD-GCP-0015
 AVD-GCP-0017
+
+# Container-scan (apps/api FastAPI image): pip-vendored deps, not app deps.
+# pip (26.x) vendors msgpack==1.1.2 and setuptools==70.3.0 for its own internal
+# use — pip/_vendor/vendor.txt + pip/_vendor/bom.cdx.json list them, in both the
+# app venv's pip and the base image's /usr/local pip. Nothing in
+# apps/api/requirements.txt pulls these, and pip is never invoked at runtime
+# (the container's entrypoint is `uvicorn`). The latest pip still vendors these
+# exact versions, so no upstream bump clears them. Revisit if a future pip
+# re-vendors patched copies, or if pip is stripped from the runtime image.
+# msgpack — out-of-bounds read / crash; only reachable via pip's own HTTP cache.
+GHSA-6v7p-g79w-8964
+# setuptools — PackageIndex path traversal; only reachable during pip installs.
+CVE-2025-47273

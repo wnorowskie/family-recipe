@@ -22,12 +22,12 @@ Dev is Eric's personal sandbox. Writes are fair game; the script cleans up after
 | Region                    | `us-east1`                                                                          |
 | Next.js Cloud Run         | `family-recipe-dev` → `https://family-recipe-dev-894181878182.us-east1.run.app`     |
 | Recipe importer Cloud Run | `recipe-importer-dev` → `https://recipe-importer-dev-894181878182.us-east1.run.app` |
-| FastAPI                   | not yet deployed to dev                                                             |
+| FastAPI Cloud Run         | `family-recipe-api-dev` → `https://family-recipe-api-dev-ibom73tcdq-ue.a.run.app`   |
 | Cloud SQL instance        | `family-recipe-dev` (`family-recipe-dev:us-east1:family-recipe-dev`)                |
 | Runtime SA                | `family-recipe-runner@family-recipe-dev.iam.gserviceaccount.com`                    |
 | Deployer SA               | `family-recipe-deployer@family-recipe-dev.iam.gserviceaccount.com`                  |
 
-Both Cloud Run services run with `--no-allow-unauthenticated` + `--ingress all`, so every request needs a Bearer ID token from an account with `roles/run.invoker`.
+All three Cloud Run services run with `--no-allow-unauthenticated` + `--ingress all`, so every request needs a Bearer ID token from an account with `roles/run.invoker`. Tokens are audience-scoped per service — `smoke:dev` mints one for the Next service and one for FastAPI. Browsers reach FastAPI same-origin via the Next `/v1/*` forwarder ([src/app/v1/[...path]/route.ts](../../src/app/v1/%5B...path%5D/route.ts)), so it needs no public URL of its own.
 
 ## One-time setup
 
@@ -107,21 +107,25 @@ npm run smoke:dev
 
 What this does (see [scripts/smoke-dev.sh](../../scripts/smoke-dev.sh)):
 
-1. Mints a Bearer ID token via deployer-SA impersonation.
-2. GET `/api/health` — confirms ingress auth + DB connectivity.
-3. POST `/api/auth/login` with ID-token Bearer + claude-test credentials → session cookie.
-4. POST `/api/posts` (multipart) — creates a tagged test post.
-5. POST `/api/posts/:id/comments` (multipart) — adds a comment.
-6. POST `/api/reactions` (JSON) — adds a reaction.
-7. GET `/api/posts/:id` — confirms comment + reaction are visible.
-8. DELETE `/api/posts/:id` — cascade-removes comment + reaction + post.
-9. GET `/api/posts/:id` — confirms 404.
+1. Mints two Bearer ID tokens via deployer-SA impersonation — one per service audience (Next + FastAPI).
+2. GET `$DEV_API_URL/health` — probes FastAPI directly so an outage here points at FastAPI itself, not the Next `/v1` forwarder.
+3. GET `/api/health` — confirms Next ingress auth + DB connectivity.
+4. POST `/api/auth/login` (claude-test credentials) → `refresh_token` + `csrf_token` cookies.
+5. POST `/api/auth/bootstrap` — mints the in-memory FastAPI access token the SPA uses on each page load.
+6. POST `/v1/posts` (multipart) — creates a tagged test post via the same-origin `/v1` forwarder → FastAPI.
+7. POST `/v1/posts/:id/comments` (multipart) — adds a comment.
+8. POST `/v1/reactions` (JSON) — toggles a reaction (200, not 201).
+9. GET `/v1/posts/:id` — confirms comment + reaction are visible.
+10. DELETE `/v1/posts/:id` — cascade-removes comment + reaction + post.
+11. GET `/v1/posts/:id` — confirms 404.
+
+Data-plane calls carry two auth headers: `X-Serverless-Authorization` (the Cloud Run IAM token, consumed and stripped at ingress) and `Authorization: Bearer <access token>` (forwarded to FastAPI by the `/v1` proxy). This mirrors the split in [scripts/dev-auth-proxy.ts](../../scripts/dev-auth-proxy.ts); see the header note atop `smoke-dev.sh`.
 
 Exit 0 = all green. Any non-zero exit runs the cleanup trap so no test post is left behind.
 
 ## Manual probes
 
-When you need to hit a specific endpoint the smoke script doesn't cover, mint the token once and reuse it:
+When you need to hit a specific `/v1/*` endpoint the smoke script doesn't cover, reproduce its two-token setup: `X-Serverless-Authorization` carries the Cloud Run IAM token; `Authorization: Bearer` carries the FastAPI access token from `/api/auth/bootstrap`.
 
 ```bash
 source .env.dev.local
@@ -129,19 +133,26 @@ TOKEN=$(gcloud auth print-identity-token \
   --impersonate-service-account="$DEV_DEPLOYER_SA" \
   --audiences="$DEV_NEXT_URL")
 
-# Cookie-jar login (for endpoints that need the session)
+# Login → refresh_token + csrf_token cookies, then bootstrap the access token.
 rm -f /tmp/fr-dev-cookies.txt
 curl -sS -o /dev/null \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "X-Serverless-Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -c /tmp/fr-dev-cookies.txt \
   -d "$(jq -cn --arg u "$CLAUDE_TEST_USER" --arg p "$CLAUDE_TEST_PASSWORD" \
         '{emailOrUsername:$u,password:$p}')" \
   "$DEV_NEXT_URL/api/auth/login"
+ACCESS_TOKEN=$(curl -sS -X POST \
+  -H "X-Serverless-Authorization: Bearer $TOKEN" \
+  -b /tmp/fr-dev-cookies.txt -c /tmp/fr-dev-cookies.txt \
+  "$DEV_NEXT_URL/api/auth/bootstrap" | jq -r '.accessToken')
 
-# Example: list timeline
-curl -sS -H "Authorization: Bearer $TOKEN" -b /tmp/fr-dev-cookies.txt \
-  "$DEV_NEXT_URL/api/timeline" | jq '.timelineEvents | length'
+# Example: list timeline via the same-origin /v1 forwarder → FastAPI.
+# (FastAPI's /v1/timeline wraps events in `.items`, not the old `.timelineEvents`.)
+curl -sS \
+  -H "X-Serverless-Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  "$DEV_NEXT_URL/v1/timeline" | jq '.items | length'
 ```
 
 **Importer probe** (separate audience, same deployer SA):
@@ -165,7 +176,7 @@ npm run proxy:dev                     # foreground; Ctrl-C to stop
 # → http://localhost:3100 proxies to $DEV_NEXT_URL
 ```
 
-The proxy mints an ID token by impersonating the deployer SA (same path as `smoke:dev`), attaches `Authorization: Bearer …` to every forwarded request, refreshes the token before it expires, and strips the `Secure` flag from Set-Cookie so the `session` cookie survives the plain-HTTP localhost hop. Now a browser at `http://localhost:3100/login` loads CSS/JS and hydrates normally.
+The proxy mints an ID token by impersonating the deployer SA (same path as `smoke:dev`), attaches it on `X-Serverless-Authorization` to every forwarded request (leaving `Authorization` free for the app's FastAPI access token), refreshes the token before it expires, and strips the `Secure` flag from Set-Cookie so the auth cookies (`refresh_token` + `csrf_token`) survive the plain-HTTP localhost hop. Now a browser at `http://localhost:3100/login` loads CSS/JS and hydrates normally.
 
 For an end-to-end Playwright run against the live dev deployment:
 
@@ -208,8 +219,8 @@ The same canary pattern lives in `deploy-prod.yml` — confirm prod the same way
 
 - **`curl -F` interprets `;` in values** as a content-type delimiter and silently truncates the payload. Use `curl --form-string` for `multipart/form-data` JSON payloads (the smoke script does; so must your manual probes).
 - **ID tokens are audience-scoped.** The token minted for `$DEV_NEXT_URL` will 401 against `$DEV_IMPORTER_URL`. Mint one per service.
-- **The cookie jar's `session` cookie is tied to the Next.js host.** Reusing the same jar across Next + importer requests is harmless (the importer ignores cookies) but don't expect it to carry identity.
-- **Rate limits are per-runtime-instance.** If the dev Cloud Run service has been warm, prior traffic counts against your quota. A 429 on `/api/posts` means either a bug or you genuinely sent too many — re-run after ~60s.
+- **The cookie jar's auth cookies (`refresh_token` + `csrf_token`) are tied to the Next.js host.** Reusing the same jar across Next + importer requests is harmless (the importer ignores cookies) but don't expect it to carry identity. Data-plane `/v1/*` calls authenticate by `Authorization: Bearer <access token>`, not by these cookies.
+- **Rate limits are per-runtime-instance.** If the dev Cloud Run service has been warm, prior traffic counts against your quota. A 429 on `/v1/posts` means either a bug or you genuinely sent too many — re-run after ~60s.
 - **`claude-test` lives alongside real family data.** Its posts are family-scoped to the real `Wnorowski Family Recipe` space, so family members _can_ see the smoke post during its short lifetime. Keep run times short; always let the script clean up.
 
 ## Seeding / rotating the `claude-test` user

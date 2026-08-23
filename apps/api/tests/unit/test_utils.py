@@ -12,24 +12,45 @@ from src.utils import is_cuid, iso
 
 class TestIsCuid:
     def test_valid_cuid(self):
-        """is_cuid should return True for valid CUIDs."""
-        # CUIDs are 25+ lowercase alphanumeric characters
+        """is_cuid should return True for valid CUIDs (leading 'c', 9+ lowercase alphanumeric chars)."""
         valid_cuids = [
             "cjld2cjxh0000qzrmn831i7rn",
             "cjld2cyuq0000t3rmniod1foy",
             "cm1234567890abcdefghijklm",
-            "abcdefghijklmnopqrstuvwxy",
         ]
         for cuid in valid_cuids:
             assert is_cuid(cuid) is True, f"Expected {cuid} to be valid"
 
     def test_invalid_cuid_too_short(self):
-        """is_cuid should return False for strings shorter than 25 chars."""
+        """is_cuid should return False for strings shorter than 9 chars total.
+
+        Mirrors Zod's z.string().cuid(): 'c' + 8 or more lowercase alphanumeric
+        chars. E2E seed IDs like 'ce2epost001' (11 chars) must pass so that
+        FastAPI route guards don't 404 on seeded fixture IDs.
+        """
         assert is_cuid("abc123") is False
-        assert is_cuid("cjld2cjxh0000qzrmn831i7r") is False  # 24 chars
+        assert is_cuid("c1234567") is False  # 8 chars total (only 7 after 'c')
+
+    def test_valid_cuid_varied_lengths(self):
+        """is_cuid should return True for any c + 8+ lowercase alphanumeric chars."""
+        assert is_cuid("ce2epost001") is True       # E2E seed (11 chars)
+        assert is_cuid("ce2erecipe001") is True     # E2E seed (13 chars)
+        assert is_cuid("cjld2cjxh0000qzrmn831i7r") is True   # 24 chars
+        assert is_cuid("cabcdefghijklmnopqrstuvwxyz") is True  # 27 chars
+
+    def test_invalid_cuid_no_leading_c(self):
+        """is_cuid should return False when the first char isn't 'c'."""
+        # 25 chars but starts with a digit.
+        assert is_cuid("0abcdefghijklmnopqrstuvwx") is False
+        # 25 chars but starts with a non-'c' letter.
+        assert is_cuid("abcdefghijklmnopqrstuvwxy") is False
 
     def test_invalid_cuid_uppercase(self):
-        """is_cuid should return False for uppercase characters."""
+        """is_cuid should return False for uppercase characters.
+
+        Stricter than Zod (whose cuid regex is case-insensitive via /i);
+        justified because Prisma's `@default(cuid())` always emits lowercase.
+        """
         assert is_cuid("CJLD2CJXH0000QZRMN831I7RN") is False
         assert is_cuid("cjld2cjxh0000qzrmn831i7rN") is False  # mixed case
 

@@ -1,31 +1,19 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import NotificationsFeed, {
   type NotificationResponseItem,
 } from '@/components/notifications/NotificationsFeed';
-import { getCurrentUser } from '@/lib/session';
+import { resolvePageUser } from '@/lib/session';
 import { fetchNotifications } from '@/lib/notifications';
 
 const PAGE_SIZE = 20;
 
 export default async function NotificationsPage() {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('session');
-
-  if (!sessionCookie) {
-    redirect('/login');
-  }
-
-  const mockRequest = {
-    cookies: {
-      get: () => sessionCookie,
-    },
-  } as any;
-
-  const user = await getCurrentUser(mockRequest);
+  const user = await resolvePageUser();
 
   if (!user) {
-    redirect('/login');
+    // `_se=1` marks a session error so the middleware lets /login through;
+    // see resolvePageUser in src/lib/session.ts.
+    redirect('/login?_se=1');
   }
 
   const { notifications, hasMore, nextOffset } = await fetchNotifications({

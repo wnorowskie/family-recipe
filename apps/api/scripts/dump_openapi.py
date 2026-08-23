@@ -28,8 +28,23 @@ def _stub_prisma() -> None:
     prisma_stub = types.ModuleType("prisma")
     prisma_stub.Prisma = lambda: mock  # type: ignore[attr-defined]
 
+    # `comments.py` imports `Json` to wrap Json-column payloads
+    # (notification metadata); mirror tests/conftest.py's stub.
+    class _Json:
+        def __init__(self, data: object) -> None:
+            self.data = data
+
+    prisma_stub.Json = _Json  # type: ignore[attr-defined]
+
     errors_stub = types.ModuleType("prisma.errors")
     errors_stub.PrismaError = Exception  # type: ignore[attr-defined]
+
+    # `me.py`'s PATCH /v1/me/profile handler catches `UniqueViolationError`
+    # to map P2002 -> 409 CONFLICT; without a real symbol the import fails.
+    class _UniqueViolationError(errors_stub.PrismaError):  # type: ignore[attr-defined,misc]
+        pass
+
+    errors_stub.UniqueViolationError = _UniqueViolationError  # type: ignore[attr-defined]
 
     models_stub = types.ModuleType("prisma.models")
 
