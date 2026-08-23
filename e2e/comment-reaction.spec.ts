@@ -58,7 +58,14 @@ test(
     await page.getByPlaceholder('Share your thoughts').fill(commentText);
     await page.getByRole('button', { name: /^post comment$/i }).click();
 
-    const commentLocator = page.getByText(commentText, { exact: true });
+    // Scope to the rendered comment body, never a bare page-wide getByText:
+    // the comment <textarea> still holds this exact string (the form clears it
+    // only on success), so an unscoped text locator matches the *input* and a
+    // failed write reads as a pass. That false positive is what let #276 slip
+    // past this assertion and fail later at the reload instead.
+    const commentLocator = page
+      .getByRole('paragraph')
+      .filter({ hasText: commentText });
     await expect(commentLocator).toBeVisible();
 
     // The 🔥 button appears both in the post-level Reactions section and on
@@ -84,7 +91,9 @@ test(
     await expect(reactionPill).toBeVisible();
 
     await page.reload();
-    await expect(page.getByText(commentText, { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('paragraph').filter({ hasText: commentText })
+    ).toBeVisible();
     await expect(
       page
         .getByRole('heading', { name: 'Reactions', exact: true })

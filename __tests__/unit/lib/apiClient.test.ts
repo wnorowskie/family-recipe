@@ -5,6 +5,7 @@ import {
   clearRefreshHooks,
   setAccessTokenProvider,
   setRefreshHooks,
+  tryRefresh,
 } from '@/lib/apiClient';
 import { API_ERROR_CODES } from '@/lib/apiErrors';
 
@@ -491,6 +492,138 @@ describe('apiClient', () => {
       });
       expect(onRefreshed).not.toHaveBeenCalled();
       expect(onRefreshFailed).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // #276: AuthBootstrap starts a rotating refresh on mount. A request made in
+  // that window used to go out with no Authorization header, 401, and recover
+  // only on the retry — which a concurrent navigation could abort, silently
+  // dropping the write.
+  describe('joining an in-flight refresh', () => {
+    const originalDocument = (global as { document?: unknown }).document;
+
+    function setCookie(value: string): void {
+      Object.defineProperty(global, 'document', {
+        value: { cookie: value },
+        configurable: true,
+        writable: true,
+      });
+    }
+
+    // Resolves once every pending microtask *and* macrotask has drained, so an
+    // assertion of "this fetch has not been issued" is meaningful rather than
+    // just early.
+    const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+    // apiClient's `inflightRefresh` is module state with no exported reset. A
+    // test that fails before releasing its deferred refresh would otherwise
+    // leave it pending forever, and the next test's tryRefresh() would join
+    // that dead promise instead of issuing its own fetch. Track every deferred
+    // response and settle them all in afterEach so a failure stays local.
+    let releases: Array<() => void> = [];
+
+    function deferredRefresh(): Promise<Response> {
+      let release: (value: Response) => void = () => {};
+      const promise = new Promise<Response>((resolve) => {
+        release = resolve;
+      });
+      releases.push(() => release(jsonResponse({ accessToken: 'released' })));
+      return promise;
+    }
+
+    beforeEach(() => {
+      setCookie('csrf_token=csrf-abc');
+      releases = [];
+    });
+
+    afterEach(async () => {
+      for (const release of releases) release();
+      await flush();
+      if (originalDocument === undefined) {
+        delete (global as { document?: unknown }).document;
+      } else {
+        Object.defineProperty(global, 'document', {
+          value: originalDocument,
+          configurable: true,
+          writable: true,
+        });
+      }
+    });
+
+    it('holds a tokenless request until the in-flight refresh resolves, then sends it authenticated', async () => {
+      let token: string | null = null;
+      setAccessTokenProvider(() => token);
+      setRefreshHooks({
+        onRefreshed: (accessToken) => {
+          token = accessToken;
+        },
+        onRefreshFailed: () => {
+          token = null;
+        },
+      });
+
+      let releaseRefresh: (value: Response) => void = () => {};
+      const pendingRefresh = new Promise<Response>((resolve) => {
+        releaseRefresh = resolve;
+      });
+      releases.push(() => releaseRefresh(jsonResponse({ accessToken: 'x' })));
+
+      fetchMock
+        .mockReturnValueOnce(pendingRefresh)
+        .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+      const refreshing = tryRefresh();
+      const writing = apiClient.post<{ ok: boolean }>('/v1/posts/p1/comments', {
+        body: { text: 'hello' },
+      });
+
+      await flush();
+      // Only the bootstrap has gone out — the write is parked, not 401ing.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe('/api/auth/bootstrap');
+
+      releaseRefresh(jsonResponse({ accessToken: 'fresh-token' }));
+      await expect(refreshing).resolves.toBe(true);
+      await expect(writing).resolves.toEqual({ ok: true });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[1][0]).toBe('/v1/posts/p1/comments');
+      expect(fetchMock.mock.calls[1][1]?.headers).toEqual(
+        expect.objectContaining({ Authorization: 'Bearer fresh-token' })
+      );
+    });
+
+    it('does not wait when a token is already held, even mid-rotation', async () => {
+      setAccessTokenProvider(() => 'existing-token');
+      setRefreshHooks({ onRefreshed: jest.fn(), onRefreshFailed: jest.fn() });
+
+      fetchMock
+        .mockReturnValueOnce(deferredRefresh())
+        .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+      void tryRefresh();
+      await expect(
+        apiClient.get<{ ok: boolean }>('/v1/posts')
+      ).resolves.toEqual({ ok: true });
+
+      expect(fetchMock.mock.calls[1][1]?.headers).toEqual(
+        expect.objectContaining({ Authorization: 'Bearer existing-token' })
+      );
+    });
+
+    it('does not park auth endpoints behind an in-flight refresh', async () => {
+      setAccessTokenProvider(() => null);
+      setRefreshHooks({ onRefreshed: jest.fn(), onRefreshFailed: jest.fn() });
+
+      fetchMock
+        .mockReturnValueOnce(deferredRefresh())
+        .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+      void tryRefresh();
+      // Would hang here if logout were parked behind the pending refresh.
+      await expect(apiClient.post('/api/auth/logout')).resolves.toEqual({
+        ok: true,
+      });
     });
   });
 });
