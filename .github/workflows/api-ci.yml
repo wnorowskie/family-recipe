@@ -156,10 +156,13 @@ jobs:
           severity: HIGH,CRITICAL
           # The FastAPI image is Debian-based (prisma-client-py's query engine
           # doesn't run on Alpine's openssl 3 — see apps/api/Dockerfile). The
-          # Debian base carries unfixed HIGH/CRITICAL CVEs in perl / util-linux
-          # that we can't remediate — no upstream fix exists and the app never
-          # invokes them. Fail only on FIXED (actionable) vulns; the unfixed
-          # base-OS backlog is tracked for periodic base-image bumps (#248).
+          # Debian base carries unfixed HIGH/CRITICAL CVEs (e.g. perl-base,
+          # curl) that we can't remediate — no upstream fix exists and the app
+          # never invokes them. Fail only on FIXED (actionable) vulns; the
+          # unfixed base-OS backlog is tracked for periodic base-image bumps
+          # (#248). When a previously-unfixed CVE gets a Debian security fix
+          # (e.g. util-linux, #281), this job goes red until the Dockerfile's
+          # `apt-get upgrade -y` picks it up on the next image rebuild.
           ignore-unfixed: true
 
   dependency-scan:
