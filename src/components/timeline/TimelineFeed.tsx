@@ -6,6 +6,7 @@ import EmptyState from './EmptyState';
 import { TimelineItem } from '@/lib/timeline';
 import { apiClient, ApiError } from '@/lib/apiClient';
 import { API_ERROR_CODES } from '@/lib/apiErrors';
+import Button from '@/components/ui/Button';
 
 interface TimelinePage {
   items: TimelineItem[];
@@ -77,13 +78,13 @@ export default function TimelineFeed({
 
       {hasMore && (
         <div className="text-center pt-4">
-          <button
+          <Button
+            variant="secondary"
             onClick={handleLoadMore}
             disabled={isLoadingMore}
-            className="px-6 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoadingMore ? 'Loading...' : 'Load More'}
-          </button>
+          </Button>
         </div>
       )}
     </div>

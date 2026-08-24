@@ -4,9 +4,9 @@ export default function EmptyState() {
   return (
     <div className="bg-white rounded-lg shadow p-8 text-center">
       <div className="max-w-sm mx-auto">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--bg-muted)] flex items-center justify-center">
           <svg
-            className="w-8 h-8 text-gray-400"
+            className="w-8 h-8 text-[var(--fg-placeholder)]"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -19,10 +19,10 @@ export default function EmptyState() {
             />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <h3 className="text-lg font-semibold text-[var(--fg-strong)] mb-2">
           No activity yet!
         </h3>
-        <p className="text-gray-600 mb-6">
+        <p className="text-[var(--fg-meta)] mb-6">
           Be the first to share a recipe or post what you&apos;re cooking.
         </p>
         <Link
