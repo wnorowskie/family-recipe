@@ -40,7 +40,7 @@ function ReactionSummary({
       {reactionSummary.emojiCounts.map((entry) => (
         <span
           key={entry.emoji}
-          className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-muted)] px-2 py-1 text-xs font-semibold text-[var(--bg-primary)]"
+          className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-muted)] px-2 py-1 text-xs font-semibold text-[var(--color-gray-800)]"
         >
           <span aria-hidden>{entry.emoji}</span>
           <span>{entry.count}</span>

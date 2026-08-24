@@ -631,7 +631,9 @@ export default function PostDetailView({
               <p className="text-sm text-[var(--fg-caption)] mb-1">
                 Family story
               </p>
-              <p className="text-[var(--bg-primary)]">{post.recipe.origin}</p>
+              <p className="text-[var(--color-gray-800)]">
+                {post.recipe.origin}
+              </p>
             </div>
           )}
 
@@ -655,7 +657,7 @@ export default function PostDetailView({
               <h2 className="text-lg font-semibold text-[var(--fg-strong)] mb-3">
                 Ingredients
               </h2>
-              <div className="bg-[var(--bg-page)] rounded-2xl p-4 text-[var(--bg-primary)]">
+              <div className="bg-[var(--bg-page)] rounded-2xl p-4 text-[var(--color-gray-800)]">
                 {post.recipe.ingredients.length > 0 ? (
                   <ul className="space-y-2 text-sm md:text-base">
                     {post.recipe.ingredients.map((ingredient, index) => (
@@ -675,7 +677,7 @@ export default function PostDetailView({
               <h2 className="text-lg font-semibold text-[var(--fg-strong)] mb-3">
                 Steps
               </h2>
-              <div className="bg-[var(--bg-page)] rounded-2xl p-4 text-[var(--bg-primary)]">
+              <div className="bg-[var(--bg-page)] rounded-2xl p-4 text-[var(--color-gray-800)]">
                 {post.recipe.steps.length > 0 ? (
                   <ol className="space-y-3 list-decimal list-inside text-sm md:text-base">
                     {post.recipe.steps.map((step, index) => (
@@ -733,7 +735,7 @@ export default function PostDetailView({
               )}
             </p>
             {post.lastEditNote && (
-              <p className="text-[var(--bg-primary)] mt-1">
+              <p className="text-[var(--color-gray-800)] mt-1">
                 “{post.lastEditNote}”
               </p>
             )}
@@ -803,7 +805,7 @@ export default function PostDetailView({
                     )}
                   </div>
                   {entry.note && (
-                    <p className="mt-2 text-[var(--bg-primary)] whitespace-pre-line">
+                    <p className="mt-2 text-[var(--color-gray-800)] whitespace-pre-line">
                       {entry.note}
                     </p>
                   )}
@@ -922,7 +924,7 @@ export default function PostDetailView({
                       </button>
                     )}
                   </div>
-                  <p className="text-[var(--bg-primary)] mt-2 whitespace-pre-line">
+                  <p className="text-[var(--color-gray-800)] mt-2 whitespace-pre-line">
                     {comment.text}
                   </p>
                   {comment.photoUrl && (
