@@ -158,11 +158,15 @@ jobs:
           # doesn't run on Alpine's openssl 3 — see apps/api/Dockerfile). The
           # Debian base carries unfixed HIGH/CRITICAL CVEs (e.g. perl-base,
           # curl) that we can't remediate — no upstream fix exists and the app
-          # never invokes them. Fail only on FIXED (actionable) vulns; the
-          # unfixed base-OS backlog is tracked for periodic base-image bumps
-          # (#248). When a previously-unfixed CVE gets a Debian security fix
-          # (e.g. util-linux, #281), this job goes red until the Dockerfile's
-          # `apt-get upgrade -y` picks it up on the next image rebuild.
+          # never invokes them. Fail only on FIXED (actionable) vulns.
+          # Alpine and distroless bases were both evaluated and rejected as
+          # ways to shrink this backlog — see "Base image CVE posture" in
+          # apps/api/CLAUDE.md (#248) for why, before revisiting either.
+          # `ignore-unfixed` is a deliberate, reviewed-in-place stance, not a
+          # stopgap waiting on a follow-up. When a previously-unfixed CVE gets
+          # a Debian security fix (e.g. util-linux, #281), this job goes red
+          # until the Dockerfile's `apt-get upgrade -y` picks it up on the
+          # next image rebuild.
           ignore-unfixed: true
 
   dependency-scan:
