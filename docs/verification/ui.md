@@ -7,11 +7,16 @@ Rule of thumb: **if the change adds, removes, or alters anything a user sees, do
 ## Start the dev server
 
 ```bash
-npm run dev &
+scripts/local-stack-up.sh
+scripts/with-local-stack.sh npm run dev &
+scripts/with-local-stack.sh uvicorn apps.api.src.main:app --port 8000 &
 until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
+until curl -sf http://localhost:8000/v1/health >/dev/null; do sleep 0.5; done
 ```
 
-Postgres must be up — see the setup block in [next-api.md](next-api.md#start-the-dev-server). SQLite was dropped in #80; local dev is Postgres-only.
+Postgres must be up — [scripts/local-stack-up.sh](../../scripts/local-stack-up.sh) handles it. SQLite was dropped in #80; local dev is Postgres-only.
+
+**Start FastAPI too, not just Next.** Every gated page under the `(app)` group resolves its user through the auth proxies, which forward to FastAPI — so without uvicorn you can log in nowhere and L1 below is limited to `/login` and `/signup`. See the shared setup block in [README.md](README.md#shared-helpers).
 
 ## L0 — server-rendered HTML / static strings
 

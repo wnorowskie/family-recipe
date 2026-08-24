@@ -61,8 +61,11 @@ The script prints the seeded family master key and `CLAUDE_TEST_USER` / `CLAUDE_
 scripts/with-local-stack.sh npm run dev &                                     # Next on :3000
 scripts/with-local-stack.sh uvicorn apps.api.src.main:app --port 8000 &       # FastAPI on :8000
 until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
+until curl -sf http://localhost:8000/v1/health >/dev/null; do sleep 0.5; done
 echo "ready"
 ```
+
+**Start both.** Since the Phase 4 cutover the Next auth proxies are the only way to get a session, and they forward to FastAPI — so a Next server on its own cannot log anyone in. `.env.sandbox` carries `API_INTERNAL_URL=http://localhost:8000` for that hop (#299); if you run uvicorn on a different port, re-run `API_PORT=<port> scripts/local-stack-up.sh` so the two agree.
 
 **Cookie-jar login** — use [scripts/claude-login.sh](../../scripts/claude-login.sh), which logs in as the `claude-test` seed user and writes a session cookie to `/tmp/fr-cookies.txt`:
 

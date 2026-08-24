@@ -9,6 +9,7 @@
 #
 # Usage:
 #   scripts/local-stack-up.sh
+#   API_PORT=8001 scripts/local-stack-up.sh   # if uvicorn will run on a non-default port
 #
 # After this succeeds:
 #   scripts/with-local-stack.sh npm run dev                 # Next on :3000
@@ -27,6 +28,7 @@ CONTAINER_NAME="family-recipe-pg-sandbox"
 VOLUME_NAME="family-recipe-pg-sandbox-data"
 POSTGRES_IMAGE="postgres:16"
 HOST_PORT="5434"                 # non-default, avoids clashing with a user's :5432 Postgres
+API_PORT="${API_PORT:-8000}"     # uvicorn default used throughout docs/verification/
 DB_USER="family_app"
 DB_PASSWORD="dev-only-password"
 DB_NAME="family_recipe_dev"
@@ -39,6 +41,9 @@ JWT_SECRET="sandbox-jwt-secret-not-for-production"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="${REPO_ROOT}/.env.sandbox"
 DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${HOST_PORT}/${DB_NAME}"
+# Server-side FastAPI origin for the Next auth proxies. Without this the proxies
+# throw UpstreamNotConfiguredError and every login returns 500 (#299).
+API_INTERNAL_URL="http://localhost:${API_PORT}"
 
 step() { printf "\n\033[1;34m==>\033[0m %s\n" "$*"; }
 info() { printf "    %s\n" "$*"; }
@@ -144,6 +149,10 @@ cat > "$ENV_FILE" <<EOF
 # before running \`npm run dev\` or \`uvicorn\` so the servers target the
 # sandbox Postgres on :${HOST_PORT} rather than the default :5432.
 DATABASE_URL="${DATABASE_URL}"
+# Read at runtime by the Next auth proxies (src/lib/apiUpstream.ts) to reach
+# FastAPI. Assumes uvicorn is running on :${API_PORT}; if you start it on a
+# different port, re-run this script with API_PORT set to match.
+API_INTERNAL_URL="${API_INTERNAL_URL}"
 JWT_SECRET="${JWT_SECRET}"
 FAMILY_MASTER_KEY="${FAMILY_MASTER_KEY}"
 CLAUDE_TEST_USER="${CLAUDE_TEST_USER}"
@@ -156,13 +165,14 @@ printf '\n\033[1;32m✓ local stack is up\033[0m\n\n'
 cat <<EOF
   Postgres          ${CONTAINER_NAME}  (postgres:16 on localhost:${HOST_PORT})
   DATABASE_URL      ${DATABASE_URL}
+  API_INTERNAL_URL  ${API_INTERNAL_URL}  (Next -> FastAPI; start uvicorn on :${API_PORT})
   Family master key ${FAMILY_MASTER_KEY}
   Test user         ${CLAUDE_TEST_USER} / ${CLAUDE_TEST_PASSWORD}
   Sandbox env       ${ENV_FILE}  (gitignored)
 
 Next steps:
   scripts/with-local-stack.sh npm run dev                              # Next on :3000
-  scripts/with-local-stack.sh uvicorn apps.api.src.main:app --port 8000  # FastAPI on :8000
+  scripts/with-local-stack.sh uvicorn apps.api.src.main:app --port ${API_PORT}  # FastAPI on :${API_PORT}
   COOKIES=\$(scripts/claude-login.sh)                                    # grab a cookie
 
 Teardown: scripts/local-stack-down.sh

@@ -16,8 +16,12 @@ Start the dev server:
 ```bash
 scripts/local-stack-up.sh
 scripts/with-local-stack.sh npm run dev &
+scripts/with-local-stack.sh uvicorn apps.api.src.main:app --port 8000 &
 until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
+until curl -sf http://localhost:8000/v1/health >/dev/null; do sleep 0.5; done
 ```
+
+All four routes below are proxies — they forward to FastAPI and have no local fallback, so **uvicorn must be running** or every call returns 500 `INTERNAL_ERROR` / "API not configured". `.env.sandbox` supplies the `API_INTERNAL_URL` that points Next at it (#299).
 
 Confirm bootstrap responds (requires valid FastAPI refresh + csrf cookies in the browser):
 
