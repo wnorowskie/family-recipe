@@ -1,8 +1,12 @@
 # Frontend ↔ FastAPI Migration Plan
 
-> ## ✅ Status: Migration complete (Phase 4 cutover shipped)
+> ## ✅ Status: Live in production since 2026-08-23
 >
-> **FastAPI is the sole application and auth backend.** The Next `/api/*` data routes were deleted (Phase 4.3, #231) and the legacy Next JWT/`session`-cookie auth stack was removed (Phase 4.4, #232). The Next service now serves only the UI plus same-origin auth proxies (`login`/`signup`/`logout`/`bootstrap`) and a health check; all data and auth flow through FastAPI under `/v1/*`.
+> **FastAPI is the sole application and auth backend, in prod.** Released via PR #263 (merge commit `1912ceab`); epic #38 closed. Prod runs `family-recipe-prod` (Next UI + auth proxies) and `family-recipe-api-prod` (this backend, IAM-private) in `family-recipe-prod`/`us-east1`. Both Phase 4 migrations — `add_refresh_tokens` and `add_idempotency_keys`, both additive — are applied to the prod database.
+>
+> The Next `/api/*` data routes were deleted (Phase 4.3, #231) and the legacy Next JWT/`session`-cookie auth stack was removed (Phase 4.4, #232). The Next service now serves only the UI plus same-origin auth proxies (`login`/`signup`/`logout`/`bootstrap`) and a health check; all data and auth flow through FastAPI under `/v1/*`.
+>
+> **Two known gaps carried forward from the release.** The rollout used the repo's candidate-tag canary (deploy at 0% → smoke the tagged revision → promote) rather than the graduated 5/25/50/100 split described below, and the rollback triggers in [Rollback Criteria](#rollback-criteria) are **not wired to alerts** — `Service Down` is inverted (#284) and the API service has no monitoring coverage (#32). Release monitoring was done by hand against Cloud Run logs.
 >
 > This document is now **two things**: a historical record of how the migration ran, and the reference for the current backend architecture (Phase-status call-outs are inline below). Because the feature flags are gone, **rollback is a code revert, not a config flip** — see the standalone [Phase 4 rollback runbook](rollback-phase4.md).
 >
@@ -29,12 +33,16 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ## Current State Summary
 
+> **Historical — this describes the pre-migration world (April 2026).** For the architecture as it stands today, see the status banner above and the root [CLAUDE.md](../CLAUDE.md).
+
 - Frontend fetches same‑origin `/api/*` routes in Next.
 - Next route handlers implement auth, sessions, and data logic.
 - FastAPI has core routes for auth, posts, profile, tags, timeline, etc., but is missing some endpoints used by the frontend.
 - Next middleware and server components read session cookies directly.
 
 ## Target Architecture
+
+> **Reached.** Everything in this section shipped, with one deviation: `NEXT_PUBLIC_API_BASE_URL` is deliberately built **empty** in the deployed images, so the browser issues same-origin `/v1/*` requests that the Next catch-all proxy forwards to the IAM-private FastAPI service. Passing the FastAPI URL here would send browsers cross-origin to a service they cannot invoke (#241).
 
 - Frontend calls FastAPI via a shared API client using `NEXT_PUBLIC_API_BASE_URL`.
 - Auth uses:
@@ -49,11 +57,10 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ### API Versioning
 
-- **Target prefix**: all FastAPI endpoints are **/v1/**.
-- **Transition aliasing**: keep unprefixed routes as aliases during rollout.
-  - Example: `/v1/auth/login` and `/auth/login` both resolve to the same handler.
+- **Target prefix**: all FastAPI endpoints are **/v1/**. ✅ Reached.
+- **Transition aliasing**: ~~keep unprefixed routes as aliases during rollout~~ — **done and removed.** #233 collapsed the routers to `/v1`-only and deleted every un-prefixed alias, so `/auth/login` and `/posts` now 404. Anything still calling a bare path is a bug.
 - **Mapping table below** assumes **/v1/** for all target endpoints.
-- **Deprecation**: unprefixed routes sunset after rollout (announce + remove).
+- **Deprecation**: complete — the sunset happened in #233.
 
 ### Common Conventions
 
@@ -535,6 +542,32 @@ terraform apply
 
 The phase-2 plan also surfaces any pre-existing traffic-pin drift on the **Next** service (`TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION` → `LATEST`) — that is unrelated to this work and safe to apply, since the next `deploy-*` run promotes a fresh revision to `LATEST` anyway. Confirm the pinned revision isn't a deliberate rollback before approving.
 
+##### ⚠️ Three phases, not two, when the environment is already live
+
+**The two-phase sequence above is only safe on a greenfield environment.** It was written for dev, where nothing was serving users yet. Running it against an environment with a live Next service — as prod was during the #283 bring-up — is destructive: the bare `terraform apply` in phase 2 **strips `JWT_SECRET` from the running Next service**, because at that point terraform's config did not yet know about a secret ref the deploy workflow had set. That would have broken auth for real users before the cutover ever shipped.
+
+Prod was brought up with a targeted third phase instead, and this is the sequence to use for any live environment:
+
+```bash
+cd infra/envs/<env>
+terraform init
+
+# Phase 1 — create ONLY the refresh-pepper secret container
+terraform apply -target='module.cloud_run_infra.google_secret_manager_secret.secrets["family-recipe-<env>-refresh-pepper"]'
+
+# Phase 2 — seed a version (>= 32 chars enforced in production)
+openssl rand -base64 48 | tr -d '\n' | \
+  gcloud secrets versions add family-recipe-<env>-refresh-pepper \
+    --project family-recipe-<env> --data-file=-
+
+# Phase 3 — create ONLY the new API-side resources. Never a bare apply.
+terraform apply \
+  -target='module.cloud_run_api' \
+  -target='module.artifact_registry_api'
+```
+
+**The general rule this reflects:** the deploy workflows and terraform both own parts of the Cloud Run service spec, and terraform treats anything a workflow set as drift to be removed. A bare `terraform apply` against a live environment will silently revert workflow-managed env vars and secret refs. Always `-target` the resources you actually intend to change, and read the plan **body** — the summary line is not enough. As of the Phase 4 release the prod plan reports a benign-looking `0 add, 4 change, 0 destroy` while proposing to delete all three `API_INTERNAL_*` env vars from the live Next service, which would break every `/v1` request (tracked in #285).
+
 **Order of operations for a first deploy into an environment:**
 
 1. Two-phase `terraform apply` + seed (above) — creates the API service (hello-world baseline), its Artifact Registry repo, and the seeded secret.
@@ -553,6 +586,13 @@ After the first bring-up each service deploys independently on subsequent pushes
 - Reads can be mirrored for validation logs without side effects.
 
 ### Rollback Criteria
+
+> **⚠️ These are not wired to alerts.** Nothing fires automatically on any threshold below. `Service Down (dev|prod)` is inverted — it alerts when the service is _healthy_ and stays silent when it is down (#284) — and the FastAPI service has no monitoring coverage at all (#32). Until both land, judging these criteria means querying Cloud Run logs by hand:
+>
+> ```bash
+> gcloud logging read 'resource.type=cloud_run_revision AND httpRequest.status>=500' \
+>   --project family-recipe-prod --freshness=15m
+> ```
 
 - Auth failure rate > 2% for 10 minutes
 - Refresh loop rate > 0.5% of sessions
