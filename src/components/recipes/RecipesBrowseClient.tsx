@@ -413,20 +413,22 @@ export default function RecipesBrowseClient({
       <section className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Recipes</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-2xl font-bold text-[var(--fg-strong)]">
+              Recipes
+            </h2>
+            <p className="text-sm text-[var(--fg-caption)]">
               Browse the family cookbook and find what to cook next.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 lg:justify-end">
-            <div className="inline-flex rounded-full border border-gray-200 bg-gray-50 p-1 text-xs font-semibold">
+            <div className="inline-flex rounded-full border border-[var(--border-card)] bg-[var(--bg-page)] p-1 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => setSortMode('recent')}
                 className={`rounded-full px-3 py-1.5 transition ${
                   sortMode === 'recent'
-                    ? 'bg-white text-gray-900 shadow'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-white text-[var(--fg-strong)] shadow'
+                    : 'text-[var(--fg-meta)] hover:text-[var(--fg-strong)]'
                 }`}
               >
                 Most recent
@@ -436,8 +438,8 @@ export default function RecipesBrowseClient({
                 onClick={() => setSortMode('alpha')}
                 className={`rounded-full px-3 py-1.5 transition ${
                   sortMode === 'alpha'
-                    ? 'bg-white text-gray-900 shadow'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-white text-[var(--fg-strong)] shadow'
+                    : 'text-[var(--fg-meta)] hover:text-[var(--fg-strong)]'
                 }`}
               >
                 A-Z title
@@ -447,8 +449,8 @@ export default function RecipesBrowseClient({
                 onClick={() => setSortMode('rating')}
                 className={`rounded-full px-3 py-1.5 transition ${
                   sortMode === 'rating'
-                    ? 'bg-white text-gray-900 shadow'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-white text-[var(--fg-strong)] shadow'
+                    : 'text-[var(--fg-meta)] hover:text-[var(--fg-strong)]'
                 }`}
               >
                 Top rated
@@ -457,7 +459,7 @@ export default function RecipesBrowseClient({
             <button
               type="button"
               onClick={resetFilters}
-              className="self-start rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              className="self-start rounded-full border border-[var(--border-card)] px-4 py-2 text-sm font-semibold text-[var(--fg-body)] hover:bg-[var(--bg-page)]"
             >
               Reset filters
             </button>
@@ -469,9 +471,9 @@ export default function RecipesBrowseClient({
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder="Search by recipe title"
-            className="w-full rounded-2xl border border-gray-200 px-5 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+            className="w-full rounded-2xl border border-[var(--border-card)] px-5 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
           />
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--fg-placeholder)]">
             ⌕
           </span>
         </div>
@@ -485,11 +487,13 @@ export default function RecipesBrowseClient({
           aria-expanded={filtersOpen}
         >
           <div>
-            <p className="text-sm font-semibold text-gray-900">Filters</p>
-            <p className="text-xs text-gray-500">{filterSummary}</p>
+            <p className="text-sm font-semibold text-[var(--fg-strong)]">
+              Filters
+            </p>
+            <p className="text-xs text-[var(--fg-caption)]">{filterSummary}</p>
           </div>
           <svg
-            className={`h-5 w-5 text-gray-500 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
+            className={`h-5 w-5 text-[var(--fg-caption)] transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
             viewBox="0 0 20 20"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -505,7 +509,7 @@ export default function RecipesBrowseClient({
           </svg>
         </button>
         {filtersOpen && (
-          <div className="border-t border-gray-100 p-6 space-y-3">
+          <div className="border-t border-[var(--bg-muted)] p-6 space-y-3">
             <FilterGroup title="Course" summary={courseSummary}>
               <div className="flex flex-wrap gap-2">
                 {COURSE_OPTIONS.map((option) => {
@@ -520,8 +524,8 @@ export default function RecipesBrowseClient({
                       onClick={() => toggleCourse(option.value)}
                       className={`rounded-full border px-4 py-2 text-sm font-medium ${
                         isSelected
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                          ? 'bg-[var(--fg-strong)] text-white border-[var(--border-active)]'
+                          : 'border-[var(--border-card)] text-[var(--fg-body)] hover:border-[var(--border-input)]'
                       }`}
                     >
                       {option.label}
@@ -540,8 +544,8 @@ export default function RecipesBrowseClient({
                     onClick={() => handleCookTimeSelect(option.key)}
                     className={`rounded-full border px-4 py-2 text-sm font-medium ${
                       selectedCookTimeKey === option.key
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                        ? 'bg-[var(--fg-strong)] text-white border-[var(--border-active)]'
+                        : 'border-[var(--border-card)] text-[var(--fg-body)] hover:border-[var(--border-input)]'
                     }`}
                   >
                     {option.label}
@@ -559,8 +563,8 @@ export default function RecipesBrowseClient({
                     onClick={() => handleServingsSelect(option.key)}
                     className={`rounded-full border px-4 py-2 text-sm font-medium ${
                       selectedServingsKey === option.key
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                        ? 'bg-[var(--fg-strong)] text-white border-[var(--border-active)]'
+                        : 'border-[var(--border-card)] text-[var(--fg-body)] hover:border-[var(--border-input)]'
                     }`}
                   >
                     {option.label}
@@ -583,8 +587,8 @@ export default function RecipesBrowseClient({
                       onClick={() => toggleDifficulty(option.value)}
                       className={`rounded-full border px-4 py-2 text-sm font-medium ${
                         isSelected
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                          ? 'bg-[var(--fg-strong)] text-white border-[var(--border-active)]'
+                          : 'border-[var(--border-card)] text-[var(--fg-body)] hover:border-[var(--border-input)]'
                       }`}
                     >
                       {option.label}
@@ -601,8 +605,8 @@ export default function RecipesBrowseClient({
                   onClick={() => setSelectedAuthorId('')}
                   className={`rounded-full border px-4 py-2 text-sm font-medium ${
                     selectedAuthorId === ''
-                      ? 'bg-gray-900 text-white border-gray-900'
-                      : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      ? 'bg-[var(--fg-strong)] text-white border-[var(--border-active)]'
+                      : 'border-[var(--border-card)] text-[var(--fg-body)] hover:border-[var(--border-input)]'
                   }`}
                 >
                   All members
@@ -620,8 +624,8 @@ export default function RecipesBrowseClient({
                       }
                       className={`rounded-full border px-4 py-2 text-sm font-medium ${
                         isSelected
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                          ? 'bg-[var(--fg-strong)] text-white border-[var(--border-active)]'
+                          : 'border-[var(--border-card)] text-[var(--fg-body)] hover:border-[var(--border-input)]'
                       }`}
                     >
                       {member.name}
@@ -640,7 +644,7 @@ export default function RecipesBrowseClient({
                     onChange={(event) => setIngredientInput(event.target.value)}
                     onKeyDown={handleIngredientKeyDown}
                     placeholder="Add an ingredient keyword"
-                    className="flex-1 rounded-2xl border border-gray-200 px-4 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    className="flex-1 rounded-2xl border border-[var(--border-card)] px-4 py-2 text-sm text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
                   />
                   <button
                     type="button"
@@ -649,7 +653,7 @@ export default function RecipesBrowseClient({
                       !ingredientInput.trim() ||
                       ingredientFilters.length >= INGREDIENT_LIMIT
                     }
-                    className="rounded-2xl border border-gray-900 px-4 py-2 text-sm font-semibold text-gray-900 disabled:opacity-40"
+                    className="rounded-2xl border border-[var(--border-active)] px-4 py-2 text-sm font-semibold text-[var(--fg-strong)] disabled:opacity-40"
                   >
                     Add
                   </button>
@@ -659,13 +663,13 @@ export default function RecipesBrowseClient({
                     {ingredientFilters.map((keyword) => (
                       <span
                         key={keyword}
-                        className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700"
+                        className="inline-flex items-center gap-2 rounded-full bg-[var(--bg-muted)] px-3 py-1 text-xs font-medium text-[var(--fg-body)]"
                       >
                         {keyword}
                         <button
                           type="button"
                           onClick={() => removeIngredient(keyword)}
-                          className="text-gray-500 hover:text-gray-900"
+                          className="text-[var(--fg-caption)] hover:text-[var(--fg-strong)]"
                           aria-label={`Remove ingredient filter ${keyword}`}
                         >
                           ×
@@ -674,7 +678,7 @@ export default function RecipesBrowseClient({
                     ))}
                   </div>
                 )}
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-[var(--fg-caption)]">
                   Up to {INGREDIENT_LIMIT} ingredient keywords. Results must
                   include all of them.
                 </p>
@@ -683,8 +687,8 @@ export default function RecipesBrowseClient({
 
             <FilterGroup title="Tags" summary={tagsSummary}>
               <div className="space-y-4">
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span className="font-semibold text-gray-700">
+                <div className="flex items-center justify-between text-xs text-[var(--fg-caption)]">
+                  <span className="font-semibold text-[var(--fg-body)]">
                     Pick up to {TAG_LIMIT} tags
                   </span>
                   <span>
@@ -693,7 +697,7 @@ export default function RecipesBrowseClient({
                 </div>
                 {Object.entries(tagGroups).map(([groupName, tags]) => (
                   <div key={groupName} className="space-y-2">
-                    <p className="text-xs font-semibold uppercase text-gray-500">
+                    <p className="text-xs font-semibold uppercase text-[var(--fg-caption)]">
                       {groupName.replace(/-/g, ' ')}
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -709,8 +713,8 @@ export default function RecipesBrowseClient({
                             disabled={disabled}
                             className={`rounded-full border px-3 py-1 text-sm font-medium ${
                               selected
-                                ? 'bg-gray-900 text-white border-gray-900'
-                                : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                                ? 'bg-[var(--fg-strong)] text-white border-[var(--border-active)]'
+                                : 'border-[var(--border-card)] text-[var(--fg-body)] hover:border-[var(--border-input)]'
                             } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                           >
                             #{tag.name}
@@ -733,13 +737,15 @@ export default function RecipesBrowseClient({
       )}
 
       <section className="space-y-4">
-        {isLoading && <p className="text-sm text-gray-500">Loading recipes…</p>}
+        {isLoading && (
+          <p className="text-sm text-[var(--fg-caption)]">Loading recipes…</p>
+        )}
         {!isLoading && items.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-gray-200 p-8 text-center">
-            <p className="text-lg font-semibold text-gray-900">
+          <div className="rounded-2xl border border-dashed border-[var(--border-card)] p-8 text-center">
+            <p className="text-lg font-semibold text-[var(--fg-strong)]">
               No recipes found
             </p>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-[var(--fg-caption)] mt-1">
               Try adjusting your search or filters.
             </p>
           </div>
@@ -750,9 +756,9 @@ export default function RecipesBrowseClient({
               <Link
                 href={`/posts/${recipe.id}`}
                 key={recipe.id}
-                className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 flex flex-col"
+                className="bg-white rounded-2xl shadow-sm overflow-hidden border border-[var(--bg-muted)] flex flex-col"
               >
-                <div className="relative h-40 w-full bg-gray-100">
+                <div className="relative h-40 w-full bg-[var(--bg-muted)]">
                   {recipe.mainPhotoUrl ? (
                     <Image
                       src={recipe.mainPhotoUrl}
@@ -763,24 +769,24 @@ export default function RecipesBrowseClient({
                       unoptimized
                     />
                   ) : (
-                    <div className="h-full w-full flex items-center justify-center text-gray-400 text-sm">
+                    <div className="h-full w-full flex items-center justify-center text-[var(--fg-placeholder)] text-sm">
                       No photo yet
                     </div>
                   )}
                 </div>
                 <div className="p-4 flex-1 flex flex-col gap-3">
                   <div>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-[var(--fg-caption)]">
                       {recipe.courses.length > 0
                         ? recipe.courses.join(' · ')
                         : (recipe.primaryCourse ?? 'Recipe')}
                       {recipe.difficulty ? ` · ${recipe.difficulty}` : ''}
                     </p>
-                    <h3 className="text-lg font-semibold text-gray-900 mt-1">
+                    <h3 className="text-lg font-semibold text-[var(--fg-strong)] mt-1">
                       {recipe.title}
                     </h3>
                     <div className="mt-2 flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-semibold text-gray-600 overflow-hidden">
+                      <div className="h-8 w-8 rounded-full bg-[var(--bg-muted)] flex items-center justify-center text-sm font-semibold text-[var(--fg-meta)] overflow-hidden">
                         {recipe.author.avatarUrl ? (
                           <Image
                             src={recipe.author.avatarUrl}
@@ -797,10 +803,12 @@ export default function RecipesBrowseClient({
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
+                        <p className="text-sm font-semibold text-[var(--fg-strong)] truncate">
                           {recipe.author.name}
                         </p>
-                        <p className="text-xs text-gray-500">Family member</p>
+                        <p className="text-xs text-[var(--fg-caption)]">
+                          Family member
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -808,18 +816,18 @@ export default function RecipesBrowseClient({
                     {recipe.tags.slice(0, 4).map((tag) => (
                       <span
                         key={tag}
-                        className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700"
+                        className="rounded-full bg-[var(--bg-muted)] px-2 py-0.5 text-xs font-medium text-[var(--fg-body)]"
                       >
                         #{tag}
                       </span>
                     ))}
                     {recipe.tags.length > 4 && (
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-[var(--fg-caption)]">
                         +{recipe.tags.length - 4} more
                       </span>
                     )}
                   </div>
-                  <div className="mt-auto flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600">
+                  <div className="mt-auto flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--fg-meta)]">
                     <span>
                       {recipe.totalTime
                         ? `${recipe.totalTime} min`
@@ -849,7 +857,7 @@ export default function RecipesBrowseClient({
             type="button"
             onClick={handleLoadMore}
             disabled={isLoadingMore}
-            className="rounded-full bg-gray-900 text-white px-6 py-3 font-semibold disabled:opacity-50"
+            className="rounded-full bg-[var(--fg-strong)] text-white px-6 py-3 font-semibold disabled:opacity-50"
           >
             {isLoadingMore ? 'Loading…' : 'Load more'}
           </button>
@@ -875,7 +883,7 @@ function FilterGroup({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="rounded-2xl border border-gray-100">
+    <div className="rounded-2xl border border-[var(--bg-muted)]">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-3 px-4 py-3"
@@ -883,11 +891,15 @@ function FilterGroup({
         aria-expanded={isOpen}
       >
         <div className="text-left">
-          <p className="text-sm font-semibold text-gray-900">{title}</p>
-          {summary && <p className="text-xs text-gray-500">{summary}</p>}
+          <p className="text-sm font-semibold text-[var(--fg-strong)]">
+            {title}
+          </p>
+          {summary && (
+            <p className="text-xs text-[var(--fg-caption)]">{summary}</p>
+          )}
         </div>
         <svg
-          className={`h-5 w-5 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`h-5 w-5 text-[var(--fg-caption)] transition-transform ${isOpen ? 'rotate-180' : ''}`}
           viewBox="0 0 20 20"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
@@ -903,7 +915,9 @@ function FilterGroup({
         </svg>
       </button>
       {isOpen && (
-        <div className="border-t border-gray-100 px-4 py-4">{children}</div>
+        <div className="border-t border-[var(--bg-muted)] px-4 py-4">
+          {children}
+        </div>
       )}
     </div>
   );

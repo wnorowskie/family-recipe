@@ -480,9 +480,11 @@ export default function PostDetailView({
       <header className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{post.title}</h1>
+            <h1 className="text-3xl font-bold text-[var(--fg-strong)]">
+              {post.title}
+            </h1>
             <div className="flex items-center gap-3 mt-3">
-              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-lg font-semibold text-gray-700 overflow-hidden">
+              <div className="w-12 h-12 rounded-full bg-[var(--bg-muted)] flex items-center justify-center text-lg font-semibold text-[var(--fg-body)] overflow-hidden">
                 {post.author.avatarUrl ? (
                   <Image
                     src={post.author.avatarUrl}
@@ -497,14 +499,14 @@ export default function PostDetailView({
                 )}
               </div>
               <div>
-                <p className="text-sm text-gray-900">
+                <p className="text-sm text-[var(--fg-strong)]">
                   <span className="font-semibold">{post.author.name}</span>
-                  <span className="text-gray-500">
+                  <span className="text-[var(--fg-caption)]">
                     {' '}
                     · {formatRelativeTime(createdDate)}
                   </span>
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-[var(--fg-caption)]">
                   Posted on {formatDateTime(createdDate)}
                 </p>
               </div>
@@ -520,7 +522,7 @@ export default function PostDetailView({
                 className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
                   isFavorited
                     ? 'border-rose-200 bg-rose-50 text-rose-600'
-                    : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                    : 'border-[var(--border-card)] text-[var(--fg-body)] hover:bg-[var(--bg-page)]'
                 } disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {isFavorited ? 'Saved to Favorites' : 'Save to Favorites'}
@@ -528,7 +530,7 @@ export default function PostDetailView({
               {canEdit && (
                 <Link
                   href={`/posts/${post.id}/edit`}
-                  className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  className="rounded-full border border-[var(--border-card)] px-4 py-2 text-sm font-semibold text-[var(--fg-body)] hover:bg-[var(--bg-page)]"
                 >
                   Edit Post
                 </Link>
@@ -553,7 +555,7 @@ export default function PostDetailView({
           </div>
         </div>
         {post.caption && (
-          <p className="text-lg text-gray-700 whitespace-pre-line">
+          <p className="text-lg text-[var(--fg-body)] whitespace-pre-line">
             {post.caption}
           </p>
         )}
@@ -604,13 +606,13 @@ export default function PostDetailView({
             ).map((course) => (
               <span
                 key={course}
-                className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-700"
+                className="inline-flex items-center rounded-full bg-[var(--bg-muted)] px-3 py-1 text-sm font-semibold text-[var(--fg-body)]"
               >
                 {course}
               </span>
             ))}
             {post.recipe.difficulty && (
-              <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-700">
+              <span className="inline-flex items-center rounded-full bg-[var(--bg-muted)] px-3 py-1 text-sm font-semibold text-[var(--fg-body)]">
                 {post.recipe.difficulty} difficulty
               </span>
             )}
@@ -625,22 +627,24 @@ export default function PostDetailView({
           </div>
 
           {post.recipe.origin && (
-            <div className="bg-gray-50 rounded-2xl p-4">
-              <p className="text-sm text-gray-500 mb-1">Family story</p>
-              <p className="text-gray-800">{post.recipe.origin}</p>
+            <div className="bg-[var(--bg-page)] rounded-2xl p-4">
+              <p className="text-sm text-[var(--fg-caption)] mb-1">
+                Family story
+              </p>
+              <p className="text-[var(--bg-primary)]">{post.recipe.origin}</p>
             </div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-gray-100 p-4">
-              <p className="text-sm text-gray-500">Total time</p>
-              <p className="text-lg font-semibold text-gray-900">
+            <div className="rounded-2xl border border-[var(--bg-muted)] p-4">
+              <p className="text-sm text-[var(--fg-caption)]">Total time</p>
+              <p className="text-lg font-semibold text-[var(--fg-strong)]">
                 {formatTotalTime(post.recipe.totalTime)}
               </p>
             </div>
-            <div className="rounded-2xl border border-gray-100 p-4">
-              <p className="text-sm text-gray-500">Servings</p>
-              <p className="text-lg font-semibold text-gray-900">
+            <div className="rounded-2xl border border-[var(--bg-muted)] p-4">
+              <p className="text-sm text-[var(--fg-caption)]">Servings</p>
+              <p className="text-lg font-semibold text-[var(--fg-strong)]">
                 {formatServings(post.recipe.servings)}
               </p>
             </div>
@@ -648,10 +652,10 @@ export default function PostDetailView({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">
+              <h2 className="text-lg font-semibold text-[var(--fg-strong)] mb-3">
                 Ingredients
               </h2>
-              <div className="bg-gray-50 rounded-2xl p-4 text-gray-800">
+              <div className="bg-[var(--bg-page)] rounded-2xl p-4 text-[var(--bg-primary)]">
                 {post.recipe.ingredients.length > 0 ? (
                   <ul className="space-y-2 text-sm md:text-base">
                     {post.recipe.ingredients.map((ingredient, index) => (
@@ -661,17 +665,17 @@ export default function PostDetailView({
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-[var(--fg-caption)]">
                     No ingredients listed.
                   </p>
                 )}
               </div>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">
+              <h2 className="text-lg font-semibold text-[var(--fg-strong)] mb-3">
                 Steps
               </h2>
-              <div className="bg-gray-50 rounded-2xl p-4 text-gray-800">
+              <div className="bg-[var(--bg-page)] rounded-2xl p-4 text-[var(--bg-primary)]">
                 {post.recipe.steps.length > 0 ? (
                   <ol className="space-y-3 list-decimal list-inside text-sm md:text-base">
                     {post.recipe.steps.map((step, index) => (
@@ -679,7 +683,9 @@ export default function PostDetailView({
                     ))}
                   </ol>
                 ) : (
-                  <p className="text-sm text-gray-500">No steps listed.</p>
+                  <p className="text-sm text-[var(--fg-caption)]">
+                    No steps listed.
+                  </p>
                 )}
               </div>
             </div>
@@ -690,14 +696,14 @@ export default function PostDetailView({
       <section className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
         <div className="flex flex-wrap gap-4 justify-between">
           <div>
-            <p className="text-sm text-gray-500">Cooked this</p>
-            <p className="text-lg font-semibold text-gray-900">
+            <p className="text-sm text-[var(--fg-caption)]">Cooked this</p>
+            <p className="text-lg font-semibold text-[var(--fg-strong)]">
               {cookedStats.timesCooked} times
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Average rating</p>
-            <p className="text-lg font-semibold text-gray-900">
+            <p className="text-sm text-[var(--fg-caption)]">Average rating</p>
+            <p className="text-lg font-semibold text-[var(--fg-strong)]">
               {cookedStats.averageRating
                 ? `${cookedStats.averageRating.toFixed(1)} / 5`
                 : 'No ratings yet'}
@@ -707,27 +713,29 @@ export default function PostDetailView({
         <button
           type="button"
           onClick={() => setIsCookedModalOpen(true)}
-          className="w-full rounded-xl bg-gray-900 text-white py-3 font-semibold"
+          className="w-full rounded-xl bg-[var(--fg-strong)] text-white py-3 font-semibold"
         >
           Cooked this!
         </button>
 
         {lastEditDate && (
-          <div className="rounded-2xl bg-gray-50 p-4">
-            <p className="text-sm text-gray-500">
+          <div className="rounded-2xl bg-[var(--bg-page)] p-4">
+            <p className="text-sm text-[var(--fg-caption)]">
               Last updated {formatRelativeTime(lastEditDate)}
               {post.editor && (
                 <>
                   {' '}
                   by{' '}
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-[var(--fg-strong)]">
                     {post.editor.name}
                   </span>
                 </>
               )}
             </p>
             {post.lastEditNote && (
-              <p className="text-gray-800 mt-1">“{post.lastEditNote}”</p>
+              <p className="text-[var(--bg-primary)] mt-1">
+                “{post.lastEditNote}”
+              </p>
             )}
           </div>
         )}
@@ -735,10 +743,12 @@ export default function PostDetailView({
 
       <section className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold text-gray-900">Recent cooks</h2>
+          <h2 className="text-xl font-semibold text-[var(--fg-strong)]">
+            Recent cooks
+          </h2>
           <div className="flex items-center gap-3">
             {cookedStats.timesCooked > recentCooked.length && (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[var(--fg-caption)]">
                 +{cookedStats.timesCooked - recentCooked.length} more logged
               </p>
             )}
@@ -747,7 +757,7 @@ export default function PostDetailView({
                 type="button"
                 onClick={handleLoadOlderCooked}
                 disabled={isLoadingOlderCooked}
-                className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-gray-300 disabled:opacity-60"
+                className="rounded-full border border-[var(--border-card)] px-3 py-1 text-xs font-semibold text-[var(--fg-body)] hover:border-[var(--border-input)] disabled:opacity-60"
               >
                 {isLoadingOlderCooked ? 'Loading…' : 'Load older cooks'}
               </button>
@@ -762,9 +772,9 @@ export default function PostDetailView({
             {recentCooked.map((entry) => (
               <div
                 key={entry.id}
-                className="rounded-2xl border border-gray-100 p-4 flex gap-3"
+                className="rounded-2xl border border-[var(--bg-muted)] p-4 flex gap-3"
               >
-                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-semibold text-gray-600 overflow-hidden">
+                <div className="w-10 h-10 rounded-full bg-[var(--bg-muted)] flex items-center justify-center text-sm font-semibold text-[var(--fg-meta)] overflow-hidden">
                   {entry.user.avatarUrl ? (
                     <Image
                       src={entry.user.avatarUrl}
@@ -780,20 +790,20 @@ export default function PostDetailView({
                 </div>
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-gray-900">
+                    <p className="text-sm font-semibold text-[var(--fg-strong)]">
                       {entry.user.name}
                     </p>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-[var(--fg-caption)]">
                       {formatRelativeTime(new Date(entry.createdAt))}
                     </span>
                     {typeof entry.rating === 'number' && (
-                      <span className="ml-auto text-sm font-semibold text-gray-900">
+                      <span className="ml-auto text-sm font-semibold text-[var(--fg-strong)]">
                         {entry.rating} ★
                       </span>
                     )}
                   </div>
                   {entry.note && (
-                    <p className="mt-2 text-gray-800 whitespace-pre-line">
+                    <p className="mt-2 text-[var(--bg-primary)] whitespace-pre-line">
                       {entry.note}
                     </p>
                   )}
@@ -802,7 +812,7 @@ export default function PostDetailView({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[var(--fg-caption)]">
             No one has logged this yet — be the first to cook it!
           </p>
         )}
@@ -810,7 +820,9 @@ export default function PostDetailView({
 
       <section className="bg-white rounded-2xl shadow-sm p-6 space-y-6">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold text-gray-900">Reactions</h2>
+          <h2 className="text-xl font-semibold text-[var(--fg-strong)]">
+            Reactions
+          </h2>
           <div className="flex flex-wrap gap-2">
             {REACTION_EMOJIS.map((emoji) => (
               <button
@@ -818,7 +830,7 @@ export default function PostDetailView({
                 type="button"
                 disabled={isReacting}
                 onClick={() => handleReactionClick(emoji)}
-                className="rounded-full border border-gray-200 px-3 py-1 text-lg hover:bg-gray-50 disabled:opacity-40"
+                className="rounded-full border border-[var(--border-card)] px-3 py-1 text-lg hover:bg-[var(--bg-page)] disabled:opacity-40"
               >
                 {emoji}
               </button>
@@ -836,12 +848,12 @@ export default function PostDetailView({
                   key={reaction.emoji}
                   className="flex flex-wrap items-center gap-3"
                 >
-                  <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-700">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-muted)] px-3 py-1 text-sm font-semibold text-[var(--fg-body)]">
                     <span>{reaction.emoji}</span>
                     <span>{reaction.count}</span>
                   </span>
                   {participantLabel && (
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-[var(--fg-caption)]">
                       {participantLabel}
                     </span>
                   )}
@@ -849,20 +861,22 @@ export default function PostDetailView({
               );
             })
           ) : (
-            <p className="text-sm text-gray-500">No reactions yet</p>
+            <p className="text-sm text-[var(--fg-caption)]">No reactions yet</p>
           )}
         </div>
       </section>
 
       <section className="bg-white rounded-2xl shadow-sm p-6 space-y-6">
-        <h2 className="text-xl font-semibold text-gray-900">Comments</h2>
+        <h2 className="text-xl font-semibold text-[var(--fg-strong)]">
+          Comments
+        </h2>
         {commentPagination.hasMore && (
           <div className="flex justify-center">
             <button
               type="button"
               onClick={handleLoadOlderComments}
               disabled={isLoadingOlderComments}
-              className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-gray-300 disabled:opacity-60"
+              className="rounded-full border border-[var(--border-card)] px-4 py-2 text-sm font-semibold text-[var(--fg-body)] hover:border-[var(--border-input)] disabled:opacity-60"
             >
               {isLoadingOlderComments ? 'Loading…' : 'Load older comments'}
             </button>
@@ -875,7 +889,7 @@ export default function PostDetailView({
           {comments.length > 0 ? (
             comments.map((comment) => (
               <div key={comment.id} className="flex gap-3">
-                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-semibold text-gray-600 overflow-hidden">
+                <div className="w-10 h-10 rounded-full bg-[var(--bg-muted)] flex items-center justify-center text-sm font-semibold text-[var(--fg-meta)] overflow-hidden">
                   {comment.author.avatarUrl ? (
                     <Image
                       src={comment.author.avatarUrl}
@@ -889,12 +903,12 @@ export default function PostDetailView({
                     <span>{comment.author.name.charAt(0).toUpperCase()}</span>
                   )}
                 </div>
-                <div className="flex-1 rounded-2xl border border-gray-100 p-4">
+                <div className="flex-1 rounded-2xl border border-[var(--bg-muted)] p-4">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-gray-900">
+                    <p className="text-sm font-semibold text-[var(--fg-strong)]">
                       {comment.author.name}
                     </p>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-[var(--fg-caption)]">
                       {formatRelativeTime(new Date(comment.createdAt))}
                     </span>
                     {canDeleteComment(comment.author.id) && (
@@ -902,13 +916,13 @@ export default function PostDetailView({
                         type="button"
                         onClick={() => handleDeleteComment(comment.id)}
                         disabled={deleteInFlight === comment.id}
-                        className="ml-auto text-xs text-gray-500 hover:text-red-600"
+                        className="ml-auto text-xs text-[var(--fg-caption)] hover:text-red-600"
                       >
                         {deleteInFlight === comment.id ? 'Deleting…' : 'Delete'}
                       </button>
                     )}
                   </div>
-                  <p className="text-gray-800 mt-2 whitespace-pre-line">
+                  <p className="text-[var(--bg-primary)] mt-2 whitespace-pre-line">
                     {comment.text}
                   </p>
                   {comment.photoUrl && (
@@ -935,8 +949,8 @@ export default function PostDetailView({
                           disabled={commentReactionTarget === comment.id}
                           className={`rounded-full border px-3 py-1 text-sm transition ${
                             commentReactionTarget === comment.id
-                              ? 'border-gray-200 text-gray-400'
-                              : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                              ? 'border-[var(--border-card)] text-[var(--fg-placeholder)]'
+                              : 'border-[var(--border-card)] text-[var(--fg-meta)] hover:border-[var(--border-input)]'
                           }`}
                         >
                           {emoji}
@@ -954,12 +968,12 @@ export default function PostDetailView({
                               key={reaction.emoji}
                               className="flex flex-wrap items-center gap-2"
                             >
-                              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-muted)] px-3 py-1 text-xs font-semibold text-[var(--fg-body)]">
                                 <span>{reaction.emoji}</span>
                                 <span>{reaction.count}</span>
                               </span>
                               {participantLabel && (
-                                <span className="text-[11px] text-gray-500">
+                                <span className="text-[11px] text-[var(--fg-caption)]">
                                   {participantLabel}
                                 </span>
                               )}
@@ -967,7 +981,7 @@ export default function PostDetailView({
                           );
                         })
                       ) : (
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-[var(--fg-placeholder)]">
                           No reactions yet
                         </p>
                       )}
@@ -977,19 +991,19 @@ export default function PostDetailView({
               </div>
             ))
           ) : (
-            <p className="text-sm text-gray-500">No comments yet</p>
+            <p className="text-sm text-[var(--fg-caption)]">No comments yet</p>
           )}
         </div>
         <form
-          className="border-t border-gray-100 pt-4 space-y-4"
+          className="border-t border-[var(--bg-muted)] pt-4 space-y-4"
           onSubmit={handleCommentSubmit}
         >
           <div>
-            <label className="text-sm font-semibold text-gray-700">
+            <label className="text-sm font-semibold text-[var(--fg-body)]">
               Add a comment
             </label>
             <textarea
-              className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="mt-2 w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
               placeholder="Share your thoughts"
               rows={3}
               value={commentText}
@@ -1017,7 +1031,7 @@ export default function PostDetailView({
                 />
                 <button
                   type="button"
-                  className="absolute -top-2 -right-2 bg-white rounded-full px-2 text-xs text-gray-700"
+                  className="absolute -top-2 -right-2 bg-white rounded-full px-2 text-xs text-[var(--fg-body)]"
                   onClick={() => {
                     if (commentPhotoPreview) {
                       URL.revokeObjectURL(commentPhotoPreview);
@@ -1037,7 +1051,7 @@ export default function PostDetailView({
           <button
             type="submit"
             disabled={isSubmittingComment}
-            className="w-full rounded-xl bg-gray-900 text-white py-3 font-semibold disabled:opacity-50"
+            className="w-full rounded-xl bg-[var(--fg-strong)] text-white py-3 font-semibold disabled:opacity-50"
           >
             {isSubmittingComment ? 'Posting…' : 'Post Comment'}
           </button>
@@ -1053,22 +1067,22 @@ export default function PostDetailView({
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-gray-500">Cooked this!</p>
-                <h3 className="text-xl font-semibold text-gray-900">
+                <p className="text-sm text-[var(--fg-caption)]">Cooked this!</p>
+                <h3 className="text-xl font-semibold text-[var(--fg-strong)]">
                   Tell the family how it went
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={closeCookedModal}
-                className="text-gray-500 hover:text-gray-900"
+                className="text-[var(--fg-caption)] hover:text-[var(--fg-strong)]"
               >
                 ×
               </button>
             </div>
             <form className="mt-6 space-y-6" onSubmit={handleCookedSubmit}>
               <div>
-                <p className="text-sm font-semibold text-gray-900 mb-3">
+                <p className="text-sm font-semibold text-[var(--fg-strong)] mb-3">
                   Rating (optional)
                 </p>
                 <div className="flex gap-2">
@@ -1083,8 +1097,8 @@ export default function PostDetailView({
                       }
                       className={`flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
                         cookedRating === rating
-                          ? 'border-gray-900 bg-gray-900 text-white'
-                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                          ? 'border-[var(--border-active)] bg-[var(--fg-strong)] text-white'
+                          : 'border-[var(--border-card)] text-[var(--fg-body)] hover:border-[var(--border-input)]'
                       }`}
                     >
                       {rating} ★
@@ -1094,14 +1108,14 @@ export default function PostDetailView({
               </div>
               <div>
                 <label
-                  className="text-sm font-semibold text-gray-900"
+                  className="text-sm font-semibold text-[var(--fg-strong)]"
                   htmlFor="cooked-note"
                 >
                   Notes (optional)
                 </label>
                 <textarea
                   id="cooked-note"
-                  className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="mt-2 w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
                   rows={4}
                   placeholder="Share any tips, tweaks, or how it turned out"
                   value={cookedNote}
@@ -1115,14 +1129,14 @@ export default function PostDetailView({
                 <button
                   type="button"
                   onClick={closeCookedModal}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto"
+                  className="w-full rounded-xl border border-[var(--border-card)] px-4 py-3 text-sm font-semibold text-[var(--fg-body)] hover:bg-[var(--bg-page)] sm:w-auto"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingCooked}
-                  className="w-full rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
+                  className="w-full rounded-xl bg-[var(--fg-strong)] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
                 >
                   {isSubmittingCooked ? 'Saving…' : 'Save cooked event'}
                 </button>
