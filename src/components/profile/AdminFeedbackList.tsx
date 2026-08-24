@@ -72,10 +72,10 @@ export default function AdminFeedbackList({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-wide text-gray-500">
+          <p className="text-xs uppercase tracking-wide text-[var(--fg-caption)]">
             Feedback
           </p>
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-lg font-semibold text-[var(--fg-strong)]">
             {categoryLabel}
           </h3>
         </div>
@@ -95,8 +95,8 @@ export default function AdminFeedbackList({
                 onClick={() => handleFilterChange(option)}
                 className={`rounded-full border px-3 py-2 text-sm font-semibold transition ${
                   active
-                    ? 'bg-gray-900 text-white border-gray-900'
-                    : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                    ? 'bg-[var(--fg-strong)] text-white border-[var(--border-active)]'
+                    : 'border-[var(--border-card)] text-[var(--fg-body)] hover:border-[var(--border-input)]'
                 }`}
               >
                 {label}
@@ -113,7 +113,7 @@ export default function AdminFeedbackList({
       )}
 
       {items.length === 0 && !loading && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 text-sm text-gray-600">
+        <div className="rounded-2xl border border-[var(--bg-muted)] bg-white p-6 text-sm text-[var(--fg-meta)]">
           No feedback yet.
         </div>
       )}
@@ -122,7 +122,7 @@ export default function AdminFeedbackList({
         {items.map((item) => (
           <article
             key={item.id}
-            className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"
+            className="rounded-2xl border border-[var(--bg-muted)] bg-white p-5 shadow-sm"
           >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
@@ -135,15 +135,15 @@ export default function AdminFeedbackList({
                 >
                   {item.category === 'bug' ? 'Bug' : 'Suggestion'}
                 </span>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-[var(--fg-caption)]">
                   {new Date(item.createdAt).toLocaleString()}
                 </p>
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-[var(--fg-caption)]">
                 {item.pageUrl ? (
                   <a
                     href={item.pageUrl}
-                    className="text-gray-700 underline-offset-2 hover:underline"
+                    className="text-[var(--fg-body)] underline-offset-2 hover:underline"
                   >
                     {item.pageUrl}
                   </a>
@@ -152,16 +152,20 @@ export default function AdminFeedbackList({
                 )}
               </div>
             </div>
-            <p className="mt-3 text-sm text-gray-900 whitespace-pre-line">
+            <p className="mt-3 text-sm text-[var(--fg-strong)] whitespace-pre-line">
               {item.message}
             </p>
-            <div className="mt-4 grid grid-cols-1 gap-3 text-sm text-gray-600 sm:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-3 text-sm text-[var(--fg-meta)] sm:grid-cols-3">
               <div>
-                <p className="text-xs font-semibold text-gray-500">Contact</p>
+                <p className="text-xs font-semibold text-[var(--fg-caption)]">
+                  Contact
+                </p>
                 <p>{item.contactEmail || 'Not provided'}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-500">User</p>
+                <p className="text-xs font-semibold text-[var(--fg-caption)]">
+                  User
+                </p>
                 {item.userId ? (
                   <p>
                     {item.userName || 'User'} ({item.userEmail})
@@ -171,7 +175,7 @@ export default function AdminFeedbackList({
                 )}
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-500">
+                <p className="text-xs font-semibold text-[var(--fg-caption)]">
                   User agent
                 </p>
                 <p className="break-words">{item.userAgent || 'Unknown'}</p>
@@ -187,7 +191,7 @@ export default function AdminFeedbackList({
             type="button"
             onClick={() => loadPage({ append: true, offset: nextOffset })}
             disabled={loading}
-            className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-[var(--border-card)] px-4 py-2 text-sm font-semibold text-[var(--fg-body)] hover:bg-[var(--bg-page)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? 'Loading...' : 'Load more'}
           </button>
