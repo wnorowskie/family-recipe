@@ -23,6 +23,13 @@ resource "google_cloud_run_v2_service" "importer" {
       # every plan only for the next deploy to write them back. See #89.
       client,
       client_version,
+      # Same class as client/client_version above: `gcloud run deploy` stamps
+      # the revision name on every deploy, which TF doesn't model. See #285.
+      template[0].revision,
+      # A top-level `scaling` block (manual_instance_count/min/max) the
+      # provider now surfaces as live drift alongside the `template.scaling`
+      # block this module actually declares; not something TF ever set. See #285.
+      scaling,
     ]
   }
 
