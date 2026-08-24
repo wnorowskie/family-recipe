@@ -32,7 +32,13 @@ FastAPI requires **Postgres** — it uses the Python Prisma client generated aga
 
 ## Auth and cookie flow
 
-The session cookie format is identical to Next — same JWT, same `JWT_SECRET`, same cookie name. A cookie obtained by logging in via Next `/api/auth/login` (see [next-api.md](next-api.md)) also works against FastAPI. Useful for contract parity checks.
+FastAPI owns auth outright — there is no shared `session` cookie with Next any more, and `JWT_SECRET` is no longer set on the Next service (#232, #243). A successful login sets two HTTP-only cookies from FastAPI, `refresh_token` and `csrf_token`; the short-lived access token is held **in memory** by the client and minted via `/api/auth/bootstrap`.
+
+Consequences when testing by hand:
+
+- The `refresh_token` cookie is what a cookie jar carries. Endpoints taking `Authorization: Bearer <accessToken>` (such as `/v1/auth/me`) need a token from a login/refresh response, not the jar.
+- `POST /v1/auth/refresh` is the **only** rotating endpoint and enforces double-submit CSRF — send the `csrf_token` value back as a header. `GET /v1/auth/session` is the non-rotating read used by SSR, so prefer it when you just want to verify a cookie.
+- Replaying an old `refresh_token` against `/refresh` will burn the chain (reuse detection). If a test loop starts 401ing, log in again rather than debugging the token.
 
 Login through FastAPI directly via [scripts/claude-login.sh](../../scripts/claude-login.sh):
 
@@ -40,9 +46,9 @@ Login through FastAPI directly via [scripts/claude-login.sh](../../scripts/claud
 COOKIES=$(COOKIES=/tmp/fastapi-cookies.txt scripts/claude-login.sh --host http://localhost:8000)
 ```
 
-The script routes to `/auth/login` when the host targets `:8000` and to `/api/auth/login` otherwise. Credentials come from `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD` (seeded by `npm run db:seed`).
+The script routes to `/v1/auth/login` when the host targets `:8000` and to `/api/auth/login` otherwise. Credentials come from `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD` (seeded by `npm run db:seed`).
 
-> **Path note.** FastAPI routers mount **without** an `/api/` prefix (e.g. `/posts`, `/recipes`, `/auth/login`). Next mounts the same resources under `/api/*`. When diffing contracts, expect the path to differ even though the response body should match.
+> **Path note.** Every FastAPI route lives under `/v1/*` (`/v1/posts`, `/v1/recipes`, `/v1/auth/login`) — #233 collapsed the routers to `/v1`-only and deleted the un-prefixed rollout aliases, so a bare `/posts` or `/auth/login` now 404s. Next no longer mirrors these paths at all: its only remaining handlers are the four `/api/auth/*` proxies and `/api/health`. Against a **deployed** environment, hit `/v1/*` on the Next origin — the catch-all proxy forwards it to the IAM-private FastAPI service; calling the API host directly returns 403 from Cloud Run.
 
 ## L0 — curl the route
 

@@ -5,6 +5,13 @@ unhealthy in an environment. This is the procedure the
 [migration plan](API_BACKEND_MIGRATION_PLAN.md) points to; read the
 [status banner](API_BACKEND_MIGRATION_PLAN.md) there first for context.
 
+> **Live in production since 2026-08-23** (release #263, merge commit
+> `1912ceab`). This runbook is no longer hypothetical — real family users are on
+> the FastAPI stack, so treat a Level 2 escalation as a user-visible outage
+> window. Prod resources: services `family-recipe-prod` (Next) and
+> `family-recipe-api-prod` (FastAPI), project `family-recipe-prod`, region
+> `us-east1`.
+
 > **The important thing to know:** the migration is done and **the feature flags
 > are gone**. Before Phase 4.4 you could roll back by flipping
 > `NEXT_PUBLIC_USE_FASTAPI_AUTH` off. That toggle — and the entire dual-mode
@@ -26,6 +33,21 @@ bad API deploy) in minutes; Level 2 is the last resort.
 | **2** | FastAPI is fundamentally unfit for the environment and the Next monolith must serve data/auth again   | Revert the Phase 4 cutover commits, rebuild, redeploy        | A full build + deploy cycle |
 
 ### When to roll back (criteria)
+
+> **⚠️ Nothing pages you on these.** The thresholds below are not wired to any
+> alert: `Service Down (dev|prod)` is inverted and fires when the service is
+> _healthy_ (#284), and the FastAPI service has no monitoring coverage at all
+> (#32). You must evaluate these by hand:
+>
+> ```bash
+> gcloud logging read 'resource.type=cloud_run_revision AND severity>=ERROR' \
+>   --project family-recipe-prod --freshness=15m
+> gcloud logging read 'resource.type=cloud_run_revision AND httpRequest.status>=500' \
+>   --project family-recipe-prod --freshness=15m
+> ```
+>
+> Note the prod API service runs at `minScale: 0`, so `Uncaught signal: 2` in
+> its logs is idle scale-down, not a crash. The Next service is `minScale: 1`.
 
 Trigger a rollback when any of these hold for the stated window (from the
 migration plan's Rollback Criteria):
@@ -84,8 +106,17 @@ stack.
 ### 2a. Identify the commits on your target branch
 
 The table below lists the squash-merge commits **as they landed on `develop`**.
-Production (`main`) carries equivalent commits from the release PR — locate them
-on the branch you are reverting with:
+Release #263 was merged as a **true merge commit** (`1912ceab`), not squashed, so
+`main` now shares history with `develop` and **these exact SHAs are reachable from
+`main`** — no SHA translation needed. (Release #157 was squash-merged, which is
+why earlier guidance said to go hunting; that no longer applies.) To confirm:
+
+```bash
+git merge-base --is-ancestor 8733671 origin/main && echo "reachable from main"
+```
+
+If you are reverting on a branch where a SHA is missing, locate the equivalent
+with:
 
 ```bash
 git log --oneline --grep="Phase 4" -i

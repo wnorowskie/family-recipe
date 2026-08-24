@@ -16,6 +16,8 @@ Before doing any work, a new Claude session should:
 
 Private family-only web app for sharing recipes and cooking activity. Single `FamilySpace` model with members joining via a hashed master key. Currently in **testing with real family users**, so prefer minimal, non-breaking changes and protect existing data flows.
 
+**The Phase 4 FastAPI cutover is live in production** (released 2026-08-23, PR #263, epic #38). FastAPI is the sole backend everywhere, including prod — there is no environment still served by the old Next `/api/*` stack. Two caveats worth carrying into any infra work: prod alerting is **not** functional (`Service Down` is inverted and fires when healthy — #284; the FastAPI service has no monitoring coverage — #32), and a bare `terraform apply` against prod will strip workflow-managed env vars from the live Next service despite a benign-looking `0 add, 4 change, 0 destroy` plan (#285).
+
 The product/domain truth lives in [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md), [docs/USER_STORIES.md](docs/USER_STORIES.md), and [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md). The fullest **product/feature** narrative is [docs/V1_DETAILED_SUMMARY.md](docs/V1_DETAILED_SUMMARY.md); its architecture sections were refreshed for the Phase 4 FastAPI cutover (#244). For the authoritative backend architecture, trust this file and [docs/API_BACKEND_MIGRATION_PLAN.md](docs/API_BACKEND_MIGRATION_PLAN.md).
 
 ## Commands
@@ -65,11 +67,10 @@ Spin up local Postgres with the one-liner in [docs/verification/next-api.md](doc
 
 **Timeline is computed, not stored.** [src/lib/timeline-data.ts](src/lib/timeline-data.ts) unions posts, comments, post-reactions, cooked events, and post edits per request. There is no `TimelineEvent` table — don't add one without discussing trade-offs.
 
-**Rate limiting is in-process.** [src/lib/rateLimit.ts](src/lib/rateLimit.ts) uses LRU caches keyed by user or IP. Globally mocked in [jest.setup.js](jest.setup.js); production deployments behind multiple instances would not share state (acceptable for current single-instance Cloud Run setup).
+**Rate limiting lives in FastAPI.** [apps/api/src/rate_limit.py](apps/api/src/rate_limit.py) holds the in-process IP-keyed limiters on `/v1/auth/{login,signup,reset}` (#175). `/v1/auth/{session,refresh}` are deliberately unlimited — SSR reaches them through the Next service, so a per-IP bucket would collapse all family traffic onto one IP. State is per-instance and not shared across replicas (#33). Note the Next-side [src/lib/rateLimit.ts](src/lib/rateLimit.ts) still exists but has **no remaining consumers** — it went dead when the `/api/*` data routes were deleted in #231. Don't wire new code to it.
 
 **Subdirectory guides** — read before editing in these areas:
 
-- [src/app/api/CLAUDE.md](src/app/api/CLAUDE.md) — route handler conventions
 - [src/lib/CLAUDE.md](src/lib/CLAUDE.md) — what each lib/ module is for
 - [prisma/CLAUDE.md](prisma/CLAUDE.md) — schema variants and migration rules
 - [**tests**/CLAUDE.md](__tests__/CLAUDE.md) — global mocks and helper conventions

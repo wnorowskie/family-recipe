@@ -54,9 +54,11 @@ done
 USER="${CLAUDE_TEST_USER:-claude-test}"
 PASSWORD="${CLAUDE_TEST_PASSWORD:-claude-test-password}"
 
-# Next mounts auth under /api/auth/login; FastAPI uses /auth/login.
+# Next proxies auth at /api/auth/login; FastAPI serves it at /v1/auth/login
+# (routers collapsed to /v1-only in #233 — the un-prefixed /auth/login alias
+# no longer exists and would 404).
 if [[ "$HOST" == *":8000"* ]]; then
-  LOGIN_PATH="/auth/login"
+  LOGIN_PATH="/v1/auth/login"
 else
   LOGIN_PATH="/api/auth/login"
 fi
