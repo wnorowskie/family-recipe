@@ -46,7 +46,7 @@ export default function NotificationBell({
   return (
     <Link
       href="/notifications"
-      className="relative inline-flex items-center justify-center rounded-full border border-gray-200 bg-white px-3 py-2 text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900/40"
+      className="relative inline-flex items-center justify-center rounded-full border border-[var(--border-card)] bg-white px-3 py-2 text-[var(--fg-body)] shadow-sm transition hover:bg-[var(--bg-page)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-active)]"
       aria-label={
         unreadCount > 0
           ? `${unreadCount} unread notifications`
