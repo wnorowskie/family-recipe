@@ -16,7 +16,7 @@ Start the dev server:
 ```bash
 scripts/local-stack-up.sh
 scripts/with-local-stack.sh npm run dev &
-scripts/with-local-stack.sh uvicorn apps.api.src.main:app --port 8000 &
+scripts/with-local-stack.sh bash -c 'source apps/api/.venv/bin/activate && uvicorn apps.api.src.main:app --port 8000' &
 until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
 until curl -sf http://localhost:8000/v1/health >/dev/null; do sleep 0.5; done
 ```
