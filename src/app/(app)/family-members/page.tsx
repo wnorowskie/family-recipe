@@ -18,11 +18,13 @@ export default async function FamilyMembersPage() {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-wide text-gray-500">
+        <p className="text-xs uppercase tracking-wide text-[var(--fg-caption)]">
           Family space
         </p>
-        <h2 className="text-2xl font-semibold text-gray-900">Members</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-2xl font-semibold text-[var(--fg-strong)]">
+          Members
+        </h2>
+        <p className="text-sm text-[var(--fg-caption)]">
           {isAdminUser
             ? 'Manage who has access to the family recipe app.'
             : 'See everyone who shares and cooks inside the family space. Only admins can manage access.'}

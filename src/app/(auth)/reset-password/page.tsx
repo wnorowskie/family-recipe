@@ -39,12 +39,14 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[var(--bg-page)] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h1 className="text-center text-3xl font-bold text-gray-900 mb-2">
+        <h1 className="text-center text-3xl font-bold text-[var(--fg-strong)] mb-2">
           Family Recipe
         </h1>
-        <h2 className="text-center text-xl text-gray-600">Reset Password</h2>
+        <h2 className="text-center text-xl text-[var(--fg-meta)]">
+          Reset Password
+        </h2>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -64,7 +66,7 @@ export default function ResetPasswordPage() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
+                className="block text-sm font-medium text-[var(--fg-body)]"
               >
                 Email
               </label>
@@ -77,7 +79,7 @@ export default function ResetPasswordPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="you@example.com"
               />
             </div>
@@ -85,7 +87,7 @@ export default function ResetPasswordPage() {
             <div>
               <label
                 htmlFor="masterKey"
-                className="block text-sm font-medium text-gray-700"
+                className="block text-sm font-medium text-[var(--fg-body)]"
               >
                 Family Master Key
               </label>
@@ -98,7 +100,7 @@ export default function ResetPasswordPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, masterKey: e.target.value })
                 }
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Enter the family master key"
               />
             </div>
@@ -106,7 +108,7 @@ export default function ResetPasswordPage() {
             <div>
               <label
                 htmlFor="newPassword"
-                className="block text-sm font-medium text-gray-700"
+                className="block text-sm font-medium text-[var(--fg-body)]"
               >
                 New password
               </label>
@@ -120,7 +122,7 @@ export default function ResetPasswordPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, newPassword: e.target.value })
                 }
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="At least 8 characters"
               />
             </div>
@@ -135,7 +137,7 @@ export default function ResetPasswordPage() {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-[var(--fg-meta)]">
               Remembered it?{' '}
               <a
                 href="/login"

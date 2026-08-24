@@ -14,9 +14,13 @@ export default async function SettingsPage() {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-wide text-gray-500">Account</p>
-        <h2 className="text-2xl font-semibold text-gray-900">Settings</h2>
-        <p className="text-sm text-gray-500">
+        <p className="text-xs uppercase tracking-wide text-[var(--fg-caption)]">
+          Account
+        </p>
+        <h2 className="text-2xl font-semibold text-[var(--fg-strong)]">
+          Settings
+        </h2>
+        <p className="text-sm text-[var(--fg-caption)]">
           Update your profile details and credentials.
         </p>
       </div>
