@@ -154,7 +154,7 @@ DATABASE_URL="${DATABASE_URL}"
 # different port, re-run this script with API_PORT set to match.
 API_INTERNAL_URL="${API_INTERNAL_URL}"
 # The port the above points at. Nothing in the app reads this — it is exported
-# so `uvicorn --port "$API_PORT"` and any tooling can agree with the URL above.
+# so \`uvicorn --port "\$API_PORT"\` and any tooling can agree with the URL above.
 API_PORT="${API_PORT}"
 JWT_SECRET="${JWT_SECRET}"
 FAMILY_MASTER_KEY="${FAMILY_MASTER_KEY}"
