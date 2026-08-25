@@ -14,7 +14,7 @@ scripts/with-local-stack.sh bash -c '
   source apps/api/.venv/bin/activate
   uvicorn apps.api.src.main:app --reload --port 8000
 ' &
-until curl -sf http://localhost:8000/health >/dev/null; do sleep 0.5; done
+until curl -sf http://localhost:8000/v1/health >/dev/null; do sleep 0.5; done
 ```
 
 If `apps/api/.venv` doesn't exist:
@@ -26,7 +26,7 @@ cd ../..
 scripts/local-stack-up.sh   # (re)generates the Python Prisma client
 ```
 
-FastAPI listens on `:8000`. The recipe-url-importer also defaults to `:8000` — don't run both at once. Pick a different port (`--port 8001`) if you need both.
+FastAPI listens on `:8000`. The recipe-url-importer also defaults to `:8000` — don't run both at once. Pick a different port (`--port 8001`) if you need both. If you move FastAPI off `:8000`, re-run `API_PORT=8001 scripts/local-stack-up.sh` so the `API_INTERNAL_URL` in `.env.sandbox` still points at it — otherwise the Next auth proxies keep forwarding to the old port (#299).
 
 FastAPI requires **Postgres** — it uses the Python Prisma client generated against `schema.postgres.prisma`. There is no SQLite path. If the sandbox stack isn't up, run `scripts/local-stack-up.sh`.
 
