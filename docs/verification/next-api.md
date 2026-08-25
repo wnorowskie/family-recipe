@@ -17,8 +17,8 @@ Start the dev server:
 scripts/local-stack-up.sh
 scripts/with-local-stack.sh npm run dev &
 scripts/with-local-stack.sh bash -c 'source apps/api/.venv/bin/activate && uvicorn apps.api.src.main:app --port 8000' &
-until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
-until curl -sf http://localhost:8000/v1/health >/dev/null; do sleep 0.5; done
+scripts/wait-for-http.sh http://localhost:3000 120           # Next (cold compile)
+scripts/wait-for-http.sh http://localhost:8000/v1/health     # FastAPI
 ```
 
 All four routes below are proxies — they forward to FastAPI and have no local fallback, so **uvicorn must be running** or every call returns 500 `INTERNAL_ERROR` / "API not configured". `.env.sandbox` supplies the `API_INTERNAL_URL` that points Next at it (#299).

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# claude-login.sh — log in as the dev `claude-test` user and save a session cookie jar.
+# claude-login.sh — log in as the dev `claude-test` user and save an auth cookie jar.
 #
 # Usage:
 #   scripts/claude-login.sh                        # Next dev server on :3000
@@ -83,9 +83,16 @@ if [[ "$HTTP_CODE" != "200" ]]; then
 fi
 
 # Tab-anchored match against the Netscape cookie-jar format — avoids
-# false-positives from hosts or paths that contain the word "session".
-if ! grep -q $'\tsession\t' "$COOKIES"; then
-  echo "Login returned 200 but no session cookie was set" >&2
+# false-positives from hosts or paths that contain the cookie name.
+#
+# Post-Phase-4 (#232) a successful login sets FastAPI's `refresh_token`
+# (HttpOnly, so curl writes it with a `#HttpOnly_` line prefix) plus
+# `csrf_token`. The Next-signed `session` cookie this used to check for was
+# deleted in the cutover, so that check could never pass again (#301).
+if ! grep -q $'\trefresh_token\t' "$COOKIES"; then
+  echo "Login returned 200 but no refresh_token cookie was set" >&2
+  echo "Cookies actually in the jar:" >&2
+  grep -o $'\t[^\t]*\t[^\t]*$' "$COOKIES" 2>/dev/null | cut -f2 | sed 's/^/  /' >&2 || true
   exit 1
 fi
 

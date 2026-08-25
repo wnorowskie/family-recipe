@@ -14,7 +14,7 @@
 # After this succeeds:
 #   scripts/with-local-stack.sh npm run dev                 # Next on :3000
 #   scripts/with-local-stack.sh uvicorn apps.api.src.main:app --port 8000
-#   COOKIES=$(scripts/claude-login.sh)                      # grabs session cookie
+#   COOKIES=$(scripts/claude-login.sh)                      # grabs the auth cookies
 #
 # Teardown:
 #   scripts/local-stack-down.sh

@@ -63,19 +63,26 @@ test(
         `expected /uploads/<key> in src, got: ${src}`
       ).not.toBeNull();
       const storageKey = decodeURIComponent(match![1]);
-      // Uploads are written by FastAPI (cwd apps/api in CI), not Next —
-      // `Path("public/uploads")` in apps/api/src/uploads.py resolves there.
-      const diskPath = path.join(
-        process.cwd(),
-        'apps',
-        'api',
-        'public',
-        'uploads',
-        storageKey
-      );
+      // Uploads are written by FastAPI, not Next, and
+      // `Path("public/uploads")` in apps/api/src/uploads.py is relative to
+      // uvicorn's cwd. CI runs it with working-directory: apps/api; the local
+      // playbooks run it from the repo root (`uvicorn apps.api.src.main:app`).
+      // Accept either — the assertion is "the bytes reached disk", not "under
+      // one specific cwd" (#301).
+      const candidates = [
+        path.join(
+          process.cwd(),
+          'apps',
+          'api',
+          'public',
+          'uploads',
+          storageKey
+        ),
+        path.join(process.cwd(), 'public', 'uploads', storageKey),
+      ];
       expect(
-        existsSync(diskPath),
-        `expected uploaded photo at ${diskPath}`
+        candidates.some(existsSync),
+        `expected uploaded photo at one of:\n  ${candidates.join('\n  ')}`
       ).toBe(true);
     }
   }
