@@ -14,7 +14,7 @@ scripts/with-local-stack.sh bash -c '
   source apps/api/.venv/bin/activate
   uvicorn apps.api.src.main:app --reload --port 8000
 ' &
-until curl -sf http://localhost:8000/v1/health >/dev/null; do sleep 0.5; done
+scripts/wait-for-http.sh http://localhost:8000/v1/health     # FastAPI
 ```
 
 If `apps/api/.venv` doesn't exist:

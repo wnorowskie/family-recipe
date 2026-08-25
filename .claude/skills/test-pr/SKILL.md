@@ -84,23 +84,30 @@ scripts/local-stack-up.sh
 
 This is idempotent. It creates a sandbox Postgres on `:5434`, runs Prisma generate + push + seed, generates the Python Prisma client for FastAPI, and writes `.env.sandbox`. It never mutates `.env` or `.env.local`.
 
-Start only the services the diff needs:
+**Next and FastAPI both start on any run that logs in** — which is every run that touches
+runtime code. Since the Phase 4 cutover the Next auth proxies (`/api/auth/*`) forward to
+FastAPI, so a Next server on its own cannot issue a session, and the login in step 5 is a
+hard guardrail. Only the importer is genuinely conditional.
 
 ```bash
-# Next (always if src/ or prisma/ changed)
+# Next — always, if src/ or prisma/ changed
 scripts/with-local-stack.sh npm run dev &
-until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
+scripts/wait-for-http.sh http://localhost:3000               # Next
 
-# FastAPI (if apps/api/ changed OR doing a contract-parity check)
+# FastAPI — always, whenever the run will log in (i.e. whenever Next is up).
+# NOT just when apps/api/ changed: claude-login.sh goes through the Next auth
+# proxies, which forward here. Skip it and every login fails (#301).
 scripts/with-local-stack.sh bash -c '
   source apps/api/.venv/bin/activate
   uvicorn apps.api.src.main:app --port 8000
 ' &
+scripts/wait-for-http.sh http://localhost:8000/v1/health     # FastAPI
 
-# Recipe importer (if apps/recipe-url-importer/ changed)
+# Recipe importer — only if apps/recipe-url-importer/ changed
 cd apps/recipe-url-importer && source .venv/bin/activate && \
   PYTHONPATH=src uvicorn --app-dir src recipe_url_importer.app:app --port 8001 &
 cd ../..
+scripts/wait-for-http.sh http://localhost:8001/health 60 importer
 ```
 
 Port collision: FastAPI and the importer both default to `:8000`. Pick different ports (as shown) if both are needed.
@@ -158,7 +165,7 @@ These fail silently at runtime — there's no type error, no red test, just wron
 - **Error response source.** Errors use helpers from `src/lib/apiErrors.ts` (`validationError`, `notFoundError`, etc.) — not ad-hoc `NextResponse.json({ error: ... })`.
 - **Dual Prisma schemas in lockstep.** Any field / model / relation added to `prisma/schema.postgres.node.prisma` must also appear in `prisma/schema.postgres.prisma` with the same shape and `@map(...)` column name. SQLite was dropped in #80 — **do not** suggest `file:./prisma/dev.db` as a fallback. A third schema should not reappear.
 - **Photo storage.** DB stores opaque `storageKey` values, never rendered URLs. For any new upload path, confirm (a) the file landed in `public/uploads/<key>` on disk (runner has `UPLOADS_BUCKET` unset), and (b) the Prisma row has a non-null `*StorageKey`.
-- **Rate limiter.** New auth-sensitive routes should apply the LRU rate limiter from `src/lib/rateLimit.ts`. Not every route needs it; login, signup, and write-heavy routes do.
+- **Rate limiter.** Auth throttling lives in FastAPI — `apps/api/src/rate_limit.py`, IP-keyed on `/v1/auth/{login,signup,reset}` (#175). The Next-side `src/lib/rateLimit.ts` has had **no consumers** since #231 deleted the `/api/*` data routes; don't wire new code to it. `/v1/auth/{session,refresh}` are limited too since #265 (60/min and 30/min), keyed on the real client IP that `fetchUpstream` now forwards through SSR.
 
 ### 8. Run the affected test suites
 
