@@ -17,7 +17,7 @@ Start the dev server:
 scripts/local-stack-up.sh
 scripts/with-local-stack.sh npm run dev &
 scripts/with-local-stack.sh bash -c 'source apps/api/.venv/bin/activate && uvicorn apps.api.src.main:app --port 8000' &
-scripts/wait-for-http.sh http://localhost:3000               # Next
+scripts/wait-for-http.sh http://localhost:3000 120           # Next (cold compile)
 scripts/wait-for-http.sh http://localhost:8000/v1/health     # FastAPI
 ```
 

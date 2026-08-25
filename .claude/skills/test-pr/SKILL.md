@@ -92,7 +92,7 @@ hard guardrail. Only the importer is genuinely conditional.
 ```bash
 # Next — always, if src/ or prisma/ changed
 scripts/with-local-stack.sh npm run dev &
-scripts/wait-for-http.sh http://localhost:3000               # Next
+scripts/wait-for-http.sh http://localhost:3000 120           # Next (cold compile)
 
 # FastAPI — always, whenever the run will log in (i.e. whenever Next is up).
 # NOT just when apps/api/ changed: claude-login.sh goes through the Next auth
@@ -103,10 +103,12 @@ scripts/with-local-stack.sh bash -c '
 ' &
 scripts/wait-for-http.sh http://localhost:8000/v1/health     # FastAPI
 
-# Recipe importer — only if apps/recipe-url-importer/ changed
-cd apps/recipe-url-importer && source .venv/bin/activate && \
-  PYTHONPATH=src uvicorn --app-dir src recipe_url_importer.app:app --port 8001 &
-cd ../..
+# Recipe importer — only if apps/recipe-url-importer/ changed.
+# Subshell: `cd X && ... &` backgrounds the whole AND-list, so the foreground
+# shell never leaves the repo root — a bare `cd ../..` here would walk out of
+# the repo and break every relative path that follows.
+( cd apps/recipe-url-importer && source .venv/bin/activate && \
+  PYTHONPATH=src uvicorn --app-dir src recipe_url_importer.app:app --port 8001 ) &
 scripts/wait-for-http.sh http://localhost:8001/health 60 importer
 ```
 

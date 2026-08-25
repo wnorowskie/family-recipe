@@ -92,7 +92,7 @@ fi
 if ! grep -q $'\trefresh_token\t' "$COOKIES"; then
   echo "Login returned 200 but no refresh_token cookie was set" >&2
   echo "Cookies actually in the jar:" >&2
-  grep -o $'\t[a-z_]*\t[^\t]*$' "$COOKIES" 2>/dev/null | cut -f2 | sed 's/^/  /' >&2 || true
+  grep -o $'\t[^\t]*\t[^\t]*$' "$COOKIES" 2>/dev/null | cut -f2 | sed 's/^/  /' >&2 || true
   exit 1
 fi
 

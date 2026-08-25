@@ -26,10 +26,17 @@ URL="${1:-}"
 TIMEOUT_SECONDS="${2:-60}"
 LABEL="${3:-$URL}"
 
-if [[ -z "$URL" ]]; then
+usage() {
   echo "usage: scripts/wait-for-http.sh <url> [timeout-seconds] [label]" >&2
   exit 1
-fi
+}
+
+[[ -n "$URL" ]] || usage
+
+# Guard before the arithmetic below: under `set -u` a non-numeric value here
+# dies with "FastAPI: unbound variable" instead of anything actionable — an
+# easy mistake, since the docs render the label as a trailing `# FastAPI`.
+[[ "$TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || usage
 
 # Poll twice a second. Bash 3.2 has no float arithmetic, so bound the loop by
 # attempt count rather than by comparing elapsed time.

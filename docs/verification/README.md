@@ -61,7 +61,7 @@ The script prints the seeded family master key and `CLAUDE_TEST_USER` / `CLAUDE_
 scripts/with-local-stack.sh npm run dev &                                     # Next on :3000
 scripts/with-local-stack.sh bash -c \
   'source apps/api/.venv/bin/activate && uvicorn apps.api.src.main:app --port 8000' &   # FastAPI on :8000
-scripts/wait-for-http.sh http://localhost:3000               # Next
+scripts/wait-for-http.sh http://localhost:3000 120           # Next (cold compile)
 scripts/wait-for-http.sh http://localhost:8000/v1/health     # FastAPI
 echo "ready"
 ```
