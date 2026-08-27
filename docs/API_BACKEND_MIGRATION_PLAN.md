@@ -98,7 +98,10 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 ### Request/Response Schema References (FastAPI)
 
 - **LoginRequest**: `{ emailOrUsername, password, rememberMe }`
-- **SignupRequest**: `{ name, emailOrUsername, password, familyMasterKey, rememberMe }`
+- **SignupRequest**: `{ name, email, username, password, familyMasterKey, rememberMe }`
+  — note `email` and `username` are **separate** fields on signup (only _login_ takes a
+  combined `emailOrUsername`); `email` is an `EmailStr`. See
+  [`apps/api/src/schemas/auth.py`](../apps/api/src/schemas/auth.py).
 - **AuthResponse**: `{ user }`
 - **CreatePostRequest**: `{ title, caption?, recipe? }`
 - **UpdatePostRequest**: `{ title?, caption?, recipe?, changeNote? }`
@@ -110,7 +113,9 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 - **Source of truth**: FastAPI OpenAPI schema.
 - **Runtime endpoint**: `/v1/openapi.json` (served by FastAPI).
-- **CI snapshot**: add a generated file `apps/api/openapi.json` on each CI build.
+- **CI snapshot**: `apps/api/openapi.snapshot.json` — **shipped, and enforced**. The
+  `openapi-diff` job in [api-ci.yml](../.github/workflows/api-ci.yml) regenerates the spec
+  and fails on drift; regenerate with `cd apps/api && python scripts/dump_openapi.py > openapi.snapshot.json`.
 - **Frontend contract tests**: validate requests against the OpenAPI snapshot.
 
 ### Endpoint Mapping Table (All `/api/*` calls)
@@ -123,6 +128,25 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 > - **Errors**: status + error codes (shape above)
 
 #### Auth (all targets under `/v1`)
+
+> **Auth rows are the pre-cutover design; four are wrong as shipped (#306).** The
+> [Password Reset Flow](#password-reset-flow) banner below is the accurate account. In
+> shipped code ([`apps/api/src/schemas/auth_v1.py`](../apps/api/src/schemas/auth_v1.py),
+> [`routers/v1/auth.py`](../apps/api/src/routers/v1/auth.py)):
+>
+> - **`POST /v1/auth/reset`** takes `{ email, masterKey, newPassword }` — not
+>   `{ emailOrUsername }` — and returns `200 { status: "reset" }`, not `204`.
+> - **`POST /v1/auth/reset/confirm` does not exist.** There is no token, no mail
+>   pipeline, and no `INVALID_TOKEN` / `TOKEN_EXPIRED` error code anywhere in the service.
+> - **`POST /v1/auth/signup`** returns **`201 Created`**, not `200`.
+> - **`POST /v1/auth/logout`** never returns `401`. It takes no auth dependency and is
+>   best-effort: it revokes the chain if the cookie parses, clears both cookies either
+>   way, and always returns `204`.
+>
+> The login row is correct on its success shape and error codes; note that login, signup
+> and reset can additionally return `429 RATE_LIMITED` (see
+> [Rate Limits & Abuse Protections](#rate-limits--abuse-protections)), which no row lists.
+> Rows are left in place as the design record.
 
 - **POST /api/auth/login** → **POST /v1/auth/login**
   - Request: `LoginRequest`
@@ -398,7 +422,8 @@ resets on deploy. Shared storage across replicas is tracked in #33.
 `POST /v1/auth/logout` and `GET /v1/auth/me` carry no limiter by design.
 
 **Response on limit.** `429 { error: { code: "RATE_LIMITED", message } }` plus a
-`Retry-After` header in seconds, omitted only when the limiter cannot compute one.
+`Retry-After` header in seconds. Every denial computes one — `rate_limit.py` returns
+`max(1, ceil(reset_at - now))` — so in practice the header is always present.
 
 **How this differs from the original design targets**
 
