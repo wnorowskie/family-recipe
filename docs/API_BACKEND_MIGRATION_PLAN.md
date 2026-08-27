@@ -129,24 +129,36 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 #### Auth (all targets under `/v1`)
 
-> **Auth rows are the pre-cutover design; four are wrong as shipped (#306).** The
-> [Password Reset Flow](#password-reset-flow) banner below is the accurate account. In
-> shipped code ([`apps/api/src/schemas/auth_v1.py`](../apps/api/src/schemas/auth_v1.py),
-> [`routers/v1/auth.py`](../apps/api/src/routers/v1/auth.py)):
+> **Every Auth row below predates the cutover. Only `GET /v1/auth/me` is accurate as
+> shipped (#306).** The rows are kept as the design record; this banner is the current
+> contract. Request models live in
+> [`apps/api/src/schemas/auth.py`](../apps/api/src/schemas/auth.py) and response models in
+> [`schemas/auth_v1.py`](../apps/api/src/schemas/auth_v1.py) — the two are separate modules,
+> both imported by [`routers/v1/auth.py`](../apps/api/src/routers/v1/auth.py). Error-envelope
+> codes come from [`errors.py`](../apps/api/src/errors.py).
 >
-> - **`POST /v1/auth/reset`** takes `{ email, masterKey, newPassword }` — not
->   `{ emailOrUsername }` — and returns `200 { status: "reset" }`, not `204`.
-> - **`POST /v1/auth/reset/confirm` does not exist.** There is no token, no mail
->   pipeline, and no `INVALID_TOKEN` / `TOKEN_EXPIRED` error code anywhere in the service.
-> - **`POST /v1/auth/signup`** returns **`201 Created`**, not `200`.
-> - **`POST /v1/auth/logout`** never returns `401`. It takes no auth dependency and is
->   best-effort: it revokes the chain if the cookie parses, clears both cookies either
->   way, and always returns `204`.
+> - **`POST /v1/auth/login`** — success shape is right, error list is not. It also returns
+>   **`403 FORBIDDEN`** ("User is not a member of any family space") when the account has no
+>   membership, which the row omits.
+> - **`POST /v1/auth/signup`** — returns **`201 Created`**, not `200`. Its error row is
+>   wrong twice: **`409 CONFLICT` never occurs** (`conflict()` is called nowhere in the
+>   router), and a duplicate email/username returns `400` with envelope code
+>   **`BAD_REQUEST`**, not `VALIDATION_ERROR` — those are separate helpers. A bad family
+>   master key takes the same `400 BAD_REQUEST` path.
+> - **`POST /v1/auth/reset`** — takes `{ email, masterKey, newPassword }`, not
+>   `{ emailOrUsername }`, and returns `200 { status: "reset" }`, not `204`. See the
+>   [Password Reset Flow](#password-reset-flow) banner for the full account.
+> - **`POST /v1/auth/reset/confirm`** — **does not exist.** No token, no mail pipeline, and
+>   no `INVALID_TOKEN` / `TOKEN_EXPIRED` code anywhere in the service.
+> - **`POST /v1/auth/logout`** — never returns `401`. It takes no auth dependency and is
+>   best-effort: revokes the chain if the cookie parses, clears both cookies either way,
+>   and always returns `204`.
+> - **`GET /v1/auth/me`** — accurate.
 >
-> The login row is correct on its success shape and error codes; note that login, signup
-> and reset can additionally return `429 RATE_LIMITED` (see
-> [Rate Limits & Abuse Protections](#rate-limits--abuse-protections)), which no row lists.
-> Rows are left in place as the design record.
+> Two shipped endpoints have **no row at all**: `POST /v1/auth/refresh` and
+> `GET /v1/auth/session`. And no row lists `429 RATE_LIMITED`, which login, signup and reset
+> can all return — see
+> [Rate Limits & Abuse Protections](#rate-limits--abuse-protections).
 
 - **POST /api/auth/login** → **POST /v1/auth/login**
   - Request: `LoginRequest`
