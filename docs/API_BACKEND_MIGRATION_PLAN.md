@@ -98,7 +98,10 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 ### Request/Response Schema References (FastAPI)
 
 - **LoginRequest**: `{ emailOrUsername, password, rememberMe }`
-- **SignupRequest**: `{ name, emailOrUsername, password, familyMasterKey, rememberMe }`
+- **SignupRequest**: `{ name, email, username, password, familyMasterKey, rememberMe }`
+  — note `email` and `username` are **separate** fields on signup (only _login_ takes a
+  combined `emailOrUsername`); `email` is an `EmailStr`. See
+  [`apps/api/src/schemas/auth.py`](../apps/api/src/schemas/auth.py).
 - **AuthResponse**: `{ user }`
 - **CreatePostRequest**: `{ title, caption?, recipe? }`
 - **UpdatePostRequest**: `{ title?, caption?, recipe?, changeNote? }`
@@ -110,7 +113,9 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 - **Source of truth**: FastAPI OpenAPI schema.
 - **Runtime endpoint**: `/v1/openapi.json` (served by FastAPI).
-- **CI snapshot**: add a generated file `apps/api/openapi.json` on each CI build.
+- **CI snapshot**: `apps/api/openapi.snapshot.json` — **shipped, and enforced**. The
+  `openapi-diff` job in [api-ci.yml](../.github/workflows/api-ci.yml) regenerates the spec
+  and fails on drift; regenerate with `cd apps/api && python scripts/dump_openapi.py > openapi.snapshot.json`.
 - **Frontend contract tests**: validate requests against the OpenAPI snapshot.
 
 ### Endpoint Mapping Table (All `/api/*` calls)
@@ -123,6 +128,37 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 > - **Errors**: status + error codes (shape above)
 
 #### Auth (all targets under `/v1`)
+
+> **Every Auth row below predates the cutover. Only `GET /v1/auth/me` is accurate as
+> shipped (#306).** The rows are kept as the design record; this banner is the current
+> contract. Request models live in
+> [`apps/api/src/schemas/auth.py`](../apps/api/src/schemas/auth.py) and response models in
+> [`schemas/auth_v1.py`](../apps/api/src/schemas/auth_v1.py) — the two are separate modules,
+> both imported by [`routers/v1/auth.py`](../apps/api/src/routers/v1/auth.py). Error-envelope
+> codes come from [`errors.py`](../apps/api/src/errors.py).
+>
+> - **`POST /v1/auth/login`** — success shape is right, error list is not. It also returns
+>   **`403 FORBIDDEN`** ("User is not a member of any family space") when the account has no
+>   membership, which the row omits.
+> - **`POST /v1/auth/signup`** — returns **`201 Created`**, not `200`. Its error row is
+>   wrong twice: **`409 CONFLICT` never occurs** (`conflict()` is called nowhere in the
+>   router), and a duplicate email/username returns `400` with envelope code
+>   **`BAD_REQUEST`**, not `VALIDATION_ERROR` — those are separate helpers. A bad family
+>   master key takes the same `400 BAD_REQUEST` path.
+> - **`POST /v1/auth/reset`** — takes `{ email, masterKey, newPassword }`, not
+>   `{ emailOrUsername }`, and returns `200 { status: "reset" }`, not `204`. See the
+>   [Password Reset Flow](#password-reset-flow) banner for the full account.
+> - **`POST /v1/auth/reset/confirm`** — **does not exist.** No token, no mail pipeline, and
+>   no `INVALID_TOKEN` / `TOKEN_EXPIRED` code anywhere in the service.
+> - **`POST /v1/auth/logout`** — never returns `401`. It takes no auth dependency and is
+>   best-effort: revokes the chain if the cookie parses, clears both cookies either way,
+>   and always returns `204`.
+> - **`GET /v1/auth/me`** — accurate.
+>
+> Two shipped endpoints have **no row at all**: `POST /v1/auth/refresh` and
+> `GET /v1/auth/session`. And no row lists `429 RATE_LIMITED`, which login, signup and reset
+> can all return — see
+> [Rate Limits & Abuse Protections](#rate-limits--abuse-protections).
 
 - **POST /api/auth/login** → **POST /v1/auth/login**
   - Request: `LoginRequest`
@@ -376,13 +412,50 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ### Rate Limits & Abuse Protections
 
-- **Auth login**: 10 requests / 5 minutes / IP → `429 TOO_MANY_REQUESTS`
-- **Auth signup**: 5 requests / 10 minutes / IP → `429 TOO_MANY_REQUESTS`
-- **Auth reset request**: 3 requests / 30 minutes / IP + per account → `429 TOO_MANY_REQUESTS`
-- **Auth reset confirm**: 5 requests / 30 minutes / IP → `429 TOO_MANY_REQUESTS`
-- **Refresh**: 30 requests / 10 minutes / session → `429 TOO_MANY_REQUESTS`
-- **Feedback**: 20 requests / hour / user → `429 TOO_MANY_REQUESTS`
-- **Response**: `429 { error: { code: "RATE_LIMITED", message } }` + `Retry-After` header
+> **Restated to match shipped code (#306).** The table below is what
+> [`apps/api/src/rate_limit.py`](../apps/api/src/rate_limit.py) enforces today, not the
+> original design targets this section carried through Phase 3. Where the two differ the
+> implementation departed from the plan deliberately, per-limiter, with the reasoning
+> recorded in that module's comments — summarised under the table. `rate_limit.py` is the
+> source of truth; update this section when it changes.
+
+Every limiter is a fixed-window in-process counter, so state is per Cloud Run instance and
+resets on deploy. Shared storage across replicas is tracked in #33.
+
+| Endpoint                | Limit | Window | Keyed by  | Landed in |
+| ----------------------- | ----- | ------ | --------- | --------- |
+| `POST /v1/auth/login`   | 5     | 15 min | client IP | #175      |
+| `POST /v1/auth/signup`  | 3     | 1 hour | client IP | #175      |
+| `POST /v1/auth/reset`   | 5     | 15 min | client IP | #175      |
+| `POST /v1/auth/refresh` | 30    | 60 s   | client IP | #265      |
+| `GET /v1/auth/session`  | 60    | 60 s   | client IP | #265      |
+| `POST /v1/feedback`     | 20    | 1 hour | user id   | #183      |
+
+`POST /v1/auth/logout` and `GET /v1/auth/me` carry no limiter by design.
+
+**Response on limit.** `429 { error: { code: "RATE_LIMITED", message } }` plus a
+`Retry-After` header in seconds. Every denial computes one — `rate_limit.py` returns
+`max(1, ceil(reset_at - now))` — so in practice the header is always present.
+
+**How this differs from the original design targets**
+
+- **login / signup / reset** — the plan specified 10/5min, 5/10min, and a split reset
+  request-vs-confirm pair. #175 instead mirrored the Next side's legacy
+  `src/lib/rateLimit.ts` values (`loginLimiter` 5/15min, `signupLimiter` 3/hour) to keep the
+  two implementations comparable during the migration audit, with reset reusing the login
+  window. `/v1/auth/reset` is a single endpoint — there is no separate confirm limiter.
+- **refresh** — the plan keyed this per session; the shipped limiter keys per client IP,
+  consistent with the rest of the auth surface.
+- **session** — absent from the original design. Both `/session` and `/refresh` were
+  deliberately unlimited until #265: their legitimate traffic arrives server-to-server from
+  Next SSR, so until `fetchUpstream` forwarded the browser's `X-Forwarded-For` a per-IP
+  bucket would have collapsed all family traffic onto the Next service's IP.
+- **feedback** — the one row that matched all along. #183 honoured the plan's 20/hour/user
+  for the v1 contract even though the legacy Next route shipped 10/hour.
+
+**Headroom watch.** The `/session` budget is per _real client IP_, so family members behind
+one household NAT share a single 60/min bucket and every protected SSR render spends one.
+That is the number to revisit if users report spurious `/login?_se=1` bounces.
 
 ### CSRF Strategy for Refresh
 
@@ -398,6 +471,14 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ### Cookie Domain/Flags by Environment
 
+> **Illustrative, not shipped values (#306).** There is no staging environment (the
+> environments are dev and prod) and `example.com` is a placeholder. In shipped code these
+> flags are config-driven, not per-environment literals: see
+> [`apps/api/src/cookies.py`](../apps/api/src/cookies.py), which reads
+> `refresh_cookie_domain` / `refresh_cookie_samesite` from settings and sets
+> `secure = is_production or samesite == "none"`. The refresh cookie is `httponly`; the
+> `csrf_token` cookie deliberately is not.
+
 - **Local dev**: `Domain=localhost`, `Secure=false`, `SameSite=Lax` (or `None` with HTTPS dev cert if cross‑origin)
 - **Staging**: `Domain=.staging.example.com`, `Secure=true`, `SameSite=None`
 - **Production**: `Domain=.example.com`, `Secure=true`, `SameSite=None`
@@ -406,6 +487,11 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 - Required: `sub` (userId), `familySpaceId`, `role`, `iss`, `iat`, `exp`, `aud`, `jti`
 - Optional: `name`, `avatarUrl` for UI‑friendly claims
+
+> **As shipped (#306):** the required claims all ship, plus an `epoch` claim (global
+> revocation — a stale epoch fails verification) and a `kid` header for key rotation. The
+> optional UI claims are **not** minted; the client reads name/avatar from
+> `GET /v1/auth/me`. See [`apps/api/src/tokens.py`](../apps/api/src/tokens.py).
 
 ### Rotation & Reuse Detection
 
@@ -427,6 +513,21 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 - **Validation**: keep previous keys active for 2× access token TTL to allow overlap
 
 ### Password Reset Flow
+
+> **Design target — not what shipped (#306).** The emailed-token flow below was never
+> built: there is no mail pipeline, no reset token, and no `/v1/auth/reset/confirm`
+> endpoint. Kept as the record of the intended design. **What ships today:**
+>
+> `POST /v1/auth/reset` takes `{ email, masterKey, newPassword }` and resets the password
+> in a single call, authenticated by the family master key rather than an emailed token.
+> On success it rehashes the password and revokes every active refresh-token chain for
+> that user (`revokedReason = REVOKED_PASSWORD_RESET`), so all devices must re-authenticate.
+> A missing user and a bad master key return the **same** error on purpose — that is
+> deliberate anti-enumeration, not a bug. Rate limited per IP (see the table above);
+> there is no per-account limiter. See
+> [`apps/api/src/routers/v1/auth.py`](../apps/api/src/routers/v1/auth.py).
+
+_Original design:_
 
 1. **Request reset**: `POST /v1/auth/reset` with `{ emailOrUsername }` → 204
 2. **Email sent**: contains single‑use token and link to frontend reset page
@@ -639,6 +740,13 @@ After the first bring-up each service deploys independently on subsequent pushes
 
 ## Observability
 
+> **Design target — largely not shipped (#306).** The fields, metrics and thresholds below
+> describe the intended observability posture. In reality the FastAPI service has **no
+> monitoring coverage** (#32), and the one uptime alert that exists is inverted: it fires
+> when the service is healthy and stays silent when it is down (#284). Release monitoring
+> is done by hand against Cloud Run logs. Treat this section as the backlog for #32, not a
+> description of what is running.
+
 ### Structured Logging Fields
 
 - `requestId`, `userId`, `route`, `method`, `status`, `latencyMs`, `errorCode`,
@@ -663,10 +771,14 @@ After the first bring-up each service deploys independently on subsequent pushes
 1. **Source of truth for user/session state**
 
 - **Decision**: FastAPI tokens + refresh token store are the source of truth. Next session cookies remain only for legacy routes during migration.
+- **Resolved (#306):** the second sentence is spent — Phase 4.4 (#232) deleted the Next
+  session-cookie stack outright. FastAPI is the sole source of truth, with no legacy routes.
 
 2. **API versioning/backward compatibility**
 
 - **Decision**: Introduce `/v1` prefix in FastAPI and preserve old paths behind a compatibility layer during rollout. Deprecate with a fixed sunset date.
+- **Resolved (#306):** the compatibility layer is gone — Phase 4.5 (#233) removed the
+  un-prefixed aliases. `/v1` is the only surface; no sunset date was needed.
 
 3. **Data migrations/cleanup**
 
