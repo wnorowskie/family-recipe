@@ -97,7 +97,7 @@ export default function NotificationsFeed({
 
   if (notifications.length === 0) {
     return (
-      <div className="rounded-2xl bg-white p-8 text-center text-sm text-gray-600 shadow-sm">
+      <div className="rounded-2xl bg-white p-8 text-center text-sm text-[var(--fg-meta)] shadow-sm">
         You’re all caught up. New activity will appear here.
       </div>
     );
@@ -114,7 +114,7 @@ export default function NotificationsFeed({
           <button
             onClick={handleLoadMore}
             disabled={isLoadingMore}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md border border-[var(--border-input)] bg-white px-4 py-2 text-sm font-medium text-[var(--fg-body)] transition hover:bg-[var(--bg-page)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoadingMore ? 'Loading...' : 'Load More'}
           </button>

@@ -7,11 +7,16 @@ Rule of thumb: **if the change adds, removes, or alters anything a user sees, do
 ## Start the dev server
 
 ```bash
-npm run dev &
-until curl -sf http://localhost:3000 >/dev/null; do sleep 0.5; done
+scripts/local-stack-up.sh
+scripts/with-local-stack.sh npm run dev &
+scripts/with-local-stack.sh bash -c 'source apps/api/.venv/bin/activate && uvicorn apps.api.src.main:app --port 8000' &
+scripts/wait-for-http.sh http://localhost:3000 120           # Next (cold compile)
+scripts/wait-for-http.sh http://localhost:8000/v1/health     # FastAPI
 ```
 
-Postgres must be up — see the setup block in [next-api.md](next-api.md#start-the-dev-server). SQLite was dropped in #80; local dev is Postgres-only.
+Postgres must be up — [scripts/local-stack-up.sh](../../scripts/local-stack-up.sh) handles it. SQLite was dropped in #80; local dev is Postgres-only.
+
+**Start FastAPI too, not just Next.** Every gated page under the `(app)` group resolves its user through the auth proxies, which forward to FastAPI — so without uvicorn you can't log in at all and L1 below is limited to `/login` and `/signup`. See the shared setup block in [README.md](README.md#shared-helpers).
 
 ## L0 — server-rendered HTML / static strings
 
@@ -72,54 +77,30 @@ Use `browser_navigate` → `browser_snapshot` (accessibility tree — token-chea
 - **Family scoping is implicit** — if a list or detail view renders, it was already scoped by `familySpaceId`. If something is visible that shouldn't be, the bug is server-side, not rendering.
 - **Server vs client**: default is server component. `'use client'` only for interactive forms/state. When reviewing your own PR, grep the diff for `'use client'` — if it appeared on a component that doesn't need state, revert.
 
-## Phase 2 dual-mode auth verification
+## Auth verification
 
-The frontend supports two auth flows during the FastAPI migration. When you change anything in the auth surface (login/signup/logout, the protected `(app)` layout, `src/proxy.ts`, [src/lib/apiClient.ts](../../src/lib/apiClient.ts), [src/lib/authStore.ts](../../src/lib/authStore.ts), or [src/components/AuthBootstrap.tsx](../../src/components/AuthBootstrap.tsx)), verify both flag states.
+There is one auth flow. The Phase 4 cutover (#231, #263) deleted the Next-signed `session` cookie and the dual-mode feature flag that used to gate it — if you find a doc or comment describing a "flag off" path or a `session` cookie, it is stale.
 
-### Flag OFF (default — what real users see today)
+When you change anything in the auth surface (login/signup/logout, the protected `(app)` layout, [src/proxy.ts](../../src/proxy.ts), [src/lib/apiClient.ts](../../src/lib/apiClient.ts), [src/lib/authStore.ts](../../src/lib/authStore.ts), or [src/components/AuthBootstrap.tsx](../../src/components/AuthBootstrap.tsx)), verify the following with both servers running per the setup block above.
 
-```bash
-npm run dev
-```
-
-- Login with seeded `claude-test`: form posts to `/api/auth/login`; `session` cookie set; redirect to `/timeline` works.
-- Signup, logout, reset-password, deep-link redirect (`/timeline?redirect=…`), and remember-me all behave as on `develop`.
-- DevTools → Application → Cookies: only `session` cookie present. No `refresh_token` / `csrf_token`.
-
-### Flag ON (FastAPI flow)
-
-Requires the FastAPI service running locally and the env vars set at build time.
-
-```bash
-# Terminal 1: FastAPI
-cd apps/api && docker compose up fastapi
-# Or: cd apps/api && uvicorn src.main:app --reload
-
-# Terminal 2: Next pointed at FastAPI
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 \
-  npm run dev
-```
-
-- Login: form posts to `/v1/auth/login`. After redirect, DevTools shows `refresh_token` (HttpOnly) + `csrf_token` cookies; **no** `session` cookie.
-- Console: `localStorage` and `sessionStorage` empty. No JWT-shaped strings (`eyJ…`) anywhere in storage.
-- Reload: stays on `/timeline`, no flash. Network tab shows:
-  - **One** server-side `GET /v1/auth/session` (issued by the SSR layout, non-rotating, no `Set-Cookie` rotation).
-  - **One** client-side `POST /api/auth/bootstrap` (issued by `<AuthBootstrap>` after hydration, which internally calls `/v1/auth/refresh` + `/v1/auth/me` and propagates rotated cookies via the route handler's response).
+- Login with the seeded `claude-test` user: the form posts to `/api/auth/login`, which proxies to `/v1/auth/login`. DevTools → Application → Cookies shows `refresh_token` (HttpOnly) and `csrf_token`, and **no** `session` cookie.
+- Console: `localStorage` and `sessionStorage` are empty. No JWT-shaped strings (`eyJ…`) anywhere in storage — the access token is held in memory only.
+- Reload: stays on `/timeline`, no flash of `/login`. The Network tab shows
+  - **one** server-side `GET /v1/auth/session` (issued by the SSR layout; non-rotating, no `Set-Cookie`), and
+  - **one** client-side `POST /api/auth/bootstrap` (issued by `<AuthBootstrap>` after hydration, which internally calls `/v1/auth/refresh` + `/v1/auth/me` and propagates rotated cookies back through the route handler).
   - Net effect: the refresh-token chain advances exactly once per page load.
-- Logout: cookies cleared, redirect to `/login`. Subsequent navigation to `/timeline` redirects back.
-- Force token expiry (shorten `ACCESS_TOKEN_TTL_SECONDS` to 30 in FastAPI dev config): make any API call → exactly one `/v1/auth/refresh` fires → original request retries and succeeds.
-- 429 response from a rate-limited endpoint does NOT trigger `/v1/auth/refresh` (only 401 does).
+- Signup, logout, reset-password, deep-link redirect (`/login?redirect=…`), and remember-me all behave as on `develop`.
+- Logout: cookies cleared, redirect to `/login`. Navigating back to `/timeline` redirects out again.
+- Force token expiry (shorten `ACCESS_TOKEN_TTL_SECONDS` to 30 in the FastAPI env): make any API call → exactly one `/v1/auth/refresh` fires → the original request retries and succeeds.
+- A 429 from a rate-limited endpoint does **not** trigger `/v1/auth/refresh` — only a 401 does.
 
-### E2E spec
+### E2E specs
 
-`e2e/fastapi-auth.spec.ts` covers the full happy path + no-loop guarantee. Run with:
+[e2e/auth.spec.ts](../../e2e/auth.spec.ts) covers gating and the login round-trip; [e2e/fastapi-auth.spec.ts](../../e2e/fastapi-auth.spec.ts) covers the token flow's happy path plus the no-refresh-loop guarantee, and is tagged so it stays out of the default run:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 \
-  npx playwright test e2e/fastapi-auth.spec.ts --grep @fastapi-auth
+npx playwright test e2e/fastapi-auth.spec.ts --grep @fastapi-auth
 ```
-
-The default `e2e/auth.spec.ts` continues to cover the flag-off path.
 
 ## Before opening the PR
 

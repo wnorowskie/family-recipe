@@ -126,7 +126,7 @@ export default function FeedbackWidget() {
           }
           setOpen(true);
         }}
-        className="fixed bottom-28 right-4 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-900 text-white shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 sm:bottom-6 sm:right-6"
+        className="fixed bottom-28 right-4 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--fg-strong)] text-white shadow-lg transition hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--border-active)] sm:bottom-6 sm:right-6"
       >
         ?
       </button>
@@ -157,12 +157,12 @@ export default function FeedbackWidget() {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-semibold text-gray-600">
+                <p className="text-sm font-semibold text-[var(--fg-meta)]">
                   Help us improve
                 </p>
                 <h2
                   id="feedback-widget-title"
-                  className="text-xl font-bold text-gray-900"
+                  className="text-xl font-bold text-[var(--fg-strong)]"
                 >
                   Send feedback
                 </h2>
@@ -170,7 +170,7 @@ export default function FeedbackWidget() {
               <button
                 type="button"
                 onClick={closeForm}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-[var(--fg-caption)] hover:text-[var(--fg-body)]"
                 aria-label="Close feedback form"
               >
                 ✕
@@ -188,8 +188,8 @@ export default function FeedbackWidget() {
                       onClick={() => setCategory(option)}
                       className={`flex-1 rounded-full border px-3 py-2 text-sm font-semibold capitalize transition ${
                         active
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                          ? 'bg-[var(--fg-strong)] text-white border-[var(--border-active)]'
+                          : 'border-[var(--border-card)] text-[var(--fg-body)] hover:border-[var(--border-input)]'
                       }`}
                     >
                       {option}
@@ -199,37 +199,37 @@ export default function FeedbackWidget() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-[var(--fg-body)]">
                   Your email {emailRequired ? '' : '(optional)'}
                 </label>
                 <input
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
                   placeholder="you@example.com"
                   required={emailRequired}
                   inputMode="email"
                 />
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-[var(--fg-caption)]">
                   We&apos;ll reach out if we need more details. On auth pages,
                   email is required.
                 </p>
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-[var(--fg-body)]">
                   What happened?
                 </label>
                 <textarea
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
                   rows={5}
                   placeholder="Describe the bug or share your suggestion"
                   required
                 />
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-[var(--fg-caption)]">
                   Include steps, device, and page if helpful. No attachments in
                   this version.
                 </p>
@@ -241,7 +241,7 @@ export default function FeedbackWidget() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between text-xs text-gray-500">
+              <div className="flex items-center justify-between text-xs text-[var(--fg-caption)]">
                 <span className="flex-1 truncate pr-3">
                   {pageUrl || 'Page captured when you opened the form.'}
                 </span>
@@ -252,14 +252,14 @@ export default function FeedbackWidget() {
                 <button
                   type="button"
                   onClick={closeForm}
-                  className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  className="rounded-full border border-[var(--border-card)] px-4 py-2 text-sm font-semibold text-[var(--fg-body)] hover:bg-[var(--bg-page)]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full bg-[var(--fg-strong)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[var(--bg-primary)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSubmitting ? 'Sending...' : 'Send'}
                 </button>
