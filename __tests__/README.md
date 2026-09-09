@@ -1,36 +1,21 @@
 # Test Directory
 
-This directory contains all automated tests for the Family Recipe application.
-
-## Structure
+Jest tests for the Next.js app. The working notes — global mocks, layout rationale, and the traps — are in [CLAUDE.md](CLAUDE.md); this file is just the map.
 
 ```
 __tests__/
-├── unit/                    # Unit tests for individual functions/modules
-│   ├── lib/                # Tests for business logic helpers
-│   └── helpers/            # Shared test utilities
-├── integration/            # API integration tests
-│   ├── api/               # API route tests organized by endpoint
-│   │   ├── auth/
-│   │   ├── posts/
-│   │   ├── comments/
-│   │   ├── reactions/
-│   │   ├── timeline/
-│   │   ├── recipes/
-│   │   ├── profile/
-│   │   └── family/
-│   └── helpers/           # Integration test helpers
-└── fixtures/              # Test data fixtures (JSON)
+├── unit/
+│   ├── lib/            # pure-function tests for src/lib/
+│   ├── api/            # the four auth/* proxies + the /v1/* catch-all
+│   ├── app/            # (app) server-component redirect guards
+│   └── components/     # React tests (need a jsdom docblock)
+├── integration/
+│   ├── openapi-contract.test.ts   # frontend /v1/* calls vs apps/api/openapi.snapshot.json
+│   └── helpers/                   # request builders, Prisma mock, fixture users
+├── helpers/            # glob CJS shim for the coverage reporter
+└── smoke.test.ts       # asserts the jest setup itself works
 ```
 
-## Running Tests
+Python tests live with their services: [apps/api/tests/](../apps/api/tests/) and [apps/recipe-url-importer/tests/](../apps/recipe-url-importer/tests/), both pytest. Playwright specs are in [e2e/](../e2e/).
 
-See the main [TESTING.md](../docs/TESTING.md) for complete documentation.
-
-Quick commands:
-
-- `npm test` - Run all tests
-- `npm run test:watch` - Run tests in watch mode
-- `npm run test:coverage` - Generate coverage report
-- `npm run test:unit` - Run only unit tests
-- `npm run test:integration` - Run only integration tests
+Commands are in [package.json](../package.json) (`test`, `test:unit`, `test:integration`, `test:coverage`, `test:watch`). Coverage enforces a 75% global threshold over `src/lib/**` and `src/app/api/**`.
