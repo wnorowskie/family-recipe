@@ -28,7 +28,7 @@ The `DATABASE_URL` env var picks the connection. `PRISMA_SCHEMA` is read by Pris
 - Creates one `FamilySpace` if none exists, hashing `FAMILY_MASTER_KEY` (or generating one and **printing it** — save the output).
 - Loads the curated tag catalog (diet/allergen/heat/flavor/cuisine).
 - Will not overwrite an existing family or rotate the master key.
-- Skipped in `NODE_ENV=production`: seeds the `claude-test` dev user (credentials from `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD`, defaults in [seed.ts](seed.ts)).
+- Seeds a `claude-test` dev user (credentials from `CLAUDE_TEST_USER` / `CLAUDE_TEST_PASSWORD`, defaults in [seed.ts](seed.ts)) — **skipped entirely when `NODE_ENV=production`**. The username is set on create only; to rotate it, delete the row and re-seed, or the `User.username` unique constraint bites.
 
 To rotate the master key, do it manually via the DB — there is no API for it.
 
@@ -44,7 +44,9 @@ Setting `SEED_E2E=1` (alongside the default non-prod `NODE_ENV`) adds a determin
 - one cooked event against the recipe (`id='ce2ecooked001'`, rating 5) by `claude-test`
 - one notification for `e2e-author` (`id='ce2enotif001'`, type `comment`, actor `claude-test`)
 
-Fixture IDs are shaped to pass Zod's `.cuid()` check — route handlers that validate postId/commentId as CUIDs reject hyphenated IDs like `e2e-post-001`.
+Fixture IDs are shaped to pass a CUID check — a hyphenated `e2e-post-001` is rejected before the handler runs. Two gates exist and both must accept the fixture: Zod's `.cuid()` in [src/lib/validation.ts](../src/lib/validation.ts), and FastAPI's `CUID_REGEX` in [apps/api/src/utils.py](../apps/api/src/utils.py) — which is `^c[a-z0-9]{8,}$`, deliberately looser than a real 25-char CUID so short seed IDs pass. Post-cutover, FastAPI's is the one actually guarding the route.
+
+> **The seeded emails are `@example.local`, and FastAPI won't accept that on write.** Pydantic's `EmailStr` (email-validator) rejects `.local` as "a special-use or reserved name", so `claude-test@example.local` and `e2e-author@example.local` **cannot sign up or update their profile** through `/v1/auth/signup` or `/v1/me/profile`. They log in fine — `LoginRequest.identifier` is a plain `str` — and read back fine, because `UserResponse.email` is a plain `str` too. Only the write paths that declare `EmailStr` reject them. Use `@example.com` for any synthetic email a test actually submits; [e2e/signup.spec.ts](../e2e/signup.spec.ts) already does.
 
 All upserts keyed on the deterministic IDs, so re-running `SEED_E2E=1 npm run db:seed` does not duplicate rows. Specs assert by ID or content (`E2E Seed Post`, etc.). Ignored when `NODE_ENV=production` or `SEED_E2E` is unset.
 

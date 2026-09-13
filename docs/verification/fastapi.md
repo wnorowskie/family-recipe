@@ -2,7 +2,7 @@
 
 Run this when the change touches [apps/api/](../../apps/api/) — routers, schemas, dependencies, security helpers. Service context: [apps/api/CLAUDE.md](../../apps/api/CLAUDE.md). Setup/run: [apps/api/README.md](../../apps/api/README.md).
 
-FastAPI mirrors the Next API contract. A change here almost always pairs with a change to [src/app/api/](../../src/app/api/) — see [next-api.md](next-api.md).
+FastAPI is the sole backend — there is no Next mirror to keep in step. A change here pairs with a Next change only when the frontend calls a new or reshaped endpoint, in which case regenerate the OpenAPI snapshot and update `FRONTEND_CALLS` (below).
 
 ## Start the service
 
@@ -66,30 +66,25 @@ curl -s -b "$COOKIES" -H "Content-Type: application/json" \
   -d '{"garbage":true}' http://localhost:8000/posts | jq .
 ```
 
-## Contract parity check
+## Contract check
 
-When changing a shape or status code, diff both services against the same input. Mind the prefix mismatch:
+There is no cross-service diff any more — #231 deleted the `/api/*` handlers this used to be compared against, and #232/#243 removed the shared `session` cookie that made a side-by-side login possible. The contract guard is now the committed OpenAPI snapshot:
 
 ```bash
-NEXT=http://localhost:3000
-API=http://localhost:8000
-
-# Log in against both (they can share the JWT cookie if JWT_SECRET matches)
-diff <(curl -s -b "$COOKIES" "$NEXT/api/posts" | jq -S .) \
-     <(curl -s -b "$COOKIES" "$API/posts"     | jq -S .)
+cd apps/api
+python scripts/dump_openapi.py > openapi.snapshot.json
+git diff --stat openapi.snapshot.json
 ```
 
-Any non-empty diff is a parity bug unless intentional (rare — the migration plan is explicit that the contract should not change during cutover).
+Regenerate it in the same PR as any router, schema, docstring, decorator, or signature change — the `openapi-diff` job in [api-ci.yml](../../.github/workflows/api-ci.yml) fails on drift. Treat the snapshot diff as the contract changelog. A locally-generated snapshot can show spurious `format: binary` / ValidationError `ctx,input` noise from a Pydantic version mismatch; don't commit that — CI regenerates against pinned deps.
 
 ## Invariants to preserve
 
-Mirror the Next API rules:
-
-- [ ] Auth goes through the dependencies in [apps/api/src/dependencies.py](../../apps/api/src/dependencies.py) (`require_user` / `require_admin`) — never parse the cookie inline
+- [ ] Auth goes through an injected dependency — `get_current_user_v1` ([dependencies_v1.py](../../apps/api/src/dependencies_v1.py), Bearer-only, preferred for new handlers) or `get_current_user` ([dependencies.py](../../apps/api/src/dependencies.py)) — never parse the token or cookie inline
 - [ ] Every DB query scopes by `family_space_id` — missing = cross-family leak
 - [ ] Request/response models come from [apps/api/src/schemas/](../../apps/api/src/schemas/) (Pydantic)
 - [ ] Permission checks use [apps/api/src/permissions.py](../../apps/api/src/permissions.py)
-- [ ] Error shape is `{ "error": { "code", "message" } }` — the public contract, unchanged from Next
+- [ ] Error shape is `{ "error": { "code", "message" } }` — raise via `ApiError`, never a bare `HTTPException(detail=dict)`; the global handler won't unwrap a dict into the envelope
 
 ## Tests
 
