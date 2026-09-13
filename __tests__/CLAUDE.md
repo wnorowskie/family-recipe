@@ -14,11 +14,10 @@ Jest tests for the Next.js monolith. [jest.config.js](../jest.config.js) has the
 
 ## Global mocks (in [jest.setup.js](../jest.setup.js))
 
-Three things are mocked **for every test** before any test code runs — your test gets these by default and must override them when it needs real behavior:
+Two things are mocked **for every test** before any test code runs — your test gets these by default and must override them when it needs real behavior:
 
 1. **`@/lib/prisma`** — replaced with a **hand-listed set of 12 models**, each `{}`. Stub the specific methods you exercise (`prisma.user.findUnique = jest.fn().mockResolvedValue(...)`), or use [integration/helpers/mock-prisma.ts](integration/helpers/mock-prisma.ts) for bulk setup. **The list is not the whole schema** — `notification`, `feedbackSubmission`, `refreshToken` and `idempotencyKey` are absent, so touching them gives `Cannot read properties of undefined` rather than a clean "method not stubbed" failure. Add the model to [jest.setup.js](../jest.setup.js) when you first need it.
-2. **`@/lib/rateLimit`** — inert. The module has had no `src/` consumers since #231, and its own test `jest.unmock`s it on line 2, so this mock currently guards nothing. Deletion of all three is tracked in #312. Rate limiting lives in FastAPI — see [apps/api/CLAUDE.md](../apps/api/CLAUDE.md).
-3. **`console.*`** — silenced. Set `ALLOW_TEST_LOGS=true` env var to see output while debugging.
+2. **`console.*`** — silenced. Set `ALLOW_TEST_LOGS=true` env var to see output while debugging.
 
 `bcrypt` is aliased to `bcryptjs` via `moduleNameMapper` so tests don't need native binaries. Use `bcrypt` in your imports — never `bcryptjs` directly.
 

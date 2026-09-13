@@ -1,20 +1,17 @@
 """In-process rate limiter for /v1 endpoints (first introduced for #183).
 
-Mirrors src/lib/rateLimit.ts. Per-instance state — production runs a
-single Cloud Run instance so this is sufficient for the same reason
-the Next side accepts it (see [src/lib/rateLimit.ts] module comment).
-A shared-store variant is tracked in issue #33 and is the responsibility
-of #175 to bring online for the wider /v1/auth/* surface; this module
-lives in apps/api so the v1 cutover doesn't depend on either.
+Per-instance state — production runs a single Cloud Run instance, so a
+plain in-memory dict is sufficient. A shared-store variant is tracked in
+issue #33 and is the responsibility of #175 to bring online for the wider
+/v1/auth/* surface; this module lives in apps/api so the v1 cutover doesn't
+depend on either.
 
 ## Why not a third-party library
 
 `slowapi` and `fastapi-limiter` solve more general problems (Redis
 backend, custom keyfuncs, decorator API) at the cost of a dependency
-and an opaque control flow. The Next.js side hand-rolls the same loop
-in <100 lines; matching that surface here keeps the two implementations
-straightforwardly comparable for the migration audit and means a single
-PR can replace both with a Redis-backed limiter when #33 lands.
+and an opaque control flow. A hand-rolled fixed-window counter in
+under 100 lines covers everything this service actually needs.
 
 ## TTL semantics
 
@@ -24,11 +21,10 @@ Each `(name, key)` entry stores `(count, reset_at)`. On every request:
 2. If `count < limit` → increment, return allowed
 3. Otherwise → return denied with `retry_after = ceil(reset_at - now)`
 
-The window is fixed (not sliding) — same as Next. A burst at the very
-end of a window followed by a burst at the start of the next can yield
-up to `2 * limit` requests in `windowSeconds`; that's the documented
-trade-off in the Next side and acceptable for the abuse surface this
-guards (best-effort, not a security boundary).
+The window is fixed, not sliding. A burst at the very end of a window
+followed by a burst at the start of the next can yield up to `2 * limit`
+requests in `window_seconds`; that's an accepted trade-off for the abuse
+surface this guards (best-effort, not a security boundary).
 """
 from __future__ import annotations
 
@@ -94,13 +90,10 @@ class RateLimiter:
 
 # Pre-configured limiters. Add new ones here rather than constructing
 # anonymous RateLimiter() instances at handler-import time so the limit
-# values live in one place and can be cross-referenced with the Next
-# src/lib/rateLimit.ts file during the migration audit.
+# values live in one place.
 #
-# `feedback_limiter` (issue #183): 20 submissions/hour/user.
-# The migration plan specifies 20/hour/user; the Next side ships 10/hour
-# (legacy, predates the plan). We honour the plan for the v1 contract —
-# the Next limit can be bumped to match when the legacy route is retired.
+# `feedback_limiter` (issue #183): 20 submissions/hour/user, per the
+# migration plan.
 feedback_limiter = RateLimiter(
     name="feedback", limit=20, window_seconds=60 * 60
 )
@@ -109,10 +102,9 @@ feedback_limiter = RateLimiter(
 # token is `_client_ip(request)` from routers/v1/auth.py, not a user id — so
 # unlike the feedback limiter they are the high-cardinality case the module
 # docstring flags above: the plain dict grows with distinct client IPs and gets
-# no eviction until the LRU/shared-store work in #33 lands. login/signup/reset
-# limits mirror the Next side's src/lib/rateLimit.ts (`loginLimiter` 5/15min,
-# `signupLimiter` 3/hour); reset reuses the login window per the #175 ticket
-# (parity with what the legacy /api/auth/reset got from `loginLimiter`).
+# no eviction until the LRU/shared-store work in #33 lands. reset reuses the
+# login window per the #175 ticket (parity with what the legacy
+# /api/auth/reset route got from the Next side's old login limiter).
 login_limiter = RateLimiter(name="login", limit=5, window_seconds=15 * 60)
 signup_limiter = RateLimiter(name="signup", limit=3, window_seconds=60 * 60)
 reset_limiter = RateLimiter(name="reset", limit=5, window_seconds=15 * 60)

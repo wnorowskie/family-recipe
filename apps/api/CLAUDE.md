@@ -43,7 +43,7 @@ Validation logic for the cookie + CSRF gate is shared via `_validate_refresh_coo
 
 ## Rate limits
 
-[src/rate_limit.py](src/rate_limit.py) holds every limiter in the system — the Next side has none (its `src/lib/rateLimit.ts` went dead with the `/api/*` routes in #231, tracked for deletion in #312). State is in-process and per-instance, so it does not survive a restart and is not shared across replicas (#33). `settings.auth_rate_limit_enabled` disables the auth-surface limiters wholesale, which is how the tests get deterministic runs.
+[src/rate_limit.py](src/rate_limit.py) holds every limiter in the system — Next has no rate-limiting module of its own (its dead `src/lib/rateLimit.ts`, orphaned by the #231 route deletion, was removed in #312). State is in-process and per-instance, so it does not survive a restart and is not shared across replicas (#33). `settings.auth_rate_limit_enabled` disables the auth-surface limiters wholesale, which is how the tests get deterministic runs.
 
 | Endpoint               | Limit      | Key         | Issue |
 | ---------------------- | ---------- | ----------- | ----- |
