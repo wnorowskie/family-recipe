@@ -7,7 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# `apk upgrade` refreshes packages pre-installed in the base image (util-linux's
+# libuuid shipped 7 HIGH CVEs, fixed in 2.42.3-r1) — `apk add` alone never
+# touches them, so a stale base tag keeps Trivy red. (#314)
 RUN apk update \
+    && apk upgrade --no-cache \
     && apk add --no-cache build-base libxml2-dev libxslt-dev
 
 COPY apps/recipe-url-importer/requirements.txt /tmp/requirements.txt
@@ -25,7 +29,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Same upgrade as the builder stage — this is the image Trivy scans.
 RUN apk update \
+    && apk upgrade --no-cache \
     && apk add --no-cache libxml2 libxslt curl
 
 COPY --from=builder /opt/venv /opt/venv

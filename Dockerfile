@@ -1,8 +1,12 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-# Install OpenSSL so Prisma can detect and link against libssl
-RUN apk add --no-cache openssl
+# Install OpenSSL so Prisma can detect and link against libssl. `apk upgrade`
+# first so packages pre-installed in node:20-alpine (libcrypto3/libssl3 carried
+# CVE-2026-14456, fixed in openssl 3.5.8-r0) pick up the patched build — every
+# later stage inherits from `base`, so this is the one place to do it. (#314)
+RUN apk upgrade --no-cache \
+    && apk add --no-cache openssl
 
 FROM base AS deps
 ENV NODE_ENV=development
