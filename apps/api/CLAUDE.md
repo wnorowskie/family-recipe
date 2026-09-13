@@ -66,10 +66,9 @@ Local aside: a 429 on local login clears by restarting uvicorn, since the limite
 
 - [src/main.py](src/main.py) — FastAPI app, includes routers, manages prisma connect/disconnect lifespan
 - [src/routers/v1/](src/routers/v1/) — one file per resource; the only router tree since #233 collapsed everything to `/v1`-only
-- [src/dependencies_v1.py](src/dependencies_v1.py) — `get_current_user_v1`, **Bearer-only**. This is the injector new handlers should use.
-- [src/dependencies.py](src/dependencies.py) — `get_current_user`, used by most resource routers. It tries Bearer **and then falls back to the legacy `session` cookie** ([:57-65](src/dependencies.py)). That fallback outlived the Phase 4.4 dual-mode deletion (#232) and its inline comment still describes the un-prefixed routers #233 removed — so this module contradicts the "the `session` cookie is gone" claim above. Removal is tracked in #311; don't build on the cookie branch.
+- [src/dependencies_v1.py](src/dependencies_v1.py) — `get_current_user_v1`, **Bearer-only**. The sole auth injector for every `/v1` resource router since #311 deleted the old `src/dependencies.py` (which used to try Bearer and then fall back to the legacy `session` cookie).
 - [src/permissions.py](src/permissions.py) — `is_owner_or_admin` / `can_edit_post` / `can_delete_comment` / `can_remove_member`. Post deletion has no dedicated helper — it goes through `is_owner_or_admin`. Sole owner of these rules since the Next-side `permissions.ts` mirror was removed in #243.
-- [src/security.py](src/security.py) — JWT verify, password hashing
+- [src/security.py](src/security.py) — password hashing; also `clear_session_cookie`, kept as defense-in-depth cleanup of the legacy cookie on sensitive account changes (#311)
 - [src/tokens.py](src/tokens.py) / [src/cookies.py](src/cookies.py) — access/refresh token minting and the `refresh_token` + `csrf_token` cookie contract
 - [src/rate_limit.py](src/rate_limit.py) — in-process limiters, all IP-keyed except `feedback_limiter` (see below)
 - [src/idempotency.py](src/idempotency.py) — `X-Request-Id` replay store, `INSERT … ON CONFLICT` for at-most-once handler execution (#180, #223)

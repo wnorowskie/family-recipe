@@ -89,14 +89,15 @@ class TestUnauthenticated:
         )
         assert_error_envelope(response, status_code=401, code="UNAUTHORIZED")
 
-    def test_legacy_session_cookie_does_not_authenticate_v1(
-        self, client, member_auth
-    ):
-        # The legacy `session` cookie is the cookie-auth pathway and
-        # is honoured only by /api/me/delete. /v1/me/delete is bearer-
-        # only, so a cookie-only request must 401.
+    def test_legacy_session_cookie_does_not_authenticate_v1(self, client):
+        # /v1/me/delete is bearer-only and always has been — a `session`
+        # cookie (the pathway #311 removed from the other nine routers)
+        # was never honoured here, so a cookie-only request must 401.
         response = client.request(
-            "DELETE", "/v1/me/delete", json=_VALID_PAYLOAD, headers=member_auth
+            "DELETE",
+            "/v1/me/delete",
+            json=_VALID_PAYLOAD,
+            headers={"Cookie": f"{settings.cookie_name}=irrelevant"},
         )
         assert_error_envelope(response, status_code=401, code="UNAUTHORIZED")
 

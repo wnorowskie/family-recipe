@@ -14,7 +14,7 @@ a one-liner:
     @router.post("/feedback", status_code=201)
     async def create_feedback(
         payload: CreateFeedbackRequest,
-        user: UserResponse = Depends(get_current_user),
+        user: UserResponse = Depends(get_current_user_v1),
         idem: IdempotencyKey = Depends(idempotency_key),
     ):
         async def _do():

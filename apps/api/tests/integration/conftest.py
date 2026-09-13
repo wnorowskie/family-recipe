@@ -1,7 +1,7 @@
 """Shared fixtures for integration tests.
 
 These fixtures keep tests aligned with the integration blueprint by
-providing auth cookies, mock Prisma, and common mock entities.
+providing auth headers, mock Prisma, and common mock entities.
 """
 
 from typing import Dict
@@ -11,8 +11,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src import db
-from src.security import sign_token
-from src.settings import settings
+from src import tokens
 from tests.helpers.mock_prisma import create_mock_prisma_client, reset_mock_prisma
 from tests.helpers.test_data import make_mock_family_space, make_mock_membership, make_mock_user
 
@@ -47,7 +46,6 @@ def mock_prisma(monkeypatch):
     # X-Request-Id replay test would hit the real (unconnected) prisma
     # client and fail in conftest setup rather than the assertion.
     monkeypatch.setattr("src.idempotency.prisma", mock)
-    monkeypatch.setattr("src.dependencies.prisma", mock)
     monkeypatch.setattr("src.dependencies_v1.prisma", mock)
     yield mock
     reset_mock_prisma(mock)
@@ -89,39 +87,34 @@ def mock_membership(mock_user, mock_family_space) -> SimpleNamespace:
 
 
 # ---------------------------------------------------------------------------
-# Auth cookies using real JWT signing
+# Auth headers using real access-token signing
 # ---------------------------------------------------------------------------
 
 
-def _make_cookie(role: str, user_id: str, family_space_id: str, remember_me: bool = False) -> Dict[str, str]:
-    token = sign_token(
-        {
-            "userId": user_id,
-            "familySpaceId": family_space_id,
-            "role": role,
-        },
-        remember_me=remember_me,
+def _make_bearer_headers(role: str, user_id: str, family_space_id: str) -> Dict[str, str]:
+    token = tokens.mint_access_token(
+        user_id=user_id, family_space_id=family_space_id, role=role
     )
-    return {"Cookie": f"{settings.cookie_name}={token}"}
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
 def member_auth(mock_user, mock_family_space):
-    return _make_cookie("member", mock_user.id, mock_family_space.id)
+    return _make_bearer_headers("member", mock_user.id, mock_family_space.id)
 
 
 @pytest.fixture
 def admin_auth(mock_admin_user, mock_family_space):
-    return _make_cookie("admin", mock_admin_user.id, mock_family_space.id)
+    return _make_bearer_headers("admin", mock_admin_user.id, mock_family_space.id)
 
 
 @pytest.fixture
 def owner_auth(mock_owner_user, mock_family_space):
-    return _make_cookie("owner", mock_owner_user.id, mock_family_space.id)
+    return _make_bearer_headers("owner", mock_owner_user.id, mock_family_space.id)
 
 
 # ---------------------------------------------------------------------------
-# Convenience: mock get_current_user via prisma lookup
+# Convenience: mock get_current_user_v1 via prisma lookup
 # ---------------------------------------------------------------------------
 
 

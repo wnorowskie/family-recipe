@@ -6,8 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.security import sign_token
-from src.settings import settings
+from src import tokens
 
 pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership")
 
@@ -192,7 +191,8 @@ def test_remove_member_cannot_remove_self_403(client, mock_prisma, mock_family_s
     membership = _setup_membership(mock_family_space, role="member", user_id=_VALID_CUID)
     mock_prisma.familymembership.find_first = AsyncMock(return_value=membership)
     mock_prisma.familymembership.delete = AsyncMock()
-    headers = {"Cookie": f"{settings.cookie_name}=" + sign_token({"userId": _VALID_CUID, "familySpaceId": mock_family_space.id, "role": "owner"})}
+    token = tokens.mint_access_token(user_id=_VALID_CUID, family_space_id=mock_family_space.id, role="owner")
+    headers = {"Authorization": f"Bearer {token}"}
 
     response = client.delete(f"/v1/family/members/{_VALID_CUID}", headers=headers)
 

@@ -1,8 +1,8 @@
 """Bearer-token auth dependencies for /v1/* endpoints.
 
-Mirrors src/dependencies.py but reads `Authorization: Bearer <jwt>` instead
-of the legacy session cookie. Kept in a separate module so a single import
-site doesn't accidentally accept both auth modes.
+`get_current_user_v1` is the sole auth injector for every `/v1` resource
+router — #311 deleted the old `src/dependencies.py`, which used to try
+Bearer and then fall back to a legacy `session` cookie.
 """
 from __future__ import annotations
 

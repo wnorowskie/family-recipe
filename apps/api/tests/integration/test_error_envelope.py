@@ -44,18 +44,19 @@ class TestPydanticValidationEnvelope:
         )
 
 
-class TestCookieAuthUnauthorizedEnvelope:
-    """The cookie-capable auth dependency (get_current_user) raises ApiError,
+class TestBearerAuthUnauthorizedEnvelope:
+    """The Bearer-only auth dependency (get_current_user_v1) raises ApiError,
     not a bare HTTPException. Exercised via /v1/timeline, one of the resource
-    routes that depend on it — the legacy /auth/me it used to hit was removed
-    with the cookie-session auth router in #233."""
+    routes that depend on it. A stray `session` cookie (the legacy auth mode
+    #311 removed) is included in the second case to confirm it's simply
+    ignored, not treated as a credential."""
 
-    def test_missing_cookie_returns_envelope(self, client):
+    def test_missing_bearer_returns_envelope(self, client):
         response = client.get("/v1/timeline")
 
         assert_error_envelope(response, status_code=401, code="UNAUTHORIZED")
 
-    def test_invalid_cookie_returns_envelope(self, client):
+    def test_stray_session_cookie_still_returns_envelope(self, client):
         response = client.get("/v1/timeline", headers={"Cookie": "session=not-a-real-jwt"})
 
         assert_error_envelope(response, status_code=401, code="UNAUTHORIZED")

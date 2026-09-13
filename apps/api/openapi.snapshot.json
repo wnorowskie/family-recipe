@@ -1414,6 +1414,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Delete Comment",
         "tags": [
           "comments"
@@ -1433,6 +1438,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "List Members",
         "tags": [
           "family"
@@ -1474,6 +1484,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Remove Member",
         "tags": [
           "family"
@@ -1757,6 +1772,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "My Favorites",
         "tags": [
           "me"
@@ -1797,6 +1817,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Change Password",
         "tags": [
           "me"
@@ -1837,6 +1862,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Profile Multipart",
         "tags": [
           "me"
@@ -1877,6 +1907,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Profile",
         "tags": [
           "me"
@@ -2060,6 +2095,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Post",
         "tags": [
           "posts"
@@ -2101,6 +2141,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Delete Post",
         "tags": [
           "posts"
@@ -2180,6 +2225,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Get Post",
         "tags": [
           "posts"
@@ -2230,6 +2280,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Post",
         "tags": [
           "posts"
@@ -2291,6 +2346,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "List Comments",
         "tags": [
           "comments"
@@ -2340,6 +2400,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Comment",
         "tags": [
           "comments"
@@ -2401,6 +2466,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "List Cooked",
         "tags": [
           "posts"
@@ -2450,6 +2520,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Log Cooked",
         "tags": [
           "posts"
@@ -2493,6 +2568,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Unfavorite Post",
         "tags": [
           "posts"
@@ -2534,6 +2614,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Favorite Post",
         "tags": [
           "posts"
@@ -2588,6 +2673,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "My Cooked",
         "tags": [
           "profile"
@@ -2642,6 +2732,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "My Favorites",
         "tags": [
           "profile"
@@ -2696,6 +2791,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "My Posts",
         "tags": [
           "profile"
@@ -2735,6 +2835,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Toggle Reaction",
         "tags": [
           "reactions"
@@ -2980,6 +3085,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Browse Recipes",
         "tags": [
           "recipes"
@@ -3044,6 +3154,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "List Tags",
         "tags": [
           "tags"
@@ -3098,6 +3213,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Get Timeline",
         "tags": [
           "timeline"

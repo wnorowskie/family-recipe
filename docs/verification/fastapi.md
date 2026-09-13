@@ -80,7 +80,7 @@ Regenerate it in the same PR as any router, schema, docstring, decorator, or sig
 
 ## Invariants to preserve
 
-- [ ] Auth goes through an injected dependency — `get_current_user_v1` ([dependencies_v1.py](../../apps/api/src/dependencies_v1.py), Bearer-only, preferred for new handlers) or `get_current_user` ([dependencies.py](../../apps/api/src/dependencies.py)) — never parse the token or cookie inline
+- [ ] Auth goes through the injected dependency — `get_current_user_v1` ([dependencies_v1.py](../../apps/api/src/dependencies_v1.py), Bearer-only, the sole auth injector since #311 deleted the legacy cookie-fallback `dependencies.py`) — never parse the token or cookie inline
 - [ ] Every DB query scopes by `family_space_id` — missing = cross-family leak
 - [ ] Request/response models come from [apps/api/src/schemas/](../../apps/api/src/schemas/) (Pydantic)
 - [ ] Permission checks use [apps/api/src/permissions.py](../../apps/api/src/permissions.py)

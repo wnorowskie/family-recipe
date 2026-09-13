@@ -162,7 +162,7 @@ diff <(curl -s -b "$COOKIES" "$NEXT/api/<resource>" | jq -S .) \
 These fail silently at runtime — there's no type error, no red test, just wrong behavior in prod. Grep for each one on every PR that touches the relevant area.
 
 - **Family-scoping.** Any new Prisma query on `Post`, `Comment`, `Reaction`, `Favorite`, `CookedEvent`, or `Notification` must filter by `familySpaceId`. Missing filter = cross-family data leak. Grep the diff: `grep -n familySpaceId <changed-handler-files>`. If a new query lacks it, **fail the review** — this is not a lint suggestion.
-- **Auth wrapping.** New `src/app/api/**` handlers must be wrapped in `withAuth` / `withRole` from `src/lib/apiAuth.ts`. FastAPI equivalents must use `require_user` / `require_admin` from `apps/api/src/dependencies.py`. Never parse the cookie inline.
+- **Auth wrapping.** New `src/app/api/**` handlers must be wrapped in `withAuth` / `withRole` from `src/lib/apiAuth.ts`. FastAPI equivalents must inject `get_current_user_v1` from `apps/api/src/dependencies_v1.py`. Never parse the token or cookie inline.
 - **Validation source.** New Zod schemas live in `src/lib/validation.ts`, not inline in the route handler.
 - **Error response source.** Errors use helpers from `src/lib/apiErrors.ts` (`validationError`, `notFoundError`, etc.) — not ad-hoc `NextResponse.json({ error: ... })`.
 - **Dual Prisma schemas in lockstep.** Any field / model / relation added to `prisma/schema.postgres.node.prisma` must also appear in `prisma/schema.postgres.prisma` with the same shape and `@map(...)` column name. SQLite was dropped in #80 — **do not** suggest `file:./prisma/dev.db` as a fallback. A third schema should not reappear.
