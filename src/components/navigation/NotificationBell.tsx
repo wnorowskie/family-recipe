@@ -55,7 +55,7 @@ export default function NotificationBell({
     >
       <Bell size={20} aria-hidden="true" />
       {unreadCount > 0 && (
-        <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white shadow-sm">
+        <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--fg-destructive)] px-1 text-xs font-bold text-white shadow-sm">
           {badge}
         </span>
       )}

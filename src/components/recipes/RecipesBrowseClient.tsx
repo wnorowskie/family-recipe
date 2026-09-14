@@ -731,7 +731,7 @@ export default function RecipesBrowseClient({
       </section>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-error-soft)] bg-[var(--bg-error-soft)] px-4 py-3 text-sm text-[var(--color-red-700)]">
           {error}
         </div>
       )}

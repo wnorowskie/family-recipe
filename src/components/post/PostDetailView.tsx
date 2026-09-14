@@ -540,17 +540,21 @@ export default function PostDetailView({
                   type="button"
                   onClick={handleDeletePost}
                   disabled={isDeletingPost}
-                  className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  className="rounded-full border border-[var(--border-error-soft)] px-4 py-2 text-sm font-semibold text-[var(--fg-destructive)] hover:bg-[var(--bg-error-soft)] disabled:opacity-50"
                 >
                   {isDeletingPost ? 'Deleting…' : 'Delete Post'}
                 </button>
               )}
             </div>
             {favoriteError && (
-              <p className="text-xs text-red-600">{favoriteError}</p>
+              <p className="text-xs text-[var(--fg-destructive)]">
+                {favoriteError}
+              </p>
             )}
             {deleteError && (
-              <p className="text-xs text-red-600">{deleteError}</p>
+              <p className="text-xs text-[var(--fg-destructive)]">
+                {deleteError}
+              </p>
             )}
           </div>
         </div>
@@ -619,7 +623,7 @@ export default function PostDetailView({
             {post.tags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700"
+                className="inline-flex items-center rounded-full bg-[var(--bg-info-soft)] px-3 py-1 text-sm font-semibold text-[var(--fg-info)]"
               >
                 #{tag}
               </span>
@@ -767,7 +771,9 @@ export default function PostDetailView({
           </div>
         </div>
         {olderCookedError && (
-          <p className="text-sm text-red-600">{olderCookedError}</p>
+          <p className="text-sm text-[var(--fg-destructive)]">
+            {olderCookedError}
+          </p>
         )}
         {recentCooked.length > 0 ? (
           <div className="space-y-3">
@@ -885,7 +891,9 @@ export default function PostDetailView({
           </div>
         )}
         {olderCommentsError && (
-          <p className="text-sm text-red-600">{olderCommentsError}</p>
+          <p className="text-sm text-[var(--fg-destructive)]">
+            {olderCommentsError}
+          </p>
         )}
         <div className="space-y-4">
           {comments.length > 0 ? (
@@ -918,7 +926,7 @@ export default function PostDetailView({
                         type="button"
                         onClick={() => handleDeleteComment(comment.id)}
                         disabled={deleteInFlight === comment.id}
-                        className="ml-auto text-xs text-[var(--fg-caption)] hover:text-red-600"
+                        className="ml-auto text-xs text-[var(--fg-caption)] hover:text-[var(--fg-destructive)]"
                       >
                         {deleteInFlight === comment.id ? 'Deleting…' : 'Delete'}
                       </button>
@@ -1013,7 +1021,7 @@ export default function PostDetailView({
             />
           </div>
           <div className="flex items-center justify-between gap-3">
-            <label className="flex items-center gap-2 text-sm font-semibold text-blue-600 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm font-semibold text-[var(--fg-link)] cursor-pointer">
               <input
                 type="file"
                 accept="image/*"
@@ -1048,7 +1056,9 @@ export default function PostDetailView({
             )}
           </div>
           {commentError && (
-            <p className="text-sm text-red-600">{commentError}</p>
+            <p className="text-sm text-[var(--fg-destructive)]">
+              {commentError}
+            </p>
           )}
           <button
             type="submit"
@@ -1125,7 +1135,9 @@ export default function PostDetailView({
                 />
               </div>
               {cookedError && (
-                <p className="text-sm text-red-600">{cookedError}</p>
+                <p className="text-sm text-[var(--fg-destructive)]">
+                  {cookedError}
+                </p>
               )}
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <button

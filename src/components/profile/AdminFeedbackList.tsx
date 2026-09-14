@@ -107,7 +107,7 @@ export default function AdminFeedbackList({
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="rounded-lg border border-[var(--border-error-soft)] bg-[var(--bg-error-soft)] px-3 py-2 text-sm text-[var(--color-red-700)]">
           {error}
         </div>
       )}
@@ -129,8 +129,8 @@ export default function AdminFeedbackList({
                 <span
                   className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
                     item.category === 'bug'
-                      ? 'bg-red-50 text-red-700'
-                      : 'bg-blue-50 text-blue-700'
+                      ? 'bg-[var(--bg-error-soft)] text-[var(--color-red-700)]'
+                      : 'bg-[var(--bg-info-soft)] text-[var(--fg-info)]'
                   }`}
                 >
                   {item.category === 'bug' ? 'Bug' : 'Suggestion'}

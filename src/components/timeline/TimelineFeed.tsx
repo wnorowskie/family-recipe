@@ -60,7 +60,7 @@ export default function TimelineFeed({
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-[var(--bg-error-soft)] border border-[var(--border-error-soft)] rounded-lg p-4 text-[var(--color-red-700)]">
         {error}
       </div>
     );

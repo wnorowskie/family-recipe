@@ -134,7 +134,9 @@ export default function FeedbackWidget() {
       {toast && (
         <div
           className={`fixed top-4 right-4 z-50 rounded-lg px-4 py-3 shadow-lg text-sm font-medium text-white ${
-            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+            toast.type === 'success'
+              ? 'bg-[var(--bg-success)]'
+              : 'bg-[var(--bg-error)]'
           }`}
           role="status"
         >
@@ -236,7 +238,7 @@ export default function FeedbackWidget() {
               </div>
 
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <div className="rounded-lg border border-[var(--border-error-soft)] bg-[var(--bg-error-soft)] px-3 py-2 text-sm text-[var(--color-red-700)]">
                   {error}
                 </div>
               )}
