@@ -51,6 +51,42 @@
   --border-error: var(--color-red-400);
 }
 
+/* --- Warm-cozy theme variant (#154) ---
+   Opt-in via [data-theme="warm"] on <html>; default stays grayscale.
+   Values copied from docs/research/handoff-ui-warm-palette/family-recipe-design-system/project/tokens.css
+   (see docs/research/ui-warm-palette-variant.md for the a11y math). Focus rings
+   deliberately ride on --border-active rather than a dedicated --focus-ring
+   token — see the ticket's Option A follow-up. */
+[data-theme='warm'] {
+  --color-gray-50: oklch(0.97 0.012 80);
+  --color-gray-100: oklch(0.94 0.014 78);
+  --color-gray-200: oklch(0.89 0.018 75);
+  --color-gray-300: oklch(0.82 0.022 72);
+  --color-gray-400: oklch(0.66 0.028 60);
+  --color-gray-500: oklch(0.53 0.032 50);
+  --color-gray-600: oklch(0.43 0.035 45);
+  --color-gray-700: oklch(0.35 0.038 40);
+  --color-gray-800: oklch(0.26 0.038 38);
+  --color-gray-900: oklch(0.2 0.035 35);
+  --color-red-600: oklch(0.56 0.18 30);
+
+  --bg-page: var(--color-gray-50);
+  --bg-surface: oklch(0.992 0.005 85);
+  --bg-muted: var(--color-gray-100);
+  --bg-chip: var(--color-gray-200);
+  --bg-primary: oklch(0.52 0.085 145);
+
+  --fg-strong: var(--color-gray-900);
+  --fg-body: var(--color-gray-700);
+  --fg-meta: var(--color-gray-600);
+  --fg-caption: var(--color-gray-500);
+  --fg-destructive: var(--color-red-600);
+
+  --border-card: var(--color-gray-200);
+  --border-input: var(--color-gray-300);
+  --border-active: var(--color-gray-900);
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
