@@ -22,35 +22,6 @@ jest.mock('./src/lib/prisma', () => ({
   },
 }));
 
-// Mock rate limiters globally to avoid rate limiting in tests
-jest.mock('./src/lib/rateLimit', () => ({
-  signupLimiter: {
-    check: jest.fn().mockResolvedValue({ allowed: true }),
-    getIPKey: jest.fn().mockReturnValue('test-ip'),
-  },
-  loginLimiter: {
-    check: jest.fn().mockResolvedValue({ allowed: true }),
-    getIPKey: jest.fn().mockReturnValue('test-ip'),
-  },
-  postCreationLimiter: {
-    check: jest.fn().mockResolvedValue({ allowed: true }),
-    getIPKey: jest.fn().mockReturnValue('test-ip'),
-  },
-  commentLimiter: {
-    check: jest.fn().mockResolvedValue({ allowed: true }),
-    getIPKey: jest.fn().mockReturnValue('test-ip'),
-  },
-  cookedEventLimiter: {
-    check: jest.fn().mockResolvedValue({ allowed: true }),
-    getIPKey: jest.fn().mockReturnValue('test-ip'),
-  },
-  reactionLimiter: {
-    check: jest.fn().mockResolvedValue({ allowed: true }),
-    getIPKey: jest.fn().mockReturnValue('test-ip'),
-  },
-  applyRateLimit: jest.fn().mockReturnValue(null), // null means rate limit not exceeded
-}));
-
 // Suppress console noise in tests by default; set ALLOW_TEST_LOGS=true to see logs
 if (process.env.ALLOW_TEST_LOGS !== 'true') {
   jest.spyOn(console, 'log').mockImplementation(() => {});
