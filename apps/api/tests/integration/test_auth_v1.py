@@ -113,6 +113,8 @@ class TestV1Login:
         cookie_header = response.headers.get("set-cookie", "")
         assert settings.refresh_cookie_name in cookie_header
         assert settings.csrf_cookie_name in cookie_header
+        # Theme cookie (#155) reflects the user's stored preference.
+        assert settings.theme_cookie_name in cookie_header
 
         # The access token must verify with our own helper.
         claims = tokens.verify_access_token(body["accessToken"])
@@ -199,6 +201,8 @@ class TestV1Signup:
         cookie_header = response.headers.get("set-cookie", "")
         assert settings.refresh_cookie_name in cookie_header
         assert settings.csrf_cookie_name in cookie_header
+        # New signups default to 'grayscale' (#155) — theme cookie reflects it.
+        assert settings.theme_cookie_name in cookie_header
 
     def test_signup_malformed_email_returns_400_validation_error(
         self, client, mock_prisma
@@ -502,10 +506,12 @@ class TestV1Logout:
         call_kwargs = mock_prisma.refreshtoken.update_many.await_args.kwargs
         assert call_kwargs["where"]["jti"] == "jti_to_kill"
         assert call_kwargs["data"]["revokedReason"] == tokens.REVOKED_LOGOUT
-        # Both cookies cleared (Max-Age=0 in deletion)
+        # All three cookies cleared (Max-Age=0 in deletion) — theme (#155) so a
+        # shared device doesn't flash the previous account's preference.
         cookie_header = response.headers.get("set-cookie", "")
         assert settings.refresh_cookie_name in cookie_header
         assert settings.csrf_cookie_name in cookie_header
+        assert settings.theme_cookie_name in cookie_header
 
     def test_logout_without_refresh_cookie_still_returns_204(self, client, mock_prisma):
         mock_prisma.refreshtoken.update_many = AsyncMock(return_value=None)
