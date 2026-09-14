@@ -80,7 +80,7 @@ export default function SignupPage() {
         <div className="bg-white py-8 px-4 shadow rounded-lg sm:px-10">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              <div className="bg-[var(--bg-error-soft)] border border-[var(--border-error-soft)] text-[var(--fg-destructive)] px-4 py-3 rounded">
                 {error}
               </div>
             )}
@@ -101,7 +101,7 @@ export default function SignupPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-[var(--color-blue-500)] focus:border-[var(--color-blue-500)]"
                 placeholder="Your name"
               />
             </div>
@@ -122,7 +122,7 @@ export default function SignupPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-[var(--color-blue-500)] focus:border-[var(--color-blue-500)]"
                 placeholder="you@example.com"
               />
             </div>
@@ -145,7 +145,7 @@ export default function SignupPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, username: e.target.value })
                 }
-                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-[var(--color-blue-500)] focus:border-[var(--color-blue-500)]"
                 placeholder="family_handle"
               />
             </div>
@@ -166,7 +166,7 @@ export default function SignupPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, password: e.target.value })
                 }
-                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-[var(--color-blue-500)] focus:border-[var(--color-blue-500)]"
                 placeholder="At least 8 characters"
               />
             </div>
@@ -187,7 +187,7 @@ export default function SignupPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, familyMasterKey: e.target.value })
                 }
-                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-[var(--border-input)] rounded-md shadow-sm text-[var(--fg-strong)] focus:outline-none focus:ring-[var(--color-blue-500)] focus:border-[var(--color-blue-500)]"
                 placeholder="Ask your family admin"
               />
               <p className="mt-1 text-xs text-[var(--fg-caption)]">
@@ -204,7 +204,7 @@ export default function SignupPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, rememberMe: e.target.checked })
                 }
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-[var(--border-input)] rounded"
+                className="h-4 w-4 text-[var(--fg-link)] focus:ring-[var(--color-blue-500)] border-[var(--border-input)] rounded"
               />
               <label
                 htmlFor="rememberMe"
@@ -217,7 +217,7 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[var(--bg-cta)] hover:bg-[var(--bg-cta-hover)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-blue-500)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? 'Creating Account...' : 'Create Account'}
             </button>
@@ -228,7 +228,7 @@ export default function SignupPage() {
               Already have an account?{' '}
               <a
                 href="/login"
-                className="font-medium text-blue-600 hover:text-blue-500"
+                className="font-medium text-[var(--fg-link)] hover:opacity-80"
               >
                 Log in
               </a>

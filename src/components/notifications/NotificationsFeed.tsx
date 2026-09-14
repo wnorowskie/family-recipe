@@ -89,7 +89,7 @@ export default function NotificationsFeed({
 
   if (error) {
     return (
-      <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-700">
+      <div className="rounded-2xl bg-[var(--bg-error-soft)] p-4 text-sm text-[var(--color-red-700)]">
         {error}
       </div>
     );

@@ -58,7 +58,7 @@ export default function FamilyMembersAdmin({
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-error-soft)] bg-[var(--bg-error-soft)] px-4 py-2 text-sm text-[var(--color-red-700)]">
           {error}
         </div>
       )}
@@ -114,7 +114,7 @@ export default function FamilyMembersAdmin({
                     member.role === 'owner'
                       ? 'bg-amber-100 text-amber-800'
                       : member.role === 'admin'
-                        ? 'bg-blue-100 text-blue-800'
+                        ? 'bg-[var(--color-blue-100)] text-[var(--color-blue-800)]'
                         : 'bg-[var(--bg-muted)] text-[var(--fg-meta)]'
                   }`}
                 >
@@ -125,7 +125,7 @@ export default function FamilyMembersAdmin({
                     type="button"
                     onClick={() => handleRemove(member.userId)}
                     disabled={loadingId === member.userId}
-                    className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    className="rounded-full border border-[var(--border-error-soft)] px-4 py-2 text-sm font-semibold text-[var(--fg-destructive)] hover:bg-[var(--bg-error-soft)] disabled:opacity-50"
                   >
                     {loadingId === member.userId ? 'Removing…' : 'Remove'}
                   </button>

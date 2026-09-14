@@ -1587,7 +1587,7 @@ export default function AddPostForm({
       )}
 
       {formError && (
-        <div className="rounded-input border border-[var(--border-error)] bg-red-50 px-4 py-3 text-sm text-[var(--fg-destructive)]">
+        <div className="rounded-input border border-[var(--border-error)] bg-[var(--bg-error-soft)] px-4 py-3 text-sm text-[var(--fg-destructive)]">
           {formError}
         </div>
       )}

@@ -11,7 +11,7 @@ function NotificationAvatar({
   avatarUrl: string | null;
 }) {
   return (
-    <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-blue-500 text-sm font-semibold text-white">
+    <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-[var(--color-blue-500)] text-sm font-semibold text-white">
       {avatarUrl ? (
         <Image
           src={avatarUrl}
@@ -116,7 +116,9 @@ export default function NotificationCard({
   return (
     <div
       className={`space-y-3 rounded-2xl bg-white p-4 shadow-sm ${
-        unread ? 'ring-1 ring-blue-100' : 'border border-[var(--bg-muted)]'
+        unread
+          ? 'ring-1 ring-[var(--border-info-soft)]'
+          : 'border border-[var(--bg-muted)]'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -136,7 +138,7 @@ export default function NotificationCard({
             </div>
             {unread && (
               <span
-                className="mt-1 h-2 w-2 rounded-full bg-blue-500"
+                className="mt-1 h-2 w-2 rounded-full bg-[var(--color-blue-500)]"
                 aria-hidden
               />
             )}

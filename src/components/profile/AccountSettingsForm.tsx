@@ -216,7 +216,7 @@ export default function AccountSettingsForm({
             </div>
           )}
           <div className="space-y-2 text-sm">
-            <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-blue-600">
+            <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-[var(--fg-link)]">
               <input
                 type="file"
                 accept="image/*"
@@ -312,9 +312,11 @@ export default function AccountSettingsForm({
           </div>
         </div>
 
-        {profileError && <p className="text-sm text-red-600">{profileError}</p>}
+        {profileError && (
+          <p className="text-sm text-[var(--fg-destructive)]">{profileError}</p>
+        )}
         {profileSuccess && (
-          <p className="text-sm text-green-600">{profileSuccess}</p>
+          <p className="text-sm text-[var(--fg-success)]">{profileSuccess}</p>
         )}
 
         <div className="flex justify-end">
@@ -380,10 +382,12 @@ export default function AccountSettingsForm({
         </div>
 
         {passwordError && (
-          <p className="text-sm text-red-600">{passwordError}</p>
+          <p className="text-sm text-[var(--fg-destructive)]">
+            {passwordError}
+          </p>
         )}
         {passwordSuccess && (
-          <p className="text-sm text-green-600">{passwordSuccess}</p>
+          <p className="text-sm text-[var(--fg-success)]">{passwordSuccess}</p>
         )}
 
         <div className="flex justify-end">
@@ -399,13 +403,13 @@ export default function AccountSettingsForm({
 
       <form
         onSubmit={handleDeleteAccount}
-        className="rounded-3xl border border-red-100 bg-white p-6 shadow-sm space-y-6"
+        className="rounded-3xl border border-[var(--color-red-100)] bg-white p-6 shadow-sm space-y-6"
       >
         <div>
           <h3 className="text-lg font-semibold text-[var(--fg-strong)]">
             Delete account
           </h3>
-          <p className="text-sm text-red-600">
+          <p className="text-sm text-[var(--fg-destructive)]">
             This will permanently delete your account and data. Owners/admins
             cannot delete their accounts.
           </p>
@@ -425,7 +429,7 @@ export default function AccountSettingsForm({
               type="password"
               value={deletePassword}
               onChange={(event) => setDeletePassword(event.target.value)}
-              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-red-600"
+              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--fg-destructive)]"
               required
             />
           </div>
@@ -442,23 +446,25 @@ export default function AccountSettingsForm({
               type="text"
               value={deleteConfirmation}
               onChange={(event) => setDeleteConfirmation(event.target.value)}
-              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-red-600 uppercase"
+              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--fg-destructive)] uppercase"
               placeholder="DELETE"
               required
             />
           </div>
         </div>
 
-        {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+        {deleteError && (
+          <p className="text-sm text-[var(--fg-destructive)]">{deleteError}</p>
+        )}
         {deleteSuccess && (
-          <p className="text-sm text-green-600">{deleteSuccess}</p>
+          <p className="text-sm text-[var(--fg-success)]">{deleteSuccess}</p>
         )}
 
         <div className="flex justify-end">
           <button
             type="submit"
             disabled={isDeleting}
-            className="rounded-full border border-red-300 px-6 py-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+            className="rounded-full border border-[var(--color-red-300)] px-6 py-3 text-sm font-semibold text-[var(--color-red-700)] hover:bg-[var(--bg-error-soft)] disabled:opacity-50"
           >
             {isDeleting ? 'Deleting…' : 'Delete account'}
           </button>
