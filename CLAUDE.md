@@ -64,6 +64,7 @@ Directory-local guides live in [src/lib/](src/lib/CLAUDE.md), [prisma/](prisma/C
 - **Logger**: `logError`/`logWarn` from [src/lib/logger.ts](src/lib/logger.ts), not `console.*`.
 - **`bcrypt` vs `bcryptjs`**: prod uses native `bcrypt`; jest aliases it to `bcryptjs` so tests skip native compilation. Import `bcrypt` — never `bcryptjs` directly.
 - **Server vs client components**: default to server components for data fetching; `'use client'` only for interactive forms/state.
+- **`AGENTS.md` hosts the Next.js `nextjs-agent-rules` block.** `next dev` under an AI agent writes/re-syncs a managed block into `AGENTS.md` and skips `CLAUDE.md` entirely as long as `AGENTS.md` exists ([generate-agent-files.js](node_modules/next/dist/server/lib/generate-agent-files.js), decided in #316). A diff limited to `AGENTS.md` after a `next dev` run is expected — commit it. A diff touching `CLAUDE.md` instead means `AGENTS.md` went missing; restore it rather than letting the block land here.
 
 ## Before opening a PR
 
