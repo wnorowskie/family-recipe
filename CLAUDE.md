@@ -51,7 +51,7 @@ Everything else is in `package.json`. Local Postgres one-liner: [docs/verificati
 
 **Timeline is computed, not stored.** [src/lib/timeline-data.ts](src/lib/timeline-data.ts) unions posts, comments, post-reactions, cooked events, and post edits per request. There is no `TimelineEvent` table — don't add one without discussing trade-offs.
 
-**Rate limiting lives in FastAPI only** ([apps/api/src/rate_limit.py](apps/api/src/rate_limit.py); limits and their rationale are in [apps/api/CLAUDE.md](apps/api/CLAUDE.md)). The Next-side [src/lib/rateLimit.ts](src/lib/rateLimit.ts) went dead when the `/api/*` data routes were deleted (#231) — don't wire new code to it.
+**Rate limiting lives in FastAPI only** ([apps/api/src/rate_limit.py](apps/api/src/rate_limit.py); limits and their rationale are in [apps/api/CLAUDE.md](apps/api/CLAUDE.md)). Next has no rate-limiting module — the Next-side limiter went dead when the `/api/*` data routes were deleted (#231) and was removed (#312).
 
 Directory-local guides live in [src/lib/](src/lib/CLAUDE.md), [prisma/](prisma/CLAUDE.md), [`__tests__/`](__tests__/CLAUDE.md), [apps/api/](apps/api/CLAUDE.md) and [apps/recipe-url-importer/](apps/recipe-url-importer/CLAUDE.md); they load on their own when you read files there.
 
