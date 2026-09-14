@@ -39,6 +39,7 @@ const buildUser = (overrides: Partial<AuthUser> = {}): AuthUser => ({
   role: 'member',
   familySpaceId: 'family_456',
   familySpaceName: 'Doe Family',
+  theme: 'grayscale',
   ...overrides,
 });
 

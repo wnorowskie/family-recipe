@@ -200,6 +200,12 @@ export const changePasswordSchema = z.object({
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
+export const updateThemeSchema = z.object({
+  theme: z.enum(['grayscale', 'warm']),
+});
+
+export type UpdateThemeInput = z.infer<typeof updateThemeSchema>;
+
 export const resetPasswordSchema = z.object({
   email: z
     .string()

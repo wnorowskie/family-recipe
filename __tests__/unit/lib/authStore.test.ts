@@ -18,6 +18,7 @@ const fixtureUser: AuthUser = {
   role: 'member',
   familySpaceId: 'family-1',
   familySpaceName: 'Test Family',
+  theme: 'grayscale',
 };
 
 describe('authStore', () => {

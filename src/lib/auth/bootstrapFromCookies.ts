@@ -80,7 +80,8 @@ function isAuthUserShape(value: unknown): value is AuthUser {
     typeof candidate.email === 'string' &&
     typeof candidate.username === 'string' &&
     typeof candidate.role === 'string' &&
-    typeof candidate.familySpaceId === 'string'
+    typeof candidate.familySpaceId === 'string' &&
+    typeof candidate.theme === 'string'
   );
 }
 

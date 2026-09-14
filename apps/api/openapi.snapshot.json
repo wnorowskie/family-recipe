@@ -999,6 +999,24 @@
         "title": "UnreadCountResponse",
         "type": "object"
       },
+      "UpdateThemeRequest": {
+        "description": "Theme-preference update payload \u2014 mirrors `updateThemeSchema` in\n`src/lib/validation.ts`.\n\nTwo-value closed set, same convention as `FamilyMembership.role`: a\nplain string column with valid values documented in a comment, not a\nPostgres enum (see `prisma/schema.postgres.prisma`).",
+        "properties": {
+          "theme": {
+            "enum": [
+              "grayscale",
+              "warm"
+            ],
+            "title": "Theme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "theme"
+        ],
+        "title": "UpdateThemeRequest",
+        "type": "object"
+      },
       "UserResponse": {
         "properties": {
           "avatarUrl": {
@@ -1047,6 +1065,10 @@
             "title": "Role",
             "type": "string"
           },
+          "theme": {
+            "title": "Theme",
+            "type": "string"
+          },
           "username": {
             "title": "Username",
             "type": "string"
@@ -1059,7 +1081,8 @@
           "username",
           "emailOrUsername",
           "role",
-          "familySpaceId"
+          "familySpaceId",
+          "theme"
         ],
         "title": "UserResponse",
         "type": "object"
@@ -1913,6 +1936,74 @@
           }
         ],
         "summary": "Update Profile",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/theme": {
+      "get": {
+        "description": "Return the current user's theme preference (#155).\n\nNo DB hit \u2014 `get_current_user_v1` already loaded `theme` onto the\ninjected `UserResponse`.",
+        "operationId": "get_theme_v1_me_theme_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Theme",
+        "tags": [
+          "me"
+        ]
+      },
+      "patch": {
+        "description": "Update the current user's theme preference (#155).\n\nAlso sets the non-sensitive `theme` cookie so the Next root layout can\nset `<html data-theme>` on the next page load without a FastAPI round\ntrip \u2014 see `set_theme_cookie` / apps/api/CLAUDE.md's /session budget note.",
+        "operationId": "update_theme_v1_me_theme_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateThemeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Theme",
         "tags": [
           "me"
         ]

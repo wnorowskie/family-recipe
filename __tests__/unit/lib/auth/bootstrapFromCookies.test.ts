@@ -17,6 +17,7 @@ const fixtureUser = {
   role: 'member',
   familySpaceId: 'family-1',
   familySpaceName: 'Test Family',
+  theme: 'grayscale',
 };
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {

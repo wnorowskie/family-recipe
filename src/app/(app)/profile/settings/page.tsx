@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import AccountSettingsForm from '@/components/profile/AccountSettingsForm';
+import AppearanceSettingsForm from '@/components/profile/AppearanceSettingsForm';
 import { resolvePageUser } from '@/lib/session';
 
 export default async function SettingsPage() {
@@ -32,6 +33,9 @@ export default async function SettingsPage() {
           username: user.username,
           avatarUrl: user.avatarUrl,
         }}
+      />
+      <AppearanceSettingsForm
+        theme={user.theme === 'warm' ? 'warm' : 'grayscale'}
       />
     </section>
   );

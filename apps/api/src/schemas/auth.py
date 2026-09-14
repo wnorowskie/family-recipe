@@ -85,6 +85,11 @@ class UserResponse(BaseModel):
     role: str
     familySpaceId: str
     familySpaceName: Optional[str] = None
+    # 'grayscale' | 'warm' (#155). Included here so SSR pages that already
+    # call resolvePageUser() get the current value for free; the flash-free
+    # `<html data-theme>` set on first render reads the `theme` cookie
+    # instead (see set_theme_cookie / apps/api/CLAUDE.md's /session budget note).
+    theme: str
 
 
 class AuthResponse(BaseModel):
