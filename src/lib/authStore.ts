@@ -10,6 +10,7 @@ export interface AuthUser {
   role: string;
   familySpaceId: string;
   familySpaceName: string | null;
+  theme: string;
 }
 
 function isAuthUserShape(value: unknown): value is AuthUser {
@@ -21,7 +22,8 @@ function isAuthUserShape(value: unknown): value is AuthUser {
     typeof c.email === 'string' &&
     typeof c.username === 'string' &&
     typeof c.role === 'string' &&
-    typeof c.familySpaceId === 'string'
+    typeof c.familySpaceId === 'string' &&
+    typeof c.theme === 'string'
   );
 }
 

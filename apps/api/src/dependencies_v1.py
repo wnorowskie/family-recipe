@@ -56,4 +56,5 @@ async def get_current_user_v1(
         role=membership.role,
         familySpaceId=membership.familySpaceId,
         familySpaceName=membership.familySpace.name if membership.familySpace else None,
+        theme=user.theme,
     )

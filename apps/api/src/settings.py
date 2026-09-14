@@ -76,6 +76,11 @@ class Settings(BaseSettings):
     refresh_cookie_domain: Optional[str] = None
     refresh_cookie_samesite: str = "lax"  # 'lax' | 'strict' | 'none'
 
+    # Non-sensitive UI preference cookie (#155) — lets the Next root layout
+    # set `<html data-theme>` on first render via a synchronous cookie read,
+    # with no FastAPI round trip (see apps/api/CLAUDE.md's /session budget note).
+    theme_cookie_name: str = "theme"
+
     # Token audience claim — clients should verify match.
     jwt_audience: str = "family-recipe-app"
 

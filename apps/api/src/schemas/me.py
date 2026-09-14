@@ -1,5 +1,7 @@
 """Pydantic schemas for `/me` endpoints (current-user surface)."""
 
+from typing import Literal
+
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -51,3 +53,15 @@ class ChangePasswordRequest(BaseModel):
     currentPassword: str = Field(min_length=1, max_length=200)
     # `min_length=8` mirrors Next's `z.string().min(8)` on newPassword.
     newPassword: str = Field(min_length=8, max_length=200)
+
+
+class UpdateThemeRequest(BaseModel):
+    """Theme-preference update payload — mirrors `updateThemeSchema` in
+    `src/lib/validation.ts`.
+
+    Two-value closed set, same convention as `FamilyMembership.role`: a
+    plain string column with valid values documented in a comment, not a
+    Postgres enum (see `prisma/schema.postgres.prisma`).
+    """
+
+    theme: Literal["grayscale", "warm"]

@@ -4,7 +4,8 @@ This module hosts two router objects under the same `/v1/me` namespace,
 both bearer-only `get_current_user_v1` since #311 removed the legacy
 session-cookie fallback `me_router` used to fall back to:
 
-- `me_router` — `GET /favorites`, `PATCH`/`PUT /profile`, `POST /password`.
+- `me_router` — `GET /favorites`, `PATCH`/`PUT /profile`, `POST /password`,
+  `GET`/`PATCH /theme` (#155).
   Moved here from the legacy `routers/me.py` in #233 (Phase 4.5), when the
   un-prefixed aliases were removed and every resource router was collapsed
   under `routers/v1/`.
@@ -71,7 +72,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile, status
 from prisma.errors import PrismaError, UniqueViolationError
 
-from ...cookies import clear_csrf_cookie, clear_refresh_cookie
+from ...cookies import clear_csrf_cookie, clear_refresh_cookie, set_theme_cookie
 from ...db import prisma
 from ...dependencies_v1 import get_current_user_v1
 from ...errors import (
@@ -91,7 +92,7 @@ from ...multipart_uploads import (
     process_upload,
 )
 from ...schemas.auth import DeleteAccountRequest, UserResponse
-from ...schemas.me import ChangePasswordRequest, UpdateProfileRequest
+from ...schemas.me import ChangePasswordRequest, UpdateProfileRequest, UpdateThemeRequest
 from ...security import clear_session_cookie, hash_password, verify_password
 from ...uploads import create_signed_url_resolver, get_signed_upload_url
 from ...utils import iso
@@ -439,3 +440,34 @@ async def change_password(
         return internal_error("Failed to update password")
     except (ValueError, TypeError, AttributeError, KeyError):
         return internal_error("Failed to update password")
+
+
+@me_router.get("/theme")
+async def get_theme(user: UserResponse = Depends(get_current_user_v1)):
+    """Return the current user's theme preference (#155).
+
+    No DB hit — `get_current_user_v1` already loaded `theme` onto the
+    injected `UserResponse`.
+    """
+    return {"theme": user.theme}
+
+
+@me_router.patch("/theme")
+async def update_theme(
+    payload: UpdateThemeRequest,
+    response: Response,
+    user: UserResponse = Depends(get_current_user_v1),
+):
+    """Update the current user's theme preference (#155).
+
+    Also sets the non-sensitive `theme` cookie so the Next root layout can
+    set `<html data-theme>` on the next page load without a FastAPI round
+    trip — see `set_theme_cookie` / apps/api/CLAUDE.md's /session budget note.
+    """
+    try:
+        await prisma.user.update(where={"id": user.id}, data={"theme": payload.theme})
+    except PrismaError:
+        return internal_error("Failed to update theme")
+
+    set_theme_cookie(response, payload.theme)
+    return {"theme": payload.theme}

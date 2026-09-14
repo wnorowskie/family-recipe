@@ -21,6 +21,7 @@ def _make_user(idx: int = 1, **overrides) -> SimpleNamespace:
         "email": overrides.get("email", f"member{idx}@example.com"),
         "username": overrides.get("username", f"member{idx}"),
         "avatarStorageKey": overrides.get("avatarStorageKey", f"avatars/avatar-{idx}.jpg"),
+        "theme": overrides.get("theme", "grayscale"),
         "posts": overrides.get("posts", []),
     }
     data.update(overrides)

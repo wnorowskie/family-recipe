@@ -216,6 +216,12 @@ const FRONTEND_CALLS: readonly FrontendCall[] = [
     callSite: 'src/components/profile/AccountSettingsForm.tsx',
   },
   {
+    method: 'patch',
+    path: '/v1/me/theme',
+    body: { theme: 'warm' },
+    callSite: 'src/components/profile/AppearanceSettingsForm.tsx',
+  },
+  {
     method: 'delete',
     path: '/v1/family/members/{user_id}',
     callSite: 'src/components/family/FamilyMembersAdmin.tsx',

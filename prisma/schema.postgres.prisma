@@ -21,6 +21,7 @@ model User {
   username         String   @unique
   passwordHash     String   @map("password_hash")
   avatarStorageKey String?  @map("avatar_url")
+  theme            String   @default("grayscale") // 'grayscale', 'warm'
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
