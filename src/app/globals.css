@@ -107,6 +107,8 @@
   --color-red-100: oklch(0.94 0.035 30);
   --color-red-200: oklch(0.89 0.06 30);
   --color-red-300: oklch(0.82 0.09 30);
+  --color-red-400: oklch(0.72 0.13 30);
+  --color-red-500: oklch(0.64 0.155 30);
   --color-red-600: oklch(0.56 0.18 30);
   --color-red-700: oklch(0.46 0.16 30);
 
