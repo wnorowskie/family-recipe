@@ -3,7 +3,7 @@ from prisma.errors import PrismaError
 import logging
 
 from ...db import prisma
-from ...dependencies import get_current_user
+from ...dependencies_v1 import get_current_user_v1
 from ...errors import internal_error
 from ...schemas.auth import UserResponse
 from ...uploads import create_signed_url_resolver
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/v1/timeline", tags=["timeline"])
 async def get_timeline(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     try:
         take = limit + offset + 5
