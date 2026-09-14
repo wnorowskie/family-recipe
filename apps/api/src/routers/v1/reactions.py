@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 from prisma.errors import PrismaError
 
 from ...db import prisma
-from ...dependencies import get_current_user
+from ...dependencies_v1 import get_current_user_v1
 from ...errors import bad_request, internal_error, not_found
 from ...schemas.auth import UserResponse
 from ...schemas.reactions import ReactionRequest
@@ -49,7 +49,7 @@ async def _build_reaction_summary(
 
 @router.post("", status_code=status.HTTP_200_OK)
 async def toggle_reaction(
-    payload: ReactionRequest, user: UserResponse = Depends(get_current_user)
+    payload: ReactionRequest, user: UserResponse = Depends(get_current_user_v1)
 ):
     try:
         if not is_cuid(payload.targetId):

@@ -1,16 +1,18 @@
 """/v1/recipes/* — recipe browse/search + the importer proxy.
 
-This module hosts two router objects under the same `/v1/recipes` namespace:
+This module hosts two router objects under the same `/v1/recipes` namespace,
+both bearer-only `get_current_user_v1` since #311 removed the legacy
+session-cookie fallback that `browse_router` used to fall back to:
 
-- `browse_router` — `GET /v1/recipes` browse/search, cookie-capable
-  `get_current_user`. Moved here from the legacy `routers/recipes.py` in
-  #233 (Phase 4.5), when the un-prefixed aliases were removed and every
-  resource router was collapsed under `routers/v1/`.
-- `router` — `POST /v1/recipes/import`, bearer-only `get_current_user_v1`
-  (issue #185). Details below.
+- `browse_router` — `GET /v1/recipes` browse/search. Moved here from the
+  legacy `routers/recipes.py` in #233 (Phase 4.5), when the un-prefixed
+  aliases were removed and every resource router was collapsed under
+  `routers/v1/`.
+- `router` — `POST /v1/recipes/import`, added in #185. Details below.
 
-They share a resource namespace but keep **separate** router objects so each
-owns exactly one auth dependency — no single router mixes auth modes.
+They share a resource namespace but keep **separate** router objects because
+each was introduced by a different ticket — not because of an auth-mode
+split any more.
 
 ## /v1/recipes/import — proxy to the standalone recipe-url-importer (issue #185)
 
@@ -69,7 +71,6 @@ from prisma.models import CookedEvent
 from pydantic import BaseModel, HttpUrl
 
 from ...db import prisma
-from ...dependencies import get_current_user
 from ...dependencies_v1 import get_current_user_v1
 from ...errors import error_response, internal_error, validation_error
 from ...recipe_importer import (
@@ -161,10 +162,8 @@ async def import_recipe(
 
 # ---------------------------------------------------------------------------
 # Recipe browse/search — GET /v1/recipes. Moved from routers/recipes.py in
-# #233 (Phase 4.5). Cookie-capable `get_current_user` (the SPA sends a Bearer
-# token; the legacy session cookie still resolves via the fallback in
-# dependencies.py). Its own router object so the browse endpoint's auth stays
-# separate from the bearer-only importer above.
+# #233 (Phase 4.5). Bearer-only `get_current_user_v1` since #311 removed the
+# legacy session-cookie fallback this endpoint used to fall back to.
 # ---------------------------------------------------------------------------
 
 browse_router = APIRouter(prefix="/v1/recipes", tags=["recipes"])
@@ -226,7 +225,7 @@ async def browse_recipes(
     sort: str = Query(default="recent", pattern="^(recent|alpha|rating)$"),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     try:
         where: dict = {"familySpaceId": user.familySpaceId, "hasRecipeDetails": True}

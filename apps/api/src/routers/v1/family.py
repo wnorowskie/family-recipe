@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Path
 from prisma.errors import PrismaError
 
 from ...db import prisma
-from ...dependencies import get_current_user
+from ...dependencies_v1 import get_current_user_v1
 from ...errors import forbidden, internal_error, not_found
 from ...permissions import can_remove_member
 from ...schemas.auth import UserResponse
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/v1/family/members", tags=["family"])
 
 
 @router.get("")
-async def list_members(user: UserResponse = Depends(get_current_user)):
+async def list_members(user: UserResponse = Depends(get_current_user_v1)):
     try:
         memberships = await prisma.familymembership.find_many(
             where={"familySpaceId": user.familySpaceId},
@@ -44,7 +44,7 @@ async def list_members(user: UserResponse = Depends(get_current_user)):
 
 @router.delete("/{user_id}")
 async def remove_member(
-    user_id: str = Path(..., min_length=1), current_user: UserResponse = Depends(get_current_user)
+    user_id: str = Path(..., min_length=1), current_user: UserResponse = Depends(get_current_user_v1)
 ):
     try:
         if not is_cuid(user_id):

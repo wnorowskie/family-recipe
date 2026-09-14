@@ -6,4 +6,3 @@ from .test_data import (  # noqa: F401
     make_mock_family_space,
     make_mock_membership,
 )
-from .auth import make_auth_cookie  # noqa: F401

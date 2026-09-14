@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, Path, UploadFile, status
 from prisma.errors import PrismaError
 
 from ...db import prisma
-from ...dependencies import get_current_user
+from ...dependencies_v1 import get_current_user_v1
 from ...errors import (
     file_too_large,
     forbidden,
@@ -172,7 +172,7 @@ async def _resolve_tags(tag_names: Optional[List[str]]) -> List[Dict[str, str]]:
 async def create_post(
     payload: str = Form(...),
     photos: List[UploadFile] = File(default_factory=list),
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     """Create a post, optionally with up to MAX_PHOTO_COUNT photos.
 
@@ -460,7 +460,7 @@ async def get_post(
     commentOffset: int = 0,
     cookedLimit: int = 5,
     cookedOffset: int = 0,
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     try:
         if not is_cuid(post_id):
@@ -484,7 +484,7 @@ async def update_post(
     payload: str = Form(...),
     photos: List[UploadFile] = File(default_factory=list),
     post_id: str = Path(..., min_length=1),
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     """Update a post (and optionally its photos).
 
@@ -663,7 +663,7 @@ async def update_post(
 
 @router.delete("/{post_id}", status_code=status.HTTP_200_OK)
 async def delete_post(
-    post_id: str = Path(..., min_length=1), user: UserResponse = Depends(get_current_user)
+    post_id: str = Path(..., min_length=1), user: UserResponse = Depends(get_current_user_v1)
 ):
     try:
         if not is_cuid(post_id):
@@ -688,7 +688,7 @@ async def delete_post(
 
 @router.post("/{post_id}/favorite", response_model=FavoriteResponse)
 async def favorite_post(
-    post_id: str = Path(..., min_length=1), user: UserResponse = Depends(get_current_user)
+    post_id: str = Path(..., min_length=1), user: UserResponse = Depends(get_current_user_v1)
 ):
     try:
         if not is_cuid(post_id):
@@ -710,7 +710,7 @@ async def favorite_post(
 
 @router.delete("/{post_id}/favorite", response_model=FavoriteResponse)
 async def unfavorite_post(
-    post_id: str = Path(..., min_length=1), user: UserResponse = Depends(get_current_user)
+    post_id: str = Path(..., min_length=1), user: UserResponse = Depends(get_current_user_v1)
 ):
     try:
         await prisma.favorite.delete_many(
@@ -728,7 +728,7 @@ async def unfavorite_post(
 async def log_cooked(
     payload: CookedRequest,
     post_id: str = Path(..., min_length=1),
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     try:
         if not is_cuid(post_id):
@@ -792,7 +792,7 @@ async def list_cooked(
     post_id: str = Path(..., min_length=1),
     limit: int = 20,
     offset: int = 0,
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     try:
         limit_clamped = _clamp_limit(limit, 5, 50)

@@ -3,10 +3,10 @@
 The handler in `src/routers/v1/me.py#update_profile_multipart` accepts a
 flat-field multipart body (`name`, `email`, `username`, optional `avatar`,
 optional `currentPassword`, optional `removeAvatar`) and writes to the
-`avatar_url` column when an avatar is included. Cookie-capable
-`get_current_user` auth (the SPA sends a Bearer token; the legacy session
-cookie still resolves via the fallback), mounted at `/v1/me` only after the
-#233 cleanup collapsed the un-prefixed aliases.
+`avatar_url` column when an avatar is included. Bearer-only
+`get_current_user_v1` auth (since #311 removed the legacy session-cookie
+fallback this handler used to fall back to), mounted at `/v1/me` only after
+the #233 cleanup collapsed the un-prefixed aliases.
 
 Tests verify:
   - Happy path (no avatar, no sensitive change)
@@ -41,7 +41,7 @@ pytestmark = pytest.mark.usefixtures("mock_prisma", "prisma_user_with_membership
 # The `prisma_user_with_membership` fixture wires `mock_prisma.user.find_unique`
 # to return `mock_user` which has email="test@example.com", username="testuser",
 # passwordHash="$2b$10$hashed", and memberships=[mock_membership]. The handler
-# calls `find_unique` *twice*: once via `get_current_user` for auth, and once
+# calls `find_unique` *twice*: once via `get_current_user_v1` for auth, and once
 # itself for the current email/username comparison — but both calls receive the
 # same mock, so as long as the data shape is consistent that's fine.
 #

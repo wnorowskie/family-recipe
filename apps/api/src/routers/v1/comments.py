@@ -7,7 +7,7 @@ from prisma import Json
 from prisma.errors import PrismaError
 
 from ...db import prisma
-from ...dependencies import get_current_user
+from ...dependencies_v1 import get_current_user_v1
 from ...errors import forbidden, internal_error, not_found
 from ...permissions import can_delete_comment
 from ...schemas.auth import UserResponse
@@ -54,7 +54,7 @@ async def list_comments(
     post_id: str = Path(..., min_length=1),
     limit: int = 20,
     offset: int = 0,
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     try:
         if not is_cuid(post_id):
@@ -142,7 +142,7 @@ async def create_comment(
     payload: str = Form(...),
     photo: Optional[UploadFile] = File(default=None),
     post_id: str = Path(..., min_length=1),
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     try:
         if not is_cuid(post_id):
@@ -219,7 +219,7 @@ delete_router = APIRouter(prefix="/v1/comments", tags=["comments"])
 
 @delete_router.delete("/{comment_id}")
 async def delete_comment(
-    comment_id: str = Path(..., min_length=1), user: UserResponse = Depends(get_current_user)
+    comment_id: str = Path(..., min_length=1), user: UserResponse = Depends(get_current_user_v1)
 ):
     try:
         if not is_cuid(comment_id):
