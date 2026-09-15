@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { ApiError } from '@/lib/apiClient';
 import { type AuthUser, setSession } from '@/lib/authStore';
+import { applyThemeToDocument } from '@/lib/theme';
 
 interface AuthTokenResponse {
   accessToken: string;
@@ -54,6 +55,9 @@ export default function SignupPage() {
       }
       const data = payload as AuthTokenResponse;
       setSession(data.accessToken, data.user);
+      // Same as login: the root layout won't re-render across this
+      // client-side navigation — see src/lib/theme.ts (#324).
+      applyThemeToDocument(data.user.theme);
       router.replace('/timeline');
     } catch (err) {
       if (err instanceof ApiError) {
