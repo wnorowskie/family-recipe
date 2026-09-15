@@ -93,6 +93,7 @@ def test_user() -> UserResponse:
         role="member",
         familySpaceId="test-family-space-id",
         familySpaceName="Test Family",
+        theme="grayscale",
     )
 
 
@@ -109,6 +110,7 @@ def admin_user() -> UserResponse:
         role="admin",
         familySpaceId="test-family-space-id",
         familySpaceName="Test Family",
+        theme="grayscale",
     )
 
 
@@ -125,6 +127,7 @@ def owner_user() -> UserResponse:
         role="owner",
         familySpaceId="test-family-space-id",
         familySpaceName="Test Family",
+        theme="grayscale",
     )
 
 
@@ -190,12 +193,12 @@ def authenticated_client(client: TestClient, test_user: UserResponse, mocker) ->
     """
     Create an authenticated test client by mocking the auth dependency.
     """
-    from src.dependencies import get_current_user
-    
+    from src.dependencies_v1 import get_current_user_v1
+
     async def mock_get_current_user():
         return test_user
-    
-    app.dependency_overrides[get_current_user] = mock_get_current_user
+
+    app.dependency_overrides[get_current_user_v1] = mock_get_current_user
     
     yield client
     
@@ -208,12 +211,12 @@ def admin_client(client: TestClient, admin_user: UserResponse, mocker) -> TestCl
     """
     Create an authenticated test client with admin privileges.
     """
-    from src.dependencies import get_current_user
-    
+    from src.dependencies_v1 import get_current_user_v1
+
     async def mock_get_current_user():
         return admin_user
-    
-    app.dependency_overrides[get_current_user] = mock_get_current_user
+
+    app.dependency_overrides[get_current_user_v1] = mock_get_current_user
     
     yield client
     

@@ -8,6 +8,13 @@ Research output for [#59](https://github.com/wnorowskie/family-recipe/issues/59)
 > truth; local dev is Postgres-only. The decision framing (three-layer L0/L1/L2,
 > `claude-login.sh`, etc.) still applies — only the "SQLite fallback" escape
 > hatch is gone.
+>
+> **Superseded detail — #232 / #301.** The auth description below ("sets an
+> HTTP-only `session` cookie") predates the Phase 4 cutover. `/api/auth/login`
+> is now a proxy that forwards to FastAPI `/v1/auth/login`, which sets
+> `refresh_token` + `csrf_token` — there is no Next-signed `session` cookie, and
+> FastAPI must be running for any login to succeed. The cookie-jar _technique_
+> still stands; the cookie name and the single-server assumption do not.
 
 ## Decision
 

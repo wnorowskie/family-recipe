@@ -32,26 +32,58 @@ Specs use Playwright test tags to steer grep filters:
 
 ## Run locally
 
-```bash
-# 1. Start local Postgres (see scripts/local-stack-up.sh for the one-liner).
-# 2. Apply schema + seed the claude-test user:
-npm run db:push
-npm run db:seed
+**FastAPI must be running.** Every spec logs in through the Next origin's
+`/api/auth/login` proxy, and since the Phase 4 cutover that proxy forwards to
+FastAPI — a Next server on its own cannot issue a session. The
+`NEXT_PUBLIC_API_BASE_URL` fallback in
+[src/lib/apiUpstream.ts](../src/lib/apiUpstream.ts) only decides _which_ URL the
+proxy forwards to; it does not remove the need for something to be listening
+there.
 
-# 3. One-time: install the Chromium browser (~150 MB):
+```bash
+# 1. Bring up the sandbox: Postgres on :5434, Prisma generate + push + seed,
+#    and a .env.sandbox carrying DATABASE_URL + API_INTERNAL_URL. Idempotent.
+scripts/local-stack-up.sh
+
+# 2. One-time: install the Chromium browser (~150 MB).
 npx playwright install chromium
 
-# 4. Run the suite (boots `next start` via playwright.config.ts webServer):
-npm run test:e2e
+# 3. Start FastAPI against the sandbox. AUTH_RATE_LIMIT_ENABLED=false is what
+#    lets the suite log in more than 5 times in 15 minutes — see the note below.
+#    ci.yml sets the same var for its e2e job.
+AUTH_RATE_LIMIT_ENABLED=false scripts/with-local-stack.sh bash -c '
+  source apps/api/.venv/bin/activate
+  uvicorn apps.api.src.main:app --port 8000
+' &
+scripts/wait-for-http.sh http://localhost:8000/v1/health     # FastAPI
+
+# 4. Run the suite. with-local-stack.sh is what puts DATABASE_URL and
+#    API_INTERNAL_URL into the environment that playwright.config.ts's
+#    webServer (`npm run build && npm run start`) inherits.
+scripts/with-local-stack.sh npm run test:e2e
 ```
+
+Teardown when you're done: `scripts/local-stack-down.sh` (add `--purge` to drop
+the sandbox volume too).
 
 Headed / debug:
 
 ```bash
-npm run test:e2e:ui   # Playwright UI mode
+scripts/with-local-stack.sh npm run test:e2e:ui   # Playwright UI mode
 ```
 
-> **Heads up — signup rate limit.** `signup.spec.ts` hits `/api/auth/signup`, capped at 3/IP/hour by [src/lib/rateLimit.ts](../src/lib/rateLimit.ts). CI gets a fresh in-process limiter cache per run, but local re-runs inside the same hour will start returning 429. If you're iterating, `npx playwright test e2e/auth.spec.ts` only, or restart the dev server to clear the LRU.
+> **Heads up — auth rate limits.** FastAPI throttles the auth surface per-IP in
+> [apps/api/src/rate_limit.py](../apps/api/src/rate_limit.py) (#175): **login at
+> 5 per 15 minutes**, signup at 3 per hour. Every `@smoke` spec does a fresh
+> per-test login, so a full local run blows the login budget partway through and
+> the rest fail with `E2E login failed ... (429)`.
+>
+> Start uvicorn with `AUTH_RATE_LIMIT_ENABLED=false` (as step 3 does, and as
+> [ci.yml](../.github/workflows/ci.yml) does for its e2e job) — that flag exists
+> for exactly this (#268). Without it you'll get roughly five logins per quarter
+> hour. The limiter is in-process with no persistence, so **restarting uvicorn
+> also clears it** — restarting the Next dev server does nothing, since the
+> counter lives in FastAPI.
 
 ## Run against a deployed URL
 

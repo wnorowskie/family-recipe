@@ -23,6 +23,7 @@ def member_user() -> UserResponse:
         role="member",
         familySpaceId="family-space-1",
         familySpaceName="Test Family",
+        theme="grayscale",
     )
 
 
@@ -38,6 +39,7 @@ def admin_user() -> UserResponse:
         role="admin",
         familySpaceId="family-space-1",
         familySpaceName="Test Family",
+        theme="grayscale",
     )
 
 
@@ -53,6 +55,7 @@ def owner_user() -> UserResponse:
         role="owner",
         familySpaceId="family-space-1",
         familySpaceName="Test Family",
+        theme="grayscale",
     )
 
 

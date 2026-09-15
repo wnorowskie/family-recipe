@@ -40,7 +40,7 @@ export default async function ProfilePage() {
 
   return (
     <section className="space-y-6">
-      <header className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
+      <header className="rounded-3xl border border-[var(--bg-muted)] bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             {user.avatarUrl ? (
@@ -55,18 +55,18 @@ export default async function ProfilePage() {
                 />
               </div>
             ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 text-2xl">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bg-muted)] text-2xl">
                 👤
               </div>
             )}
             <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">
+              <p className="text-xs uppercase tracking-wide text-[var(--fg-caption)]">
                 {roleLabel}
               </p>
-              <h2 className="text-2xl font-semibold text-gray-900">
+              <h2 className="text-2xl font-semibold text-[var(--fg-strong)]">
                 {user.name}
               </h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[var(--fg-caption)]">
                 Keeping the family cookbook alive.
               </p>
             </div>
@@ -74,21 +74,21 @@ export default async function ProfilePage() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/profile/settings"
-              className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--border-card)] px-4 py-2 text-sm font-semibold text-[var(--fg-body)] hover:bg-[var(--bg-page)]"
             >
               Account settings →
             </Link>
             {isAdmin && (
               <Link
                 href="/profile/feedback"
-                className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--border-card)] px-4 py-2 text-sm font-semibold text-[var(--fg-body)] hover:bg-[var(--bg-page)]"
               >
                 Feedback inbox →
               </Link>
             )}
             <Link
               href="/family-members"
-              className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--border-card)] px-4 py-2 text-sm font-semibold text-[var(--fg-body)] hover:bg-[var(--bg-page)]"
             >
               {isAdmin ? 'Manage family →' : 'Family members →'}
             </Link>

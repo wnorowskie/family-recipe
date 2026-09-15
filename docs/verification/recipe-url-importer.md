@@ -10,7 +10,7 @@ No DB, no auth (in local dev). The service fetches a public URL and returns a no
 cd apps/recipe-url-importer
 source .venv/bin/activate
 PYTHONPATH=src uvicorn --app-dir src recipe_url_importer.app:app --reload --port 8000 &
-until curl -sf http://localhost:8000/health >/dev/null 2>&1; do sleep 0.5; done
+../../scripts/wait-for-http.sh http://localhost:8000/health   # importer (we cd'd above)
 ```
 
 If `.venv` doesn't exist:

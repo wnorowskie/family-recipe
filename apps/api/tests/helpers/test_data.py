@@ -14,6 +14,7 @@ def make_mock_user(**overrides: Any) -> SimpleNamespace:
         "username": overrides.get("username", "testuser"),
         "passwordHash": overrides.get("passwordHash", "$2b$10$hashed"),
         "avatarStorageKey": overrides.get("avatarStorageKey", None),
+        "theme": overrides.get("theme", "grayscale"),
         "createdAt": overrides.get("createdAt", now),
         "updatedAt": overrides.get("updatedAt", now),
         "memberships": overrides.get("memberships", []),

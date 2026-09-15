@@ -28,8 +28,10 @@ export default async function TimelinePage() {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Family Timeline</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-xl font-semibold text-[var(--fg-strong)]">
+          Family Timeline
+        </h2>
+        <p className="text-sm text-[var(--fg-caption)]">
           See what everyone has been cooking.
         </p>
       </div>

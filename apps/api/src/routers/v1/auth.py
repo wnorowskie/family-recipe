@@ -21,8 +21,10 @@ from prisma.errors import PrismaError
 from ...cookies import (
     clear_csrf_cookie,
     clear_refresh_cookie,
+    clear_theme_cookie,
     set_csrf_cookie,
     set_refresh_cookie,
+    set_theme_cookie,
 )
 from ...db import prisma
 from ...dependencies_v1 import get_current_user_v1
@@ -156,6 +158,7 @@ async def _build_user_response(user, membership) -> UserResponse:
         role=membership.role,
         familySpaceId=membership.familySpaceId,
         familySpaceName=membership.familySpace.name if membership.familySpace else None,
+        theme=user.theme,
     )
 
 
@@ -287,6 +290,7 @@ async def signup(payload: SignupRequest, request: Request, response: Response):
             "familySpace": family_space,
         })
         user_response = await _build_user_response(user, membership_with_space)
+        set_theme_cookie(response, user_response.theme)
         return AuthTokenResponse(accessToken=access_token, user=user_response)
     except PrismaError as error:
         logger.exception("auth_v1.signup.prisma_error: %s", error)
@@ -345,6 +349,7 @@ async def login(payload: LoginRequest, request: Request, response: Response):
         )
 
         user_response = await _build_user_response(user, membership)
+        set_theme_cookie(response, user_response.theme)
         return AuthTokenResponse(accessToken=access_token, user=user_response)
     except PrismaError as error:
         logger.exception("auth_v1.login.prisma_error: %s", error)
@@ -605,6 +610,9 @@ async def logout(request: Request, response: Response):
 
     clear_refresh_cookie(response)
     clear_csrf_cookie(response)
+    # Clear the cosmetic theme cookie too (#155) so a shared device doesn't
+    # flash the previous account's preference on the pre-login screen.
+    clear_theme_cookie(response)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
 

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import AccountSettingsForm from '@/components/profile/AccountSettingsForm';
+import AppearanceSettingsForm from '@/components/profile/AppearanceSettingsForm';
 import { resolvePageUser } from '@/lib/session';
 
 export default async function SettingsPage() {
@@ -14,9 +15,13 @@ export default async function SettingsPage() {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-wide text-gray-500">Account</p>
-        <h2 className="text-2xl font-semibold text-gray-900">Settings</h2>
-        <p className="text-sm text-gray-500">
+        <p className="text-xs uppercase tracking-wide text-[var(--fg-caption)]">
+          Account
+        </p>
+        <h2 className="text-2xl font-semibold text-[var(--fg-strong)]">
+          Settings
+        </h2>
+        <p className="text-sm text-[var(--fg-caption)]">
           Update your profile details and credentials.
         </p>
       </div>
@@ -28,6 +33,9 @@ export default async function SettingsPage() {
           username: user.username,
           avatarUrl: user.avatarUrl,
         }}
+      />
+      <AppearanceSettingsForm
+        theme={user.theme === 'warm' ? 'warm' : 'grayscale'}
       />
     </section>
   );

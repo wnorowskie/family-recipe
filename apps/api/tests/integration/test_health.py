@@ -17,7 +17,7 @@ def test_health_no_auth_required(client, monkeypatch):
     async def _fail_if_called():
         raise AssertionError("Auth dependency should not run for /v1/health")
 
-    monkeypatch.setattr("src.dependencies.get_current_user", _fail_if_called)
+    monkeypatch.setattr("src.dependencies_v1.get_current_user_v1", _fail_if_called)
 
     response = client.get("/v1/health")
 

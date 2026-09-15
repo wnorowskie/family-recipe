@@ -61,6 +61,6 @@
 - **Known gaps / TODOs:**
   - No true soft-delete for comments despite a `deletedAt` column; deletes are permanent.
   - Timeline aggregation performs several separate queries per request with no caching; fine for V1 but could be slow with larger histories.
-  - Rate limiting is in-process on both runtimes (`src/lib/rateLimit.ts`, `apps/api/src/rate_limit.py`), so a multi-instance deploy would not share limiter state — acceptable for the current single-instance Cloud Run setup (shared storage tracked in #33).
+  - Rate limiting is in-process in FastAPI (`apps/api/src/rate_limit.py`) — the Next-side `src/lib/rateLimit.ts` has had no consumers since #231 deleted the `/api/*` data routes. Limiter state is per-instance, so a multi-instance deploy would not share it — acceptable for the current single-instance Cloud Run setup (shared storage tracked in #33).
   - Multi-family tenancy, invitations, public sharing, meal planning, etc., remain out of scope per the product spec.
 - **Configuration assumptions:** The seed script prints a generated master key on first run — save it and rotate before real usage. `.env` needs strong secrets, and deployment should use HTTPS so the `refresh_token`/`csrf_token` cookie settings (`httpOnly`, `sameSite`, `secure` in production) deliver the intended protection.

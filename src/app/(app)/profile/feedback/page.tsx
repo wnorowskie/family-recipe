@@ -26,9 +26,13 @@ export default async function FeedbackAdminPage() {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-wide text-gray-500">Admin</p>
-        <h2 className="text-2xl font-semibold text-gray-900">Feedback inbox</h2>
-        <p className="text-sm text-gray-500">
+        <p className="text-xs uppercase tracking-wide text-[var(--fg-caption)]">
+          Admin
+        </p>
+        <h2 className="text-2xl font-semibold text-[var(--fg-strong)]">
+          Feedback inbox
+        </h2>
+        <p className="text-sm text-[var(--fg-caption)]">
           Bugs and suggestions submitted by your family. Logs are emitted on
           submission for alerting.
         </p>

@@ -23,6 +23,7 @@ import {
   loginSchema,
   updateProfileSchema,
   changePasswordSchema,
+  updateThemeSchema,
   recipeDetailsSchema,
   resetPasswordSchema,
   deleteAccountSchema,
@@ -1159,6 +1160,28 @@ describe('Validation Schemas', () => {
           newPassword: 'newpassword123',
         });
         expect(result.success).toBe(true);
+      });
+    });
+
+    describe('updateThemeSchema', () => {
+      it('accepts grayscale', () => {
+        const result = updateThemeSchema.safeParse({ theme: 'grayscale' });
+        expect(result.success).toBe(true);
+      });
+
+      it('accepts warm', () => {
+        const result = updateThemeSchema.safeParse({ theme: 'warm' });
+        expect(result.success).toBe(true);
+      });
+
+      it('rejects an unknown theme value', () => {
+        const result = updateThemeSchema.safeParse({ theme: 'sepia' });
+        expect(result.success).toBe(false);
+      });
+
+      it('rejects a missing theme field', () => {
+        const result = updateThemeSchema.safeParse({});
+        expect(result.success).toBe(false);
       });
     });
 

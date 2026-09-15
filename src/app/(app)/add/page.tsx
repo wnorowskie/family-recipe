@@ -14,13 +14,13 @@ export default async function AddPostPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--bg-page)]">
       <div className="max-w-2xl mx-auto p-4 space-y-6">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold text-[var(--fg-strong)]">
             Hey {user.name.split(' ')[0]}, what&apos;s cooking?
           </h2>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-[var(--fg-meta)]">
             Add a quick post or expand it into a full recipe for the family.
           </p>
         </div>

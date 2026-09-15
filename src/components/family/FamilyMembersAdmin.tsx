@@ -58,11 +58,11 @@ export default function FamilyMembersAdmin({
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-error-soft)] bg-[var(--bg-error-soft)] px-4 py-2 text-sm text-[var(--color-red-700)]">
           {error}
         </div>
       )}
-      <div className="rounded-3xl border border-gray-100 bg-white shadow-sm divide-y divide-gray-100">
+      <div className="rounded-3xl border border-[var(--bg-muted)] bg-white shadow-sm divide-y divide-[var(--bg-muted)]">
         {members.map((member) => {
           const canRemove =
             isAdmin(currentUserRole) &&
@@ -86,16 +86,18 @@ export default function FamilyMembersAdmin({
                     />
                   </div>
                 ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-base font-semibold text-gray-600">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-muted)] text-base font-semibold text-[var(--fg-meta)]">
                     {member.name.charAt(0).toUpperCase()}
                   </div>
                 )}
                 <div>
-                  <p className="font-semibold text-gray-900">{member.name}</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="font-semibold text-[var(--fg-strong)]">
+                    {member.name}
+                  </p>
+                  <p className="text-sm text-[var(--fg-caption)]">
                     @{member.username} · {member.email}
                   </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-[var(--fg-placeholder)]">
                     Joined{' '}
                     {new Intl.DateTimeFormat('en-US', {
                       month: 'short',
@@ -112,8 +114,8 @@ export default function FamilyMembersAdmin({
                     member.role === 'owner'
                       ? 'bg-amber-100 text-amber-800'
                       : member.role === 'admin'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-gray-100 text-gray-600'
+                        ? 'bg-[var(--color-blue-100)] text-[var(--color-blue-800)]'
+                        : 'bg-[var(--bg-muted)] text-[var(--fg-meta)]'
                   }`}
                 >
                   {member.role}
@@ -123,7 +125,7 @@ export default function FamilyMembersAdmin({
                     type="button"
                     onClick={() => handleRemove(member.userId)}
                     disabled={loadingId === member.userId}
-                    className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    className="rounded-full border border-[var(--border-error-soft)] px-4 py-2 text-sm font-semibold text-[var(--fg-destructive)] hover:bg-[var(--bg-error-soft)] disabled:opacity-50"
                   >
                     {loadingId === member.userId ? 'Removing…' : 'Remove'}
                   </button>
@@ -133,7 +135,7 @@ export default function FamilyMembersAdmin({
           );
         })}
         {members.length === 0 && (
-          <p className="p-6 text-center text-sm text-gray-500">
+          <p className="p-6 text-center text-sm text-[var(--fg-caption)]">
             No members found.
           </p>
         )}

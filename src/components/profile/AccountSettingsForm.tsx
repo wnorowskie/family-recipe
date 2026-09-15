@@ -188,11 +188,15 @@ export default function AccountSettingsForm({
     <div className="space-y-8">
       <form
         onSubmit={handleProfileSubmit}
-        className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm space-y-6"
+        className="rounded-3xl border border-[var(--bg-muted)] bg-white p-6 shadow-sm space-y-6"
       >
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Profile</h3>
-          <p className="text-sm text-gray-500">Update your display info.</p>
+          <h3 className="text-lg font-semibold text-[var(--fg-strong)]">
+            Profile
+          </h3>
+          <p className="text-sm text-[var(--fg-caption)]">
+            Update your display info.
+          </p>
         </div>
 
         <div className="flex items-center gap-4">
@@ -207,12 +211,12 @@ export default function AccountSettingsForm({
               />
             </div>
           ) : (
-            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gray-100 text-2xl">
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[var(--bg-muted)] text-2xl">
               👤
             </div>
           )}
           <div className="space-y-2 text-sm">
-            <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-blue-600">
+            <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-[var(--fg-link)]">
               <input
                 type="file"
                 accept="image/*"
@@ -225,7 +229,7 @@ export default function AccountSettingsForm({
               <button
                 type="button"
                 onClick={handleRemoveAvatar}
-                className="text-xs text-gray-500 underline"
+                className="text-xs text-[var(--fg-caption)] underline"
               >
                 Remove photo
               </button>
@@ -236,7 +240,7 @@ export default function AccountSettingsForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <label
-              className="text-sm font-semibold text-gray-700"
+              className="text-sm font-semibold text-[var(--fg-body)]"
               htmlFor="name"
             >
               Name
@@ -247,13 +251,13 @@ export default function AccountSettingsForm({
               type="text"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
               required
             />
           </div>
           <div className="space-y-2">
             <label
-              className="text-sm font-semibold text-gray-700"
+              className="text-sm font-semibold text-[var(--fg-body)]"
               htmlFor="email"
             >
               Email
@@ -264,7 +268,7 @@ export default function AccountSettingsForm({
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
               required
             />
           </div>
@@ -273,7 +277,7 @@ export default function AccountSettingsForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <label
-              className="text-sm font-semibold text-gray-700"
+              className="text-sm font-semibold text-[var(--fg-body)]"
               htmlFor="username"
             >
               Username
@@ -286,13 +290,13 @@ export default function AccountSettingsForm({
               maxLength={30}
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
               required
             />
           </div>
           <div className="space-y-2">
             <label
-              className="text-sm font-semibold text-gray-700"
+              className="text-sm font-semibold text-[var(--fg-body)]"
               htmlFor="profilePassword"
             >
               Current password (required for email/username changes)
@@ -303,21 +307,23 @@ export default function AccountSettingsForm({
               type="password"
               value={profilePassword}
               onChange={(event) => setProfilePassword(event.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
             />
           </div>
         </div>
 
-        {profileError && <p className="text-sm text-red-600">{profileError}</p>}
+        {profileError && (
+          <p className="text-sm text-[var(--fg-destructive)]">{profileError}</p>
+        )}
         {profileSuccess && (
-          <p className="text-sm text-green-600">{profileSuccess}</p>
+          <p className="text-sm text-[var(--fg-success)]">{profileSuccess}</p>
         )}
 
         <div className="flex justify-end">
           <button
             type="submit"
             disabled={isSavingProfile}
-            className="rounded-full bg-gray-900 px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            className="rounded-full bg-[var(--fg-strong)] px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
           >
             {isSavingProfile ? 'Saving…' : 'Save changes'}
           </button>
@@ -326,17 +332,21 @@ export default function AccountSettingsForm({
 
       <form
         onSubmit={handlePasswordSubmit}
-        className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm space-y-6"
+        className="rounded-3xl border border-[var(--bg-muted)] bg-white p-6 shadow-sm space-y-6"
       >
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Password</h3>
-          <p className="text-sm text-gray-500">Keep your account secure.</p>
+          <h3 className="text-lg font-semibold text-[var(--fg-strong)]">
+            Password
+          </h3>
+          <p className="text-sm text-[var(--fg-caption)]">
+            Keep your account secure.
+          </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <label
-              className="text-sm font-semibold text-gray-700"
+              className="text-sm font-semibold text-[var(--fg-body)]"
               htmlFor="currentPassword"
             >
               Current password
@@ -347,13 +357,13 @@ export default function AccountSettingsForm({
               type="password"
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
               required
             />
           </div>
           <div className="space-y-2">
             <label
-              className="text-sm font-semibold text-gray-700"
+              className="text-sm font-semibold text-[var(--fg-body)]"
               htmlFor="newPassword"
             >
               New password
@@ -364,7 +374,7 @@ export default function AccountSettingsForm({
               type="password"
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
               required
               minLength={8}
             />
@@ -372,17 +382,19 @@ export default function AccountSettingsForm({
         </div>
 
         {passwordError && (
-          <p className="text-sm text-red-600">{passwordError}</p>
+          <p className="text-sm text-[var(--fg-destructive)]">
+            {passwordError}
+          </p>
         )}
         {passwordSuccess && (
-          <p className="text-sm text-green-600">{passwordSuccess}</p>
+          <p className="text-sm text-[var(--fg-success)]">{passwordSuccess}</p>
         )}
 
         <div className="flex justify-end">
           <button
             type="submit"
             disabled={isSavingPassword}
-            className="rounded-full border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-full border border-[var(--border-input)] px-6 py-3 text-sm font-semibold text-[var(--fg-body)] hover:bg-[var(--bg-page)] disabled:opacity-50"
           >
             {isSavingPassword ? 'Saving…' : 'Update password'}
           </button>
@@ -391,13 +403,13 @@ export default function AccountSettingsForm({
 
       <form
         onSubmit={handleDeleteAccount}
-        className="rounded-3xl border border-red-100 bg-white p-6 shadow-sm space-y-6"
+        className="rounded-3xl border border-[var(--color-red-100)] bg-white p-6 shadow-sm space-y-6"
       >
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-lg font-semibold text-[var(--fg-strong)]">
             Delete account
           </h3>
-          <p className="text-sm text-red-600">
+          <p className="text-sm text-[var(--fg-destructive)]">
             This will permanently delete your account and data. Owners/admins
             cannot delete their accounts.
           </p>
@@ -406,7 +418,7 @@ export default function AccountSettingsForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <label
-              className="text-sm font-semibold text-gray-700"
+              className="text-sm font-semibold text-[var(--fg-body)]"
               htmlFor="deletePassword"
             >
               Current password
@@ -417,13 +429,13 @@ export default function AccountSettingsForm({
               type="password"
               value={deletePassword}
               onChange={(event) => setDeletePassword(event.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-600"
+              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--fg-destructive)]"
               required
             />
           </div>
           <div className="space-y-2">
             <label
-              className="text-sm font-semibold text-gray-700"
+              className="text-sm font-semibold text-[var(--fg-body)]"
               htmlFor="deleteConfirmation"
             >
               Type DELETE to confirm
@@ -434,23 +446,25 @@ export default function AccountSettingsForm({
               type="text"
               value={deleteConfirmation}
               onChange={(event) => setDeleteConfirmation(event.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-600 uppercase"
+              className="w-full rounded-xl border border-[var(--border-input)] px-4 py-3 text-[var(--fg-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--fg-destructive)] uppercase"
               placeholder="DELETE"
               required
             />
           </div>
         </div>
 
-        {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+        {deleteError && (
+          <p className="text-sm text-[var(--fg-destructive)]">{deleteError}</p>
+        )}
         {deleteSuccess && (
-          <p className="text-sm text-green-600">{deleteSuccess}</p>
+          <p className="text-sm text-[var(--fg-success)]">{deleteSuccess}</p>
         )}
 
         <div className="flex justify-end">
           <button
             type="submit"
             disabled={isDeleting}
-            className="rounded-full border border-red-300 px-6 py-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+            className="rounded-full border border-[var(--color-red-300)] px-6 py-3 text-sm font-semibold text-[var(--color-red-700)] hover:bg-[var(--bg-error-soft)] disabled:opacity-50"
           >
             {isDeleting ? 'Deleting…' : 'Delete account'}
           </button>

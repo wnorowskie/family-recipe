@@ -69,3 +69,32 @@ def clear_csrf_cookie(response: Response) -> None:
         domain=settings.refresh_cookie_domain,
         path="/",
     )
+
+
+# Theme is a cosmetic preference, not session-bound, so it gets a long fixed
+# lifetime rather than tracking the refresh chain's max_age.
+_THEME_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 400  # 400 days
+
+
+def set_theme_cookie(response: Response, value: str) -> None:
+    response.set_cookie(
+        settings.theme_cookie_name,
+        value,
+        max_age=_THEME_COOKIE_MAX_AGE_SECONDS,
+        httponly=True,
+        secure=settings.is_production or _samesite() == "none",
+        samesite=_samesite(),
+        domain=settings.refresh_cookie_domain,
+        path="/",
+    )
+
+
+def clear_theme_cookie(response: Response) -> None:
+    response.delete_cookie(
+        settings.theme_cookie_name,
+        httponly=True,
+        secure=settings.is_production or _samesite() == "none",
+        samesite=_samesite(),
+        domain=settings.refresh_cookie_domain,
+        path="/",
+    )

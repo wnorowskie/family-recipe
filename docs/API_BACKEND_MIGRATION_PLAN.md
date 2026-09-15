@@ -1,8 +1,12 @@
 # Frontend ↔ FastAPI Migration Plan
 
-> ## ✅ Status: Migration complete (Phase 4 cutover shipped)
+> ## ✅ Status: Live in production since 2026-08-23
 >
-> **FastAPI is the sole application and auth backend.** The Next `/api/*` data routes were deleted (Phase 4.3, #231) and the legacy Next JWT/`session`-cookie auth stack was removed (Phase 4.4, #232). The Next service now serves only the UI plus same-origin auth proxies (`login`/`signup`/`logout`/`bootstrap`) and a health check; all data and auth flow through FastAPI under `/v1/*`.
+> **FastAPI is the sole application and auth backend, in prod.** Released via PR #263 (merge commit `1912ceab`); epic #38 closed. Prod runs `family-recipe-prod` (Next UI + auth proxies) and `family-recipe-api-prod` (this backend, IAM-private) in `family-recipe-prod`/`us-east1`. Both Phase 4 migrations — `add_refresh_tokens` and `add_idempotency_keys`, both additive — are applied to the prod database.
+>
+> The Next `/api/*` data routes were deleted (Phase 4.3, #231) and the legacy Next JWT/`session`-cookie auth stack was removed (Phase 4.4, #232). The Next service now serves only the UI plus same-origin auth proxies (`login`/`signup`/`logout`/`bootstrap`) and a health check; all data and auth flow through FastAPI under `/v1/*`.
+>
+> **Two known gaps carried forward from the release.** The rollout used the repo's candidate-tag canary (deploy at 0% → smoke the tagged revision → promote) rather than the graduated 5/25/50/100 split described below, and the rollback triggers in [Rollback Criteria](#rollback-criteria) are **not wired to alerts** — `Service Down` is inverted (#284) and the API service has no monitoring coverage (#32). Release monitoring was done by hand against Cloud Run logs.
 >
 > This document is now **two things**: a historical record of how the migration ran, and the reference for the current backend architecture (Phase-status call-outs are inline below). Because the feature flags are gone, **rollback is a code revert, not a config flip** — see the standalone [Phase 4 rollback runbook](rollback-phase4.md).
 >
@@ -29,12 +33,16 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ## Current State Summary
 
+> **Historical — this describes the pre-migration world (April 2026).** For the architecture as it stands today, see the status banner above and the root [CLAUDE.md](../CLAUDE.md).
+
 - Frontend fetches same‑origin `/api/*` routes in Next.
 - Next route handlers implement auth, sessions, and data logic.
 - FastAPI has core routes for auth, posts, profile, tags, timeline, etc., but is missing some endpoints used by the frontend.
 - Next middleware and server components read session cookies directly.
 
 ## Target Architecture
+
+> **Reached.** Everything in this section shipped, with one deviation: `NEXT_PUBLIC_API_BASE_URL` is deliberately built **empty** in the deployed images, so the browser issues same-origin `/v1/*` requests that the Next catch-all proxy forwards to the IAM-private FastAPI service. Passing the FastAPI URL here would send browsers cross-origin to a service they cannot invoke (#241).
 
 - Frontend calls FastAPI via a shared API client using `NEXT_PUBLIC_API_BASE_URL`.
 - Auth uses:
@@ -49,11 +57,10 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ### API Versioning
 
-- **Target prefix**: all FastAPI endpoints are **/v1/**.
-- **Transition aliasing**: keep unprefixed routes as aliases during rollout.
-  - Example: `/v1/auth/login` and `/auth/login` both resolve to the same handler.
+- **Target prefix**: all FastAPI endpoints are **/v1/**. ✅ Reached.
+- **Transition aliasing**: ~~keep unprefixed routes as aliases during rollout~~ — **done and removed.** #233 collapsed the routers to `/v1`-only and deleted every un-prefixed alias, so `/auth/login` and `/posts` now 404. Anything still calling a bare path is a bug.
 - **Mapping table below** assumes **/v1/** for all target endpoints.
-- **Deprecation**: unprefixed routes sunset after rollout (announce + remove).
+- **Deprecation**: complete — the sunset happened in #233.
 
 ### Common Conventions
 
@@ -91,7 +98,10 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 ### Request/Response Schema References (FastAPI)
 
 - **LoginRequest**: `{ emailOrUsername, password, rememberMe }`
-- **SignupRequest**: `{ name, emailOrUsername, password, familyMasterKey, rememberMe }`
+- **SignupRequest**: `{ name, email, username, password, familyMasterKey, rememberMe }`
+  — note `email` and `username` are **separate** fields on signup (only _login_ takes a
+  combined `emailOrUsername`); `email` is an `EmailStr`. See
+  [`apps/api/src/schemas/auth.py`](../apps/api/src/schemas/auth.py).
 - **AuthResponse**: `{ user }`
 - **CreatePostRequest**: `{ title, caption?, recipe? }`
 - **UpdatePostRequest**: `{ title?, caption?, recipe?, changeNote? }`
@@ -103,7 +113,9 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 - **Source of truth**: FastAPI OpenAPI schema.
 - **Runtime endpoint**: `/v1/openapi.json` (served by FastAPI).
-- **CI snapshot**: add a generated file `apps/api/openapi.json` on each CI build.
+- **CI snapshot**: `apps/api/openapi.snapshot.json` — **shipped, and enforced**. The
+  `openapi-diff` job in [api-ci.yml](../.github/workflows/api-ci.yml) regenerates the spec
+  and fails on drift; regenerate with `cd apps/api && python scripts/dump_openapi.py > openapi.snapshot.json`.
 - **Frontend contract tests**: validate requests against the OpenAPI snapshot.
 
 ### Endpoint Mapping Table (All `/api/*` calls)
@@ -116,6 +128,37 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 > - **Errors**: status + error codes (shape above)
 
 #### Auth (all targets under `/v1`)
+
+> **Every Auth row below predates the cutover. Only `GET /v1/auth/me` is accurate as
+> shipped (#306).** The rows are kept as the design record; this banner is the current
+> contract. Request models live in
+> [`apps/api/src/schemas/auth.py`](../apps/api/src/schemas/auth.py) and response models in
+> [`schemas/auth_v1.py`](../apps/api/src/schemas/auth_v1.py) — the two are separate modules,
+> both imported by [`routers/v1/auth.py`](../apps/api/src/routers/v1/auth.py). Error-envelope
+> codes come from [`errors.py`](../apps/api/src/errors.py).
+>
+> - **`POST /v1/auth/login`** — success shape is right, error list is not. It also returns
+>   **`403 FORBIDDEN`** ("User is not a member of any family space") when the account has no
+>   membership, which the row omits.
+> - **`POST /v1/auth/signup`** — returns **`201 Created`**, not `200`. Its error row is
+>   wrong twice: **`409 CONFLICT` never occurs** (`conflict()` is called nowhere in the
+>   router), and a duplicate email/username returns `400` with envelope code
+>   **`BAD_REQUEST`**, not `VALIDATION_ERROR` — those are separate helpers. A bad family
+>   master key takes the same `400 BAD_REQUEST` path.
+> - **`POST /v1/auth/reset`** — takes `{ email, masterKey, newPassword }`, not
+>   `{ emailOrUsername }`, and returns `200 { status: "reset" }`, not `204`. See the
+>   [Password Reset Flow](#password-reset-flow) banner for the full account.
+> - **`POST /v1/auth/reset/confirm`** — **does not exist.** No token, no mail pipeline, and
+>   no `INVALID_TOKEN` / `TOKEN_EXPIRED` code anywhere in the service.
+> - **`POST /v1/auth/logout`** — never returns `401`. It takes no auth dependency and is
+>   best-effort: revokes the chain if the cookie parses, clears both cookies either way,
+>   and always returns `204`.
+> - **`GET /v1/auth/me`** — accurate.
+>
+> Two shipped endpoints have **no row at all**: `POST /v1/auth/refresh` and
+> `GET /v1/auth/session`. And no row lists `429 RATE_LIMITED`, which login, signup and reset
+> can all return — see
+> [Rate Limits & Abuse Protections](#rate-limits--abuse-protections).
 
 - **POST /api/auth/login** → **POST /v1/auth/login**
   - Request: `LoginRequest`
@@ -369,13 +412,50 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ### Rate Limits & Abuse Protections
 
-- **Auth login**: 10 requests / 5 minutes / IP → `429 TOO_MANY_REQUESTS`
-- **Auth signup**: 5 requests / 10 minutes / IP → `429 TOO_MANY_REQUESTS`
-- **Auth reset request**: 3 requests / 30 minutes / IP + per account → `429 TOO_MANY_REQUESTS`
-- **Auth reset confirm**: 5 requests / 30 minutes / IP → `429 TOO_MANY_REQUESTS`
-- **Refresh**: 30 requests / 10 minutes / session → `429 TOO_MANY_REQUESTS`
-- **Feedback**: 20 requests / hour / user → `429 TOO_MANY_REQUESTS`
-- **Response**: `429 { error: { code: "RATE_LIMITED", message } }` + `Retry-After` header
+> **Restated to match shipped code (#306).** The table below is what
+> [`apps/api/src/rate_limit.py`](../apps/api/src/rate_limit.py) enforces today, not the
+> original design targets this section carried through Phase 3. Where the two differ the
+> implementation departed from the plan deliberately, per-limiter, with the reasoning
+> recorded in that module's comments — summarised under the table. `rate_limit.py` is the
+> source of truth; update this section when it changes.
+
+Every limiter is a fixed-window in-process counter, so state is per Cloud Run instance and
+resets on deploy. Shared storage across replicas is tracked in #33.
+
+| Endpoint                | Limit | Window | Keyed by  | Landed in |
+| ----------------------- | ----- | ------ | --------- | --------- |
+| `POST /v1/auth/login`   | 5     | 15 min | client IP | #175      |
+| `POST /v1/auth/signup`  | 3     | 1 hour | client IP | #175      |
+| `POST /v1/auth/reset`   | 5     | 15 min | client IP | #175      |
+| `POST /v1/auth/refresh` | 30    | 60 s   | client IP | #265      |
+| `GET /v1/auth/session`  | 60    | 60 s   | client IP | #265      |
+| `POST /v1/feedback`     | 20    | 1 hour | user id   | #183      |
+
+`POST /v1/auth/logout` and `GET /v1/auth/me` carry no limiter by design.
+
+**Response on limit.** `429 { error: { code: "RATE_LIMITED", message } }` plus a
+`Retry-After` header in seconds. Every denial computes one — `rate_limit.py` returns
+`max(1, ceil(reset_at - now))` — so in practice the header is always present.
+
+**How this differs from the original design targets**
+
+- **login / signup / reset** — the plan specified 10/5min, 5/10min, and a split reset
+  request-vs-confirm pair. #175 instead mirrored the Next side's legacy
+  `src/lib/rateLimit.ts` values (`loginLimiter` 5/15min, `signupLimiter` 3/hour) to keep the
+  two implementations comparable during the migration audit, with reset reusing the login
+  window. `/v1/auth/reset` is a single endpoint — there is no separate confirm limiter.
+- **refresh** — the plan keyed this per session; the shipped limiter keys per client IP,
+  consistent with the rest of the auth surface.
+- **session** — absent from the original design. Both `/session` and `/refresh` were
+  deliberately unlimited until #265: their legitimate traffic arrives server-to-server from
+  Next SSR, so until `fetchUpstream` forwarded the browser's `X-Forwarded-For` a per-IP
+  bucket would have collapsed all family traffic onto the Next service's IP.
+- **feedback** — the one row that matched all along. #183 honoured the plan's 20/hour/user
+  for the v1 contract even though the legacy Next route shipped 10/hour.
+
+**Headroom watch.** The `/session` budget is per _real client IP_, so family members behind
+one household NAT share a single 60/min bucket and every protected SSR render spends one.
+That is the number to revisit if users report spurious `/login?_se=1` bounces.
 
 ### CSRF Strategy for Refresh
 
@@ -391,6 +471,14 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 ### Cookie Domain/Flags by Environment
 
+> **Illustrative, not shipped values (#306).** There is no staging environment (the
+> environments are dev and prod) and `example.com` is a placeholder. In shipped code these
+> flags are config-driven, not per-environment literals: see
+> [`apps/api/src/cookies.py`](../apps/api/src/cookies.py), which reads
+> `refresh_cookie_domain` / `refresh_cookie_samesite` from settings and sets
+> `secure = is_production or samesite == "none"`. The refresh cookie is `httponly`; the
+> `csrf_token` cookie deliberately is not.
+
 - **Local dev**: `Domain=localhost`, `Secure=false`, `SameSite=Lax` (or `None` with HTTPS dev cert if cross‑origin)
 - **Staging**: `Domain=.staging.example.com`, `Secure=true`, `SameSite=None`
 - **Production**: `Domain=.example.com`, `Secure=true`, `SameSite=None`
@@ -399,6 +487,11 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 
 - Required: `sub` (userId), `familySpaceId`, `role`, `iss`, `iat`, `exp`, `aud`, `jti`
 - Optional: `name`, `avatarUrl` for UI‑friendly claims
+
+> **As shipped (#306):** the required claims all ship, plus an `epoch` claim (global
+> revocation — a stale epoch fails verification) and a `kid` header for key rotation. The
+> optional UI claims are **not** minted; the client reads name/avatar from
+> `GET /v1/auth/me`. See [`apps/api/src/tokens.py`](../apps/api/src/tokens.py).
 
 ### Rotation & Reuse Detection
 
@@ -420,6 +513,21 @@ Migrate the Next.js frontend to use the FastAPI service as the primary backend w
 - **Validation**: keep previous keys active for 2× access token TTL to allow overlap
 
 ### Password Reset Flow
+
+> **Design target — not what shipped (#306).** The emailed-token flow below was never
+> built: there is no mail pipeline, no reset token, and no `/v1/auth/reset/confirm`
+> endpoint. Kept as the record of the intended design. **What ships today:**
+>
+> `POST /v1/auth/reset` takes `{ email, masterKey, newPassword }` and resets the password
+> in a single call, authenticated by the family master key rather than an emailed token.
+> On success it rehashes the password and revokes every active refresh-token chain for
+> that user (`revokedReason = REVOKED_PASSWORD_RESET`), so all devices must re-authenticate.
+> A missing user and a bad master key return the **same** error on purpose — that is
+> deliberate anti-enumeration, not a bug. Rate limited per IP (see the table above);
+> there is no per-account limiter. See
+> [`apps/api/src/routers/v1/auth.py`](../apps/api/src/routers/v1/auth.py).
+
+_Original design:_
 
 1. **Request reset**: `POST /v1/auth/reset` with `{ emailOrUsername }` → 204
 2. **Email sent**: contains single‑use token and link to frontend reset page
@@ -535,6 +643,34 @@ terraform apply
 
 The phase-2 plan also surfaces any pre-existing traffic-pin drift on the **Next** service (`TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION` → `LATEST`) — that is unrelated to this work and safe to apply, since the next `deploy-*` run promotes a fresh revision to `LATEST` anyway. Confirm the pinned revision isn't a deliberate rollback before approving.
 
+##### ⚠️ Three phases, not two, when the environment is already live
+
+**The two-phase sequence above is only safe on a greenfield environment.** It was written for dev, where nothing was serving users yet. Running it against an environment with a live Next service — as prod was during the #283 bring-up — is destructive: the bare `terraform apply` in phase 2 **strips `JWT_SECRET` from the running Next service**, because at that point terraform's config did not yet know about a secret ref the deploy workflow had set. That would have broken auth for real users before the cutover ever shipped.
+
+Prod was brought up with a targeted third phase instead, and this is the sequence to use for any live environment:
+
+```bash
+cd infra/envs/<env>
+terraform init
+
+# Phase 1 — create ONLY the refresh-pepper secret container
+terraform apply -target='module.cloud_run_infra.google_secret_manager_secret.secrets["family-recipe-<env>-refresh-pepper"]'
+
+# Phase 2 — seed a version (>= 32 chars enforced in production)
+openssl rand -base64 48 | tr -d '\n' | \
+  gcloud secrets versions add family-recipe-<env>-refresh-pepper \
+    --project family-recipe-<env> --data-file=-
+
+# Phase 3 — create ONLY the new API-side resources. Never a bare apply.
+terraform apply \
+  -target='module.cloud_run_api' \
+  -target='module.artifact_registry_api'
+```
+
+**The general rule this reflects:** the deploy workflows and terraform both own parts of the Cloud Run service spec, and terraform treats anything a workflow set as drift to be removed. A bare `terraform apply` against a live environment will silently revert workflow-managed env vars and secret refs. Always `-target` the resources you actually intend to change, and read the plan **body** — the summary line is not enough.
+
+**Resolved by #285.** From the Phase 4 release until #285, the prod plan reported a benign-looking `0 add, 4 change, 0 destroy` while proposing to delete all three `API_INTERNAL_*` env vars from the live Next service — a bare `apply` would have broken every `/v1` request. The three `google_cloud_run_v2_service` resources (`cloud_run_infra.app`, `cloud_run_api.api`, `cloud_run_importer.importer`) never modeled three categories of field that Cloud Run itself or the deploy workflows populate live: the full container `env` list on the Next service (deploy workflows `--set-env-vars`/`--set-secrets` a superset of what terraform declares, including `API_INTERNAL_*`), the `template.revision` name (`gcloud run deploy` stamps this every deploy, same as the pre-existing `client`/`client_version` entries), and a top-level `scaling` block (`manual_instance_count`/`min`/`max`) the provider now surfaces as live drift alongside the `template.scaling` block terraform actually declares. All three are now in each service's `lifecycle.ignore_changes` — verified via `terraform plan` against both live dev and prod: only the pre-existing cosmetic monitoring-dashboard widget drift (`targetAxis`/`xPos`) remains in either environment. `-target`ing is still the right discipline for anything terraform doesn't already own (new resources, secret bring-up, etc.) — this fix only covers fields Cloud Run/CI already owned in practice.
+
 **Order of operations for a first deploy into an environment:**
 
 1. Two-phase `terraform apply` + seed (above) — creates the API service (hello-world baseline), its Artifact Registry repo, and the seeded secret.
@@ -553,6 +689,13 @@ After the first bring-up each service deploys independently on subsequent pushes
 - Reads can be mirrored for validation logs without side effects.
 
 ### Rollback Criteria
+
+> **⚠️ These are not wired to alerts.** Nothing fires automatically on any threshold below. `Service Down (dev|prod)` is inverted — it alerts when the service is _healthy_ and stays silent when it is down (#284) — and the FastAPI service has no monitoring coverage at all (#32). Until both land, judging these criteria means querying Cloud Run logs by hand:
+>
+> ```bash
+> gcloud logging read 'resource.type=cloud_run_revision AND httpRequest.status>=500' \
+>   --project family-recipe-prod --freshness=15m
+> ```
 
 - Auth failure rate > 2% for 10 minutes
 - Refresh loop rate > 0.5% of sessions
@@ -597,6 +740,13 @@ After the first bring-up each service deploys independently on subsequent pushes
 
 ## Observability
 
+> **Design target — largely not shipped (#306).** The fields, metrics and thresholds below
+> describe the intended observability posture. In reality the FastAPI service has **no
+> monitoring coverage** (#32), and the one uptime alert that exists is inverted: it fires
+> when the service is healthy and stays silent when it is down (#284). Release monitoring
+> is done by hand against Cloud Run logs. Treat this section as the backlog for #32, not a
+> description of what is running.
+
 ### Structured Logging Fields
 
 - `requestId`, `userId`, `route`, `method`, `status`, `latencyMs`, `errorCode`,
@@ -621,10 +771,14 @@ After the first bring-up each service deploys independently on subsequent pushes
 1. **Source of truth for user/session state**
 
 - **Decision**: FastAPI tokens + refresh token store are the source of truth. Next session cookies remain only for legacy routes during migration.
+- **Resolved (#306):** the second sentence is spent — Phase 4.4 (#232) deleted the Next
+  session-cookie stack outright. FastAPI is the sole source of truth, with no legacy routes.
 
 2. **API versioning/backward compatibility**
 
 - **Decision**: Introduce `/v1` prefix in FastAPI and preserve old paths behind a compatibility layer during rollout. Deprecate with a fixed sunset date.
+- **Resolved (#306):** the compatibility layer is gone — Phase 4.5 (#233) removed the
+  un-prefixed aliases. `/v1` is the only surface; no sunset date was needed.
 
 3. **Data migrations/cleanup**
 

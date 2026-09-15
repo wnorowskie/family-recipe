@@ -35,14 +35,14 @@ export default async function AppLayout({
 
   return (
     <AuthBootstrap>
-      <div className="min-h-screen bg-gray-50 pb-24">
-        <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur">
+      <div className="min-h-screen bg-[var(--bg-page)] pb-24">
+        <header className="sticky top-0 z-30 border-b border-[var(--border-card)] bg-white/95 backdrop-blur">
           <div className="mx-auto flex max-w-3xl lg:max-w-2xl items-center justify-between px-4 py-4 gap-4">
             <div>
-              <h1 className="text-xl font-bold text-gray-900">
+              <h1 className="text-xl font-bold text-[var(--fg-strong)]">
                 Wnorowski Family Recipe
               </h1>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[var(--fg-caption)]">
                 Hi {result.user.name.split(' ')[0]}!
               </p>
             </div>

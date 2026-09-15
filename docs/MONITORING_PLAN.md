@@ -6,14 +6,16 @@ This document outlines the plan for adding monitoring infrastructure to the Fami
 
 ## Current Infrastructure Overview
 
+> **Post Phase 4 cutover (2026-08-23):** there are now **two** Cloud Run services per environment — the Next UI service and the FastAPI backend (`family-recipe-api-{env}`), which serves all auth and data under `/v1/*`. **This plan covers only the Next service and Cloud SQL.** The FastAPI service has no dashboard, no log-based metrics, and no alert policies, which means the application backend is currently unmonitored. Extending coverage to it is tracked in **#32** — and see the correction in [§4.4](#44-uptime-check-failure-alert) before implementing any alert from this document.
+
 The app currently runs on:
 
-- **Cloud Run** (`family-recipe-prod` / `family-recipe-dev`)
+- **Cloud Run** (`family-recipe-{prod,dev}` for the Next UI; `family-recipe-api-{prod,dev}` for the FastAPI backend, IAM-private)
 - **Cloud SQL** (PostgreSQL 15)
 - **GCS Storage** (uploads bucket)
-- **Secret Manager** (DATABASE_URL, JWT_SECRET, FAMILY_MASTER_KEY)
+- **Secret Manager** (DATABASE_URL, JWT_SECRET, FAMILY_MASTER_KEY, REFRESH_PEPPER)
 
-Logs are written via structured JSON logging from the Next.js app using the `src/lib/logger.ts` module with event names and metadata.
+Logs are written via structured JSON logging from the Next.js app using the `src/lib/logger.ts` module with event names and metadata. The FastAPI service logs separately under the same `cloud_run_revision` resource type, distinguished by `resource.labels.service_name`.
 
 ---
 
@@ -326,6 +328,14 @@ resource "google_monitoring_alert_policy" "auth_failure_spike" {
 
 **Trigger:** Health check fails from 2+ regions
 
+> **⚠️ Get the comparison direction right — an earlier version of this section had it backwards, and the bug shipped.**
+>
+> `REDUCE_COUNT_FALSE` reduces the per-location `check_passed` booleans to **the number of locations currently failing**. So the alert must fire when that count is **greater** than a threshold. The original snippet here paired it with `COMPARISON_LT` / `threshold_value = 1`, which fires when _fewer than one_ location is failing — i.e. **when everything is healthy**.
+>
+> That inverted condition was implemented as written and ran in dev and prod from 2025-12-24. Prod's uptime check failed continuously for 5+ days in August 2026 and generated **zero** pages; the alert instead fired the moment the Phase 4 release deploy made the check go green. Tracked in **#284**.
+>
+> Note also that the policy-details chart in the console plots the reduced series, i.e. _failing_ locations — so a line dropping 6 → 0 is recovery, not an outage.
+
 ```hcl
 resource "google_monitoring_alert_policy" "uptime_failure" {
   display_name = "Service Down (${var.environment})"
@@ -336,15 +346,18 @@ resource "google_monitoring_alert_policy" "uptime_failure" {
 
     condition_threshold {
       filter          = "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type=\"uptime_url\" AND metric.labels.check_id=\"${google_monitoring_uptime_check_config.health_check.uptime_check_id}\""
-      duration        = "60s"
-      comparison      = "COMPARISON_LT"
+      duration        = "300s"
+      # count_false > 1  =>  2 or more locations failing (matches the stated trigger).
+      # Use COMPARISON_GT with threshold 0 to page on any single failing location.
+      comparison      = "COMPARISON_GT"
       threshold_value = 1
 
       aggregations {
-        alignment_period     = "60s"
-        per_series_aligner   = "ALIGN_FRACTION_TRUE"
+        alignment_period = "300s"
+        # ALIGN_NEXT_OLDER keeps the BOOL type that REDUCE_COUNT_FALSE expects.
+        # ALIGN_FRACTION_TRUE would emit a DOUBLE and not reduce as intended.
+        per_series_aligner   = "ALIGN_NEXT_OLDER"
         cross_series_reducer = "REDUCE_COUNT_FALSE"
-        group_by_fields      = ["resource.label.host"]
       }
     }
   }

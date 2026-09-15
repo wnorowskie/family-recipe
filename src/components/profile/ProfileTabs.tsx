@@ -34,14 +34,21 @@ export default function ProfileTabs({
   const [loadingTab, setLoadingTab] = useState<TabKey | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [postsState, setPostsState] = useState<PaginatedState<ProfilePostListItem>>(initialPosts);
-  const [cookedState, setCookedState] = useState<PaginatedState<ProfileCookedItem>>(initialCooked);
-  const [favoritesState, setFavoritesState] = useState<PaginatedState<ProfileFavoriteItem>>(initialFavorites);
+  const [postsState, setPostsState] =
+    useState<PaginatedState<ProfilePostListItem>>(initialPosts);
+  const [cookedState, setCookedState] =
+    useState<PaginatedState<ProfileCookedItem>>(initialCooked);
+  const [favoritesState, setFavoritesState] =
+    useState<PaginatedState<ProfileFavoriteItem>>(initialFavorites);
 
   const tabConfig: Array<{ key: TabKey; label: string; count: number }> = [
     { key: 'posts', label: 'My Posts', count: postsState.items.length },
     { key: 'cooked', label: 'Cooked', count: cookedState.items.length },
-    { key: 'favorites', label: 'Favorites', count: favoritesState.items.length },
+    {
+      key: 'favorites',
+      label: 'Favorites',
+      count: favoritesState.items.length,
+    },
   ];
 
   const handleLoadMore = async (tab: TabKey) => {
@@ -101,7 +108,9 @@ export default function ProfileTabs({
             {postsState.items.length === 0 ? (
               <EmptyNotice message="No posts yet. Share your latest dish!" />
             ) : (
-              postsState.items.map((post) => <PostCard key={post.id} post={post} />)
+              postsState.items.map((post) => (
+                <PostCard key={post.id} post={post} />
+              ))
             )}
             {postsState.hasMore && (
               <LoadMoreButton
@@ -117,7 +126,9 @@ export default function ProfileTabs({
             {cookedState.items.length === 0 ? (
               <EmptyNotice message="Nothing cooked yet. Log your next kitchen win!" />
             ) : (
-              cookedState.items.map((entry) => <CookedCard key={entry.id} entry={entry} />)
+              cookedState.items.map((entry) => (
+                <CookedCard key={entry.id} entry={entry} />
+              ))
             )}
             {cookedState.hasMore && (
               <LoadMoreButton
@@ -151,19 +162,19 @@ export default function ProfileTabs({
 
   return (
     <div className="space-y-4">
-      <div className="flex rounded-full border border-gray-200 bg-white p-1 text-sm font-medium text-gray-500">
+      <div className="flex rounded-full border border-[var(--border-card)] bg-white p-1 text-sm font-medium text-[var(--fg-caption)]">
         {tabConfig.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`flex-1 rounded-full px-3 py-2 transition ${
               activeTab === tab.key
-                ? 'bg-gray-900 text-white shadow'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-[var(--fg-strong)] text-white shadow'
+                : 'text-[var(--fg-meta)] hover:text-[var(--fg-strong)]'
             }`}
           >
             {tab.label}
-            <span className="ml-1 text-xs text-gray-400">
+            <span className="ml-1 text-xs text-[var(--fg-placeholder)]">
               {tab.count}
             </span>
           </button>
@@ -183,7 +194,7 @@ export default function ProfileTabs({
 
 function EmptyNotice({ message }: { message: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-6 text-center text-sm text-gray-500">
+    <div className="rounded-2xl border border-dashed border-[var(--border-card)] bg-white px-4 py-6 text-center text-sm text-[var(--fg-caption)]">
       {message}
     </div>
   );
@@ -193,18 +204,24 @@ function PostCard({ post }: { post: ProfilePostListItem }) {
   return (
     <Link
       href={`/posts/${post.id}`}
-      className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm hover:border-gray-200 hover:shadow-md transition"
+      className="flex items-center gap-4 rounded-2xl border border-[var(--bg-muted)] bg-white p-4 shadow-sm hover:border-[var(--border-card)] hover:shadow-md transition"
     >
       <Thumbnail imageUrl={post.mainPhotoUrl} title={post.title} />
       <div className="flex-1 min-w-0">
-        <h3 className="truncate font-semibold text-gray-900">{post.title}</h3>
-        <p className="text-xs text-gray-500">{formatDate(post.createdAt)}</p>
+        <h3 className="truncate font-semibold text-[var(--fg-strong)]">
+          {post.title}
+        </h3>
+        <p className="text-xs text-[var(--fg-caption)]">
+          {formatDate(post.createdAt)}
+        </p>
       </div>
-      <div className="text-right text-xs text-gray-500">
-        <p className="font-semibold text-gray-900">{post.cookedStats.timesCooked}</p>
+      <div className="text-right text-xs text-[var(--fg-caption)]">
+        <p className="font-semibold text-[var(--fg-strong)]">
+          {post.cookedStats.timesCooked}
+        </p>
         <p>Cooked</p>
         {post.cookedStats.averageRating !== null && (
-          <p className="mt-1 text-gray-700">
+          <p className="mt-1 text-[var(--fg-body)]">
             ⭐ {post.cookedStats.averageRating.toFixed(1)}
           </p>
         )}
@@ -217,13 +234,20 @@ function CookedCard({ entry }: { entry: ProfileCookedItem }) {
   return (
     <Link
       href={`/posts/${entry.post.id}`}
-      className="block rounded-2xl border border-gray-100 bg-white p-4 shadow-sm hover:border-gray-200 hover:shadow-md transition"
+      className="block rounded-2xl border border-[var(--bg-muted)] bg-white p-4 shadow-sm hover:border-[var(--border-card)] hover:shadow-md transition"
     >
       <div className="flex items-center gap-3">
-        <Thumbnail imageUrl={entry.post.mainPhotoUrl} title={entry.post.title} />
+        <Thumbnail
+          imageUrl={entry.post.mainPhotoUrl}
+          title={entry.post.title}
+        />
         <div className="flex-1 min-w-0">
-          <h3 className="truncate font-semibold text-gray-900">{entry.post.title}</h3>
-          <p className="text-xs text-gray-500">{formatDate(entry.createdAt)}</p>
+          <h3 className="truncate font-semibold text-[var(--fg-strong)]">
+            {entry.post.title}
+          </h3>
+          <p className="text-xs text-[var(--fg-caption)]">
+            {formatDate(entry.createdAt)}
+          </p>
         </div>
         {typeof entry.rating === 'number' && entry.rating !== null && (
           <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
@@ -232,7 +256,7 @@ function CookedCard({ entry }: { entry: ProfileCookedItem }) {
         )}
       </div>
       {entry.note && (
-        <p className="mt-3 text-sm text-gray-600">“{entry.note}”</p>
+        <p className="mt-3 text-sm text-[var(--fg-meta)]">“{entry.note}”</p>
       )}
     </Link>
   );
@@ -242,25 +266,40 @@ function FavoriteCard({ favorite }: { favorite: ProfileFavoriteItem }) {
   return (
     <Link
       href={`/posts/${favorite.post.id}`}
-      className="block rounded-2xl border border-gray-100 bg-white p-4 shadow-sm hover:border-gray-200 hover:shadow-md transition"
+      className="block rounded-2xl border border-[var(--bg-muted)] bg-white p-4 shadow-sm hover:border-[var(--border-card)] hover:shadow-md transition"
     >
       <div className="flex items-center gap-3">
-        <Thumbnail imageUrl={favorite.post.mainPhotoUrl} title={favorite.post.title} />
+        <Thumbnail
+          imageUrl={favorite.post.mainPhotoUrl}
+          title={favorite.post.title}
+        />
         <div className="flex-1 min-w-0">
-          <h3 className="truncate font-semibold text-gray-900">{favorite.post.title}</h3>
-          <p className="text-xs text-gray-500">By {favorite.post.authorName}</p>
+          <h3 className="truncate font-semibold text-[var(--fg-strong)]">
+            {favorite.post.title}
+          </h3>
+          <p className="text-xs text-[var(--fg-caption)]">
+            By {favorite.post.authorName}
+          </p>
         </div>
-        <span className="text-sm text-gray-400">♥</span>
+        <span className="text-sm text-[var(--fg-placeholder)]">♥</span>
       </div>
-      <p className="mt-2 text-xs text-gray-500">Saved {formatDate(favorite.createdAt)}</p>
+      <p className="mt-2 text-xs text-[var(--fg-caption)]">
+        Saved {formatDate(favorite.createdAt)}
+      </p>
     </Link>
   );
 }
 
-function Thumbnail({ imageUrl, title }: { imageUrl: string | null; title: string }) {
+function Thumbnail({
+  imageUrl,
+  title,
+}: {
+  imageUrl: string | null;
+  title: string;
+}) {
   if (!imageUrl) {
     return (
-      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gray-100 text-sm text-gray-400">
+      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--bg-muted)] text-sm text-[var(--fg-placeholder)]">
         🥘
       </div>
     );
@@ -280,13 +319,19 @@ function Thumbnail({ imageUrl, title }: { imageUrl: string | null; title: string
   );
 }
 
-function LoadMoreButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+function LoadMoreButton({
+  onClick,
+  loading,
+}: {
+  onClick: () => void;
+  loading: boolean;
+}) {
   return (
     <div className="pt-4 text-center">
       <button
         onClick={onClick}
         disabled={loading}
-        className="inline-flex items-center justify-center rounded-full border border-gray-300 px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex items-center justify-center rounded-full border border-[var(--border-input)] px-5 py-2 text-sm font-semibold text-[var(--fg-body)] hover:bg-[var(--bg-page)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? 'Loading…' : 'Load More'}
       </button>

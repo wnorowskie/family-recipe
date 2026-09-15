@@ -69,11 +69,12 @@ if settings.cors_origins_list:
 # kwarg. The un-prefixed rollout aliases and the legacy session-cookie
 # `auth.router` were removed in #233 (Phase 4.5), after the cutover (#38).
 #
-# The two merged modules each expose two routers under one `/v1` namespace,
-# split by auth mode: `recipes_v1` = `browse_router` (GET /v1/recipes,
-# cookie-capable) + `router` (POST /v1/recipes/import, bearer); `me_v1` =
-# `me_router` (favorites/profile/password, cookie-capable) + `router`
-# (DELETE /v1/me/delete, bearer). See their module docstrings.
+# The two merged modules each expose two routers under one `/v1` namespace
+# (split by which ticket added them, not by auth mode any more — #311
+# moved both onto bearer-only `get_current_user_v1`): `recipes_v1` =
+# `browse_router` (GET /v1/recipes) + `router` (POST /v1/recipes/import);
+# `me_v1` = `me_router` (favorites/profile/password) + `router`
+# (DELETE /v1/me/delete). See their module docstrings.
 _ROUTERS = (
     health.router,
     posts.router,

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
+import { cookies } from 'next/headers';
 import './globals.css';
 import FeedbackWidget from '@/components/feedback/FeedbackWidget';
 
@@ -25,13 +26,25 @@ export const metadata: Metadata = {
   description: 'Share and preserve family recipes',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Flash-free theme (#155): a synchronous cookie read, not a FastAPI call —
+  // `GET /v1/auth/session` is a shared, rate-limited household budget
+  // (apps/api/CLAUDE.md) and (app) pages already spend it twice per render.
+  // Anything other than the literal 'warm' (absent, tampered, pre-migration
+  // browser) renders as the default grayscale theme.
+  const cookieStore = await cookies();
+  const isWarm = cookieStore.get('theme')?.value === 'warm';
+
   return (
-    <html lang="en" className={fraunces.variable}>
+    <html
+      lang="en"
+      className={fraunces.variable}
+      {...(isWarm ? { 'data-theme': 'warm' } : {})}
+    >
       <body>
         {children}
         <FeedbackWidget />

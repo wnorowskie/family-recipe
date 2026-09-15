@@ -32,6 +32,10 @@ const REACTION_EMOJI = '🔥';
 const E2E_AUTHOR_USER = 'e2e-author';
 const E2E_AUTHOR_PASSWORD = 'e2e-author-password';
 
+type ReactionsResponse = {
+  reactions: Array<{ emoji: string; count: number }>;
+};
+
 test(
   'comment + reaction on a post persist and notify the author',
   { tag: ['@smoke'] },
@@ -67,20 +71,54 @@ test(
     const reactionsSection = page
       .getByRole('heading', { name: 'Reactions', exact: true })
       .locator('xpath=ancestor::section[1]');
+    const reactionButton = reactionsSection.getByRole('button', {
+      name: REACTION_EMOJI,
+    });
     const reactionPill = reactionsSection.getByText(`${REACTION_EMOJI}1`, {
       exact: false,
     });
 
-    // POST /v1/reactions is a toggle, not additive. A CI retry (retries: 1
-    // in playwright.config) reuses the seeded DB — if a prior attempt left
-    // 🔥 on, clicking again would toggle it OFF and the assertion below
-    // would fail deterministically. Click only when the pill is absent so
-    // the end state is always "🔥 reacted".
-    if ((await reactionPill.count()) === 0) {
-      await reactionsSection
-        .getByRole('button', { name: REACTION_EMOJI })
-        .click();
+    // POST /v1/reactions is a pure toggle keyed on (user, target, emoji) — a
+    // click always flips it, so we can't just click-then-assert-visible: a
+    // reused seeded DB (CI retry, or a leftover 🔥 from a prior run against
+    // the shared dev DB) could already have it on, and the click would
+    // toggle it OFF, satisfying nothing while proving nothing (#279).
+    //
+    // Normalize to "not reacted" first — click-and-wait-for-the-response,
+    // not just the pill's absence, so a slow render can't be read as a
+    // no-op — then perform one real, observed ON transition and assert
+    // *that* API response actually added the reaction, not just that a pill
+    // with matching text exists somewhere in the DOM.
+    if ((await reactionPill.count()) > 0) {
+      const [offResponse] = await Promise.all([
+        page.waitForResponse(
+          (res) =>
+            res.url().includes('/v1/reactions') &&
+            res.request().method() === 'POST'
+        ),
+        reactionButton.click(),
+      ]);
+      expect(offResponse.ok()).toBe(true);
+      const offBody: ReactionsResponse = await offResponse.json();
+      expect(
+        offBody.reactions.find((r) => r.emoji === REACTION_EMOJI)
+      ).toBeUndefined();
+      await expect(reactionPill).toBeHidden();
     }
+
+    const [onResponse] = await Promise.all([
+      page.waitForResponse(
+        (res) =>
+          res.url().includes('/v1/reactions') &&
+          res.request().method() === 'POST'
+      ),
+      reactionButton.click(),
+    ]);
+    expect(onResponse.ok()).toBe(true);
+    const onBody: ReactionsResponse = await onResponse.json();
+    expect(
+      onBody.reactions.find((r) => r.emoji === REACTION_EMOJI)?.count
+    ).toBe(1);
     await expect(reactionPill).toBeVisible();
 
     await page.reload();

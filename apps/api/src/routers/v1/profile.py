@@ -3,7 +3,7 @@ from prisma.errors import PrismaError
 import logging
 
 from ...db import prisma
-from ...dependencies import get_current_user
+from ...dependencies_v1 import get_current_user_v1
 from ...errors import internal_error
 from ...schemas.auth import UserResponse
 from ...utils import iso
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/v1/profile", tags=["profile"])
 async def my_posts(
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     try:
         posts = await prisma.post.find_many(
@@ -68,7 +68,7 @@ async def my_posts(
 async def my_cooked(
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     try:
         events = await prisma.cookedevent.find_many(
@@ -103,7 +103,7 @@ async def my_cooked(
 async def my_favorites(
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     try:
         favorites = await prisma.favorite.find_many(

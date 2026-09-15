@@ -11,7 +11,7 @@ function NotificationAvatar({
   avatarUrl: string | null;
 }) {
   return (
-    <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-blue-500 text-sm font-semibold text-white">
+    <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-[var(--color-blue-500)] text-sm font-semibold text-white">
       {avatarUrl ? (
         <Image
           src={avatarUrl}
@@ -40,13 +40,13 @@ function ReactionSummary({
       {reactionSummary.emojiCounts.map((entry) => (
         <span
           key={entry.emoji}
-          className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-800"
+          className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-muted)] px-2 py-1 text-xs font-semibold text-[var(--color-gray-800)]"
         >
           <span aria-hidden>{entry.emoji}</span>
           <span>{entry.count}</span>
         </span>
       ))}
-      <span className="text-xs text-gray-500">
+      <span className="text-xs text-[var(--fg-caption)]">
         {reactionSummary.totalCount} total reaction
         {reactionSummary.totalCount === 1 ? '' : 's'}
       </span>
@@ -75,7 +75,7 @@ function getTitle(notification: NotificationResponseItem): string {
 function renderBody(notification: NotificationResponseItem) {
   if (notification.type === 'comment' && notification.commentText) {
     return (
-      <p className="rounded-2xl bg-gray-50 p-3 text-sm text-gray-700">
+      <p className="rounded-2xl bg-[var(--bg-page)] p-3 text-sm text-[var(--fg-body)]">
         “{notification.commentText}”
       </p>
     );
@@ -90,7 +90,7 @@ function renderBody(notification: NotificationResponseItem) {
           </span>
         )}
         {notification.cookedNote && (
-          <p className="rounded-2xl bg-gray-50 p-3 text-sm text-gray-700">
+          <p className="rounded-2xl bg-[var(--bg-page)] p-3 text-sm text-[var(--fg-body)]">
             “{notification.cookedNote}”
           </p>
         )}
@@ -116,7 +116,9 @@ export default function NotificationCard({
   return (
     <div
       className={`space-y-3 rounded-2xl bg-white p-4 shadow-sm ${
-        unread ? 'ring-1 ring-blue-100' : 'border border-gray-100'
+        unread
+          ? 'ring-1 ring-[var(--border-info-soft)]'
+          : 'border border-[var(--bg-muted)]'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -127,16 +129,16 @@ export default function NotificationCard({
         <div className="flex-1 space-y-1">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-gray-900">
+              <p className="text-sm font-semibold text-[var(--fg-strong)]">
                 {getTitle(notification)}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[var(--fg-caption)]">
                 {formatRelativeTime(timestamp)}
               </p>
             </div>
             {unread && (
               <span
-                className="mt-1 h-2 w-2 rounded-full bg-blue-500"
+                className="mt-1 h-2 w-2 rounded-full bg-[var(--color-blue-500)]"
                 aria-hidden
               />
             )}

@@ -23,9 +23,28 @@
   --color-gray-900: oklch(0.21 0.034 264.665);
 
   /* Color: destructive accent */
+  --color-red-50: #fef2f2;
+  --color-red-100: #fee2e2;
+  --color-red-200: #fecaca;
+  --color-red-300: #fca5a5;
   --color-red-400: oklch(0.704 0.191 22.216);
   --color-red-500: oklch(0.637 0.237 25.331);
   --color-red-600: oklch(0.577 0.245 27.325);
+  --color-red-700: #b91c1c;
+
+  /* Color: success accent (#320) */
+  --color-green-50: #f0fdf4;
+  --color-green-200: #bbf7d0;
+  --color-green-600: #16a34a;
+  --color-green-700: #15803d;
+
+  /* Color: info/interactive accent (#320) */
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
 
   /* Semantic surface tokens */
   --bg-page: var(--color-gray-50);
@@ -34,6 +53,16 @@
   --bg-chip: var(--color-gray-200);
   --bg-chip-soft: var(--color-gray-100);
   --bg-primary: var(--color-gray-800);
+  --bg-error: var(--color-red-600);
+  --bg-error-soft: var(--color-red-50);
+  --bg-success: var(--color-green-600);
+  --bg-success-soft: var(--color-green-50);
+  --bg-info-soft: var(--color-blue-50);
+  /* Legacy auth-screen CTA accent (#320) — intentionally distinct from
+     --bg-primary so pre-design-system screens keep their current look under
+     the default theme; only the warm override moves it off blue. */
+  --bg-cta: var(--color-blue-600);
+  --bg-cta-hover: var(--color-blue-700);
 
   /* Semantic text tokens */
   --fg-strong: var(--color-gray-900);
@@ -43,12 +72,89 @@
   --fg-placeholder: var(--color-gray-400);
   --fg-on-primary: #ffffff;
   --fg-destructive: var(--color-red-600);
+  --fg-success: var(--color-green-600);
+  --fg-info: var(--color-blue-700);
+  --fg-link: var(--color-blue-600);
 
   /* Semantic border tokens */
   --border-card: var(--color-gray-200);
   --border-input: var(--color-gray-300);
   --border-active: var(--color-gray-900);
   --border-error: var(--color-red-400);
+  --border-error-soft: var(--color-red-200);
+  --border-success-soft: var(--color-green-200);
+  --border-info-soft: var(--color-blue-100);
+}
+
+/* --- Warm-cozy theme variant (#154) ---
+   Opt-in via [data-theme="warm"] on <html>; default stays grayscale.
+   Values copied from docs/research/handoff-ui-warm-palette/family-recipe-design-system/project/tokens.css
+   (see docs/research/ui-warm-palette-variant.md for the a11y math). Focus rings
+   deliberately ride on --border-active rather than a dedicated --focus-ring
+   token — see the ticket's Option A follow-up. */
+[data-theme='warm'] {
+  --color-gray-50: oklch(0.97 0.012 80);
+  --color-gray-100: oklch(0.94 0.014 78);
+  --color-gray-200: oklch(0.89 0.018 75);
+  --color-gray-300: oklch(0.82 0.022 72);
+  --color-gray-400: oklch(0.66 0.028 60);
+  --color-gray-500: oklch(0.53 0.032 50);
+  --color-gray-600: oklch(0.43 0.035 45);
+  --color-gray-700: oklch(0.35 0.038 40);
+  --color-gray-800: oklch(0.26 0.038 38);
+  --color-gray-900: oklch(0.2 0.035 35);
+  --color-red-50: oklch(0.97 0.02 30);
+  --color-red-100: oklch(0.94 0.035 30);
+  --color-red-200: oklch(0.89 0.06 30);
+  --color-red-300: oklch(0.82 0.09 30);
+  --color-red-400: oklch(0.72 0.13 30);
+  --color-red-500: oklch(0.64 0.155 30);
+  --color-red-600: oklch(0.56 0.18 30);
+  --color-red-700: oklch(0.46 0.16 30);
+
+  /* Success/info accents (#320) ride the same warm hues as the rest of the
+     palette instead of Tailwind's stock cool green/blue: success shares the
+     primary sage hue (145), info uses a warm amber (60) distinct from both
+     red and green. */
+  --color-green-50: oklch(0.96 0.02 145);
+  --color-green-200: oklch(0.86 0.05 145);
+  --color-green-600: oklch(0.52 0.085 145);
+  --color-green-700: oklch(0.44 0.09 145);
+  --color-blue-50: oklch(0.95 0.025 60);
+  --color-blue-100: oklch(0.9 0.045 60);
+  --color-blue-500: oklch(0.62 0.1 60);
+  --color-blue-600: oklch(0.53 0.105 60);
+  --color-blue-700: oklch(0.45 0.11 60);
+  --color-blue-800: oklch(0.37 0.1 60);
+
+  --bg-page: var(--color-gray-50);
+  --bg-surface: oklch(0.992 0.005 85);
+  --bg-muted: var(--color-gray-100);
+  --bg-chip: var(--color-gray-200);
+  --bg-primary: oklch(0.52 0.085 145);
+  --bg-error: var(--color-red-600);
+  --bg-error-soft: var(--color-red-50);
+  --bg-success: var(--color-green-600);
+  --bg-success-soft: var(--color-green-50);
+  --bg-info-soft: var(--color-blue-50);
+  --bg-cta: var(--color-blue-600);
+  --bg-cta-hover: var(--color-blue-700);
+
+  --fg-strong: var(--color-gray-900);
+  --fg-body: var(--color-gray-700);
+  --fg-meta: var(--color-gray-600);
+  --fg-caption: var(--color-gray-500);
+  --fg-destructive: var(--color-red-600);
+  --fg-success: var(--color-green-600);
+  --fg-info: var(--color-blue-700);
+  --fg-link: var(--color-blue-600);
+
+  --border-card: var(--color-gray-200);
+  --border-input: var(--color-gray-300);
+  --border-active: var(--color-gray-900);
+  --border-error-soft: var(--color-red-200);
+  --border-success-soft: var(--color-green-200);
+  --border-info-soft: var(--color-blue-100);
 }
 
 @media (prefers-color-scheme: dark) {

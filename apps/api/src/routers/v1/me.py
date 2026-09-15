@@ -1,14 +1,15 @@
 """/v1/me/* — current-user surface on the v1 namespace.
 
 This module hosts two router objects under the same `/v1/me` namespace,
-each owning exactly one auth dependency — no single router mixes auth modes:
+both bearer-only `get_current_user_v1` since #311 removed the legacy
+session-cookie fallback `me_router` used to fall back to:
 
 - `me_router` — `GET /favorites`, `PATCH`/`PUT /profile`, `POST /password`,
-  cookie-capable `get_current_user`. Moved here from the legacy
-  `routers/me.py` in #233 (Phase 4.5), when the un-prefixed aliases were
-  removed and every resource router was collapsed under `routers/v1/`.
-- `router` — `DELETE /v1/me/delete` (issue #186, sub-task of #37),
-  bearer-only `get_current_user_v1`. Details below.
+  `GET`/`PATCH /theme` (#155).
+  Moved here from the legacy `routers/me.py` in #233 (Phase 4.5), when the
+  un-prefixed aliases were removed and every resource router was collapsed
+  under `routers/v1/`.
+- `router` — `DELETE /v1/me/delete` (issue #186, sub-task of #37).
 
 ## Divergences from the Next handler (intentional)
 
@@ -71,9 +72,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile, status
 from prisma.errors import PrismaError, UniqueViolationError
 
-from ...cookies import clear_csrf_cookie, clear_refresh_cookie
+from ...cookies import clear_csrf_cookie, clear_refresh_cookie, set_theme_cookie
 from ...db import prisma
-from ...dependencies import get_current_user
 from ...dependencies_v1 import get_current_user_v1
 from ...errors import (
     bad_request,
@@ -92,7 +92,7 @@ from ...multipart_uploads import (
     process_upload,
 )
 from ...schemas.auth import DeleteAccountRequest, UserResponse
-from ...schemas.me import ChangePasswordRequest, UpdateProfileRequest
+from ...schemas.me import ChangePasswordRequest, UpdateProfileRequest, UpdateThemeRequest
 from ...security import clear_session_cookie, hash_password, verify_password
 from ...uploads import create_signed_url_resolver, get_signed_upload_url
 from ...utils import iso
@@ -172,17 +172,15 @@ async def delete_account(
 # ---------------------------------------------------------------------------
 # Profile / favorites / password — GET /v1/me/favorites, PATCH+PUT
 # /v1/me/profile, POST /v1/me/password. Moved from routers/me.py in #233
-# (Phase 4.5). Cookie-capable `get_current_user` (the SPA sends a Bearer
-# token; the legacy session cookie still resolves via the fallback in
-# dependencies.py). Its own router object so this cookie-capable surface's
-# auth stays separate from the bearer-only delete endpoint above.
+# (Phase 4.5). Bearer-only `get_current_user_v1` since #311 removed the
+# legacy session-cookie fallback this surface used to fall back to.
 # ---------------------------------------------------------------------------
 
 me_router = APIRouter(prefix="/v1/me", tags=["me"])
 
 
 @me_router.get("/favorites")
-async def my_favorites(limit: int = 20, offset: int = 0, user: UserResponse = Depends(get_current_user)):
+async def my_favorites(limit: int = 20, offset: int = 0, user: UserResponse = Depends(get_current_user_v1)):
     try:
         favorites = await prisma.favorite.find_many(
             where={"userId": user.id, "post": {"familySpaceId": user.familySpaceId}},
@@ -229,7 +227,7 @@ async def update_profile_multipart(
     currentPassword: Optional[str] = Form(default=None),
     removeAvatar: Optional[str] = Form(default=None),
     avatar: Optional[UploadFile] = File(default=None),
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     """Update the current user's profile, including optional avatar upload.
 
@@ -361,7 +359,7 @@ def _first_validation_message(exc: ValueError, fallback: str) -> str:
 
 @me_router.put("/profile")
 async def update_profile(
-    payload: dict, user: UserResponse = Depends(get_current_user)
+    payload: dict, user: UserResponse = Depends(get_current_user_v1)
 ):
     """Legacy JSON profile-update handler. Kept alive for Phase-2 clients.
 
@@ -411,7 +409,7 @@ async def update_profile(
 async def change_password(
     payload: ChangePasswordRequest,
     response: Response,
-    user: UserResponse = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user_v1),
 ):
     """Change the current user's password.
 
@@ -442,3 +440,34 @@ async def change_password(
         return internal_error("Failed to update password")
     except (ValueError, TypeError, AttributeError, KeyError):
         return internal_error("Failed to update password")
+
+
+@me_router.get("/theme")
+async def get_theme(user: UserResponse = Depends(get_current_user_v1)):
+    """Return the current user's theme preference (#155).
+
+    No DB hit — `get_current_user_v1` already loaded `theme` onto the
+    injected `UserResponse`.
+    """
+    return {"theme": user.theme}
+
+
+@me_router.patch("/theme")
+async def update_theme(
+    payload: UpdateThemeRequest,
+    response: Response,
+    user: UserResponse = Depends(get_current_user_v1),
+):
+    """Update the current user's theme preference (#155).
+
+    Also sets the non-sensitive `theme` cookie so the Next root layout can
+    set `<html data-theme>` on the next page load without a FastAPI round
+    trip — see `set_theme_cookie` / apps/api/CLAUDE.md's /session budget note.
+    """
+    try:
+        await prisma.user.update(where={"id": user.id}, data={"theme": payload.theme})
+    except PrismaError:
+        return internal_error("Failed to update theme")
+
+    set_theme_cookie(response, payload.theme)
+    return {"theme": payload.theme}

@@ -63,12 +63,16 @@ export default async function EditPostPage(props: EditPostPageParams) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--bg-page)]">
       <div className="max-w-2xl mx-auto p-4 space-y-6">
         <div>
-          <p className="text-sm font-semibold text-gray-500">Editing</p>
-          <h1 className="text-2xl font-bold text-gray-900">{post.title}</h1>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-sm font-semibold text-[var(--fg-caption)]">
+            Editing
+          </p>
+          <h1 className="text-2xl font-bold text-[var(--fg-strong)]">
+            {post.title}
+          </h1>
+          <p className="text-sm text-[var(--fg-meta)] mt-1">
             Make updates to your recipe details and share a quick note about
             what changed.
           </p>
