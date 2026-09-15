@@ -132,6 +132,20 @@ gcloud sql instances patch family-recipe-dev \
 # against a still-starting DB and wastes a review iteration.
 ```
 
+If this release touches infra (`infra/**`, `.github/workflows/infra-apply.yml`),
+remember that workflow's `workflow_dispatch` only ever plans/applies
+`infra/envs/dev` — a prod apply is always run locally by the repo owner, so
+this dev pass never exercises prod Terraform, and a clean `develop` plan says
+nothing about prod drift. Never infer live prod state (e.g. alert-policy
+polarity) from `origin/main` or `origin/develop` — branch and live state can
+disagree because prod Terraform is applied by hand. Check with `gcloud`
+directly, e.g.:
+
+```bash
+gcloud alpha monitoring policies list --project family-recipe-prod --format=json \
+  | jq -r '.[] | select(.displayName=="Service Down (prod)") | .conditions[0].conditionThreshold | "\(.comparison) \(.thresholdValue)"'
+```
+
 ### 5. Run the smoke script
 
 ```bash
