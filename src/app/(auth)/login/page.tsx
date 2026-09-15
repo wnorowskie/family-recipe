@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { ApiError } from '@/lib/apiClient';
 import { type AuthUser, setSession } from '@/lib/authStore';
+import { applyThemeToDocument } from '@/lib/theme';
 
 interface AuthTokenResponse {
   accessToken: string;
@@ -57,6 +58,9 @@ function LoginContent() {
       }
       const data = payload as AuthTokenResponse;
       setSession(data.accessToken, data.user);
+      // The root layout won't re-render across this client-side navigation,
+      // so apply the persisted theme here — see src/lib/theme.ts (#324).
+      applyThemeToDocument(data.user.theme);
       router.replace(safeRedirect);
     } catch (err) {
       if (err instanceof ApiError) {
