@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { apiClient, ApiError } from '@/lib/apiClient';
+import { applyThemeToDocument } from '@/lib/theme';
 import type { UpdateThemeInput } from '@/lib/validation';
 
 type Theme = UpdateThemeInput['theme'];
@@ -27,14 +28,6 @@ const THEME_OPTIONS: Array<{
     description: 'A warmer palette for the timeline and recipes.',
   },
 ];
-
-function applyThemeToDocument(theme: Theme) {
-  if (theme === 'warm') {
-    document.documentElement.setAttribute('data-theme', 'warm');
-  } else {
-    document.documentElement.removeAttribute('data-theme');
-  }
-}
 
 export default function AppearanceSettingsForm({
   theme: initialTheme,
