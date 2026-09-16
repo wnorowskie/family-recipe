@@ -49,6 +49,19 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      - name: Capture currently-serving revision (for rollback)
+        run: |
+          PREV_REVISION="$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --format='value(status.traffic[0].revisionName)' 2>/dev/null || true)"
+          if [ -n "$PREV_REVISION" ]; then
+            echo "Previously-serving revision: $PREV_REVISION"
+          else
+            echo "No previously-serving revision found (first deploy or service missing); rollback will be skipped."
+          fi
+          echo "PREV_REVISION=$PREV_REVISION" >> "$GITHUB_ENV"
+
       - name: Configure Docker auth
         run: gcloud auth configure-docker "${{ env.REGION }}-docker.pkg.dev" --quiet
 
@@ -65,8 +78,12 @@ jobs:
       - name: Push image
         run: docker push "$IMAGE"
 
-      - name: Deploy to Cloud Run (prod)
+      - name: Deploy to Cloud Run (prod) at 0% traffic with candidate tag
+        id: deploy
         run: |
+          # Mirrors the canary pattern in deploy-api-prod.yml: build the
+          # revision without traffic, probe it via its candidate tag, promote
+          # only when the probe passes.
           gcloud run deploy "$CLOUD_RUN_SERVICE" \
             --project "$PROJECT_ID" \
             --region "$REGION" \
@@ -75,6 +92,88 @@ jobs:
             --platform managed \
             --port 8000 \
             --quiet \
+            --no-traffic \
+            --tag candidate \
             --ingress all \
             --no-allow-unauthenticated \
             --set-env-vars IMPORTER_MAX_HTML_BYTES=${IMPORTER_MAX_HTML_BYTES},IMPORTER_FETCH_TIMEOUT_SECONDS=${IMPORTER_FETCH_TIMEOUT_SECONDS},IMPORTER_CONNECT_TIMEOUT_SECONDS=${IMPORTER_CONNECT_TIMEOUT_SECONDS},IMPORTER_READ_TIMEOUT_SECONDS=${IMPORTER_READ_TIMEOUT_SECONDS},IMPORTER_ENABLE_HEADLESS=${IMPORTER_ENABLE_HEADLESS},IMPORTER_CACHE_TTL_SECONDS=${IMPORTER_CACHE_TTL_SECONDS},IMPORTER_RATE_LIMIT_IP_PER_MIN=${IMPORTER_RATE_LIMIT_IP_PER_MIN},IMPORTER_RATE_LIMIT_DOMAIN_PER_MIN=${IMPORTER_RATE_LIMIT_DOMAIN_PER_MIN}
+
+      - name: Resolve candidate + service URLs
+        run: |
+          SERVICE_URL="$(gcloud run services describe "$CLOUD_RUN_SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          CANDIDATE_URL="$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" --region "$REGION" \
+            --format='value(status.traffic.filter("tag:candidate").extract(url).flatten())')"
+          if [ -z "$CANDIDATE_URL" ]; then
+            echo "Could not resolve candidate tag URL — failing fast." >&2
+            exit 1
+          fi
+          echo "Service URL:    $SERVICE_URL"
+          echo "Candidate URL:  $CANDIDATE_URL"
+          echo "SERVICE_URL=$SERVICE_URL" >> "$GITHUB_ENV"
+          echo "CANDIDATE_URL=$CANDIDATE_URL" >> "$GITHUB_ENV"
+
+      - name: Smoke check /health (against candidate revision)
+        id: smoke_check
+        run: |
+          # The audience must be the SERVICE url, not the candidate url: Cloud
+          # Run validates the `aud` claim against the service hostname, not
+          # per-tag hostnames. Same rationale as deploy-api-prod.yml.
+          # --impersonate-service-account routes the mint through
+          # iamcredentials.generateIdToken, which WIF access tokens require.
+          #
+          # The path is /health, not /healthz — Google Frontend blackholes
+          # the exact lowercase /healthz path at the edge (#113).
+          TOKEN="$(gcloud auth print-identity-token \
+            --impersonate-service-account="$DEPLOYER_SA" \
+            --audiences="$SERVICE_URL")"
+          for i in {1..20}; do
+            STATUS="$(curl -sS -H "Authorization: Bearer $TOKEN" -o /dev/null -w '%{http_code}' "$CANDIDATE_URL/health" || true)"
+            if [ "$STATUS" = "200" ]; then
+              echo "Healthcheck OK (200)"
+              exit 0
+            fi
+            echo "Healthcheck not ready yet (status=$STATUS), retrying..."
+            sleep 3
+          done
+          echo "Healthcheck did not return 200 within timeout."
+          exit 1
+
+      - name: Promote candidate to LATEST
+        if: steps.smoke_check.conclusion == 'success'
+        run: |
+          gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --to-latest \
+            --remove-tags=candidate \
+            --quiet
+
+      - name: Rollback traffic on smoke-check failure
+        if: failure() && steps.smoke_check.conclusion == 'failure'
+        run: |
+          # --no-traffic means the failed revision never served; pin explicitly
+          # to defend against any mid-flight traffic state.
+          if [ -n "${PREV_REVISION:-}" ]; then
+            echo "Smoke check failed. Pinning traffic to previous revision: $PREV_REVISION"
+            gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+              --project "$PROJECT_ID" \
+              --region "$REGION" \
+              --to-revisions="$PREV_REVISION=100" \
+              --quiet
+          else
+            echo "No previous revision captured (first deploy?); skipping traffic pin."
+          fi
+          echo "Rollback complete. Job will fail so the broken deploy is surfaced."
+          exit 1
+
+      - name: Always remove candidate tag
+        # Idempotent cleanup so a mid-pipeline failure can't leave the tag
+        # attached and break the next run's URL resolution. See deploy-api-prod.yml.
+        if: always() && steps.deploy.conclusion == 'success'
+        run: |
+          gcloud run services update-traffic "$CLOUD_RUN_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --remove-tags=candidate \
+            --quiet || true
