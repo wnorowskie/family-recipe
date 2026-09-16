@@ -52,6 +52,51 @@ FAMILY_NAME="Family Recipe" FAMILY_MASTER_KEY="actual-master-key" \
 npm run db:seed
 ```
 
+## Applying to prod
+
+Prod is never applied by CI. `infra-apply.yml`'s `workflow_dispatch` only plans/applies `infra/envs/dev` — a prod apply is always a `terraform apply` run locally by the repo owner, from `infra/envs/prod`, after the release's deploy workflows (`deploy-prod.yml` and, if touched, the importer's) have already gone green.
+
+```bash
+cd infra/envs/prod
+export GOOGLE_PROJECT=family-recipe-prod
+export TF_VAR_project_id=family-recipe-prod
+export TF_VAR_region=us-east1
+# TF_VAR_db_password etc. from local tfvars, not committed.
+
+terraform init \
+  -backend-config="bucket=family-recipe-tf-state-prod" \
+  -backend-config="prefix=envs/prod/state"
+
+terraform plan
+terraform apply
+```
+
+Read the plan body before applying, not just the add/change/destroy summary — a prod `terraform apply` has twice shipped a benign-looking `0 add, 4 change, 0 destroy` plan that actually stripped workflow-managed `API_INTERNAL_*` env vars from the live Next service (fixed by #285, guarded by the `ignore_changes` block below).
+
+### If the apply 409s on a Cloud Run service
+
+Any apply that changes a Cloud Run service's `template` (scaling, CPU, resources, ports…) shortly after a CI/CD `gcloud run deploy` has landed on that same service can fail partway through with:
+
+```
+Error 409: Revision named '<service>-000NN-xxx' with different configuration already exists.
+```
+
+Cause: `cloud_run_infra`, `cloud_run_api`, and `cloud_run_importer` all carry `template[0].revision` in `lifecycle.ignore_changes` (see the comment in each module, #285) so Terraform doesn't fight the revision name `gcloud run deploy` stamps on every deploy. `ignore_changes` pins the _state_ value at whatever a refresh last saw live — so the next plan that touches the same service's template resends that exact (already-used) revision name alongside the new template, and Cloud Run refuses to redefine an immutable revision under that name.
+
+This halts a full-env apply partway through and leaves everything after the failed resource in the graph unapplied — for prod, that includes the budget, dashboard, and (via `depends_on = [module.cloud_run_infra]`) the API and importer modules. Retry with the workaround below rather than assuming a partial apply is safe to leave as-is.
+
+Workaround, one apply at a time:
+
+1. In all three files — `infra/modules/cloud_run_infra/main.tf`, `infra/modules/cloud_run_api/main.tf`, `infra/modules/cloud_run_importer/main.tf` — comment out the `template[0].revision,` line inside `lifecycle.ignore_changes` (leave the rest of the block alone).
+2. Re-plan. The affected service(s) should now show `- revision = "<live-revision-name>" -> null` in the `template` block, on top of whatever real change you were applying — nothing else should move. If `env`, `image`, or `scaling` also show up as diffs here, stop and investigate before applying; that's not this issue.
+3. Apply.
+4. Restore the three files: `git checkout -- infra/modules` (uncommitted local edit only — never commit the comment-out).
+5. Re-run `terraform plan`; it should come back clean (aside from the known cosmetic dashboard drift noted below).
+
+Once #345 lands a permanent fix, this section should shrink to a pointer at it.
+
+Terraform-created revisions use a separate generation counter from `gcloud run deploy`'s — e.g. prod Next went from `family-recipe-prod-00020-xec` (last `gcloud run deploy`) to `family-recipe-prod-00016-bzp` (next `terraform apply`) even though the latter came second. Don't read Cloud Run revision numbers as a chronological timeline once both tools have touched a service; use `gcloud run revisions list --service=<service> --sort-by=~createTime` instead.
+
 ## Billing budget
 
 `infra/envs/prod/billing.tf` defines a single `google_billing_budget` covering both dev and prod project spend ($50/mo, alerts at 50/90/100% actual + 100% forecast, notifying the same channel as the monitoring alerts). It's declared in the prod env because prod is the "real" environment, even though `google_billing_budget` is account-scoped, not project-scoped — dev's Terraform doesn't touch it.
@@ -65,3 +110,4 @@ The Cloud Billing Budget API bills its quota to whichever project you pass as th
 - Backups: enabled, 7-day retention; maintenance window: Sunday 05:00 UTC.
 - Public IP only for now (simpler for local/Vercel). Private IP + VPC connector can be added later if moving to Cloud Run.
 - Secrets (DB password, optional family master key) should live in Secret Manager or local tfvars (not committed). I initially had to create a place holder in local tfvars, and then I updated the secret value manually in Secret Manager to avoid storing it in Terraform state. Now it is set to be ignored so that any future changes won't be stored in state.
+- Cosmetic drift: `terraform plan` on either env routinely shows `module.monitoring.google_monitoring_dashboard.main` as changed (an `etag` and per-tile `targetAxis`/`xPos` reshuffle the API adds on read, not anything this config declares) plus, until each env's cleanup-policy apply has actually run, the two Artifact Registry repos' `cleanup_policy_dry_run`. Neither reflects real drift; don't chase either to a "clean" plan.
