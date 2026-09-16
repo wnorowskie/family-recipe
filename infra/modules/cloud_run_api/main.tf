@@ -182,6 +182,11 @@ resource "google_cloud_run_v2_service" "api" {
           cpu    = var.cpu_limit
           memory = var.memory_limit
         }
+        # Request-based billing: FastAPI has no post-response work
+        # (no BackgroundTasks, no scheduled jobs), so CPU need not stay
+        # allocated between requests. See #333.
+        cpu_idle          = true
+        startup_cpu_boost = true
       }
 
       volume_mounts {

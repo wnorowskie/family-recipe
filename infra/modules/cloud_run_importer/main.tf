@@ -110,6 +110,9 @@ resource "google_cloud_run_v2_service" "importer" {
           cpu    = var.cpu_limit
           memory = var.memory_limit
         }
+        # Request-based billing: no post-response work happens after the
+        # importer responds. See #333.
+        cpu_idle = true
       }
     }
   }

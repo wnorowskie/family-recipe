@@ -72,7 +72,7 @@ variable "disk_size_gb" {
 variable "backup_retention_days" {
   description = "Automated backup retention (days)"
   type        = number
-  default     = 14
+  default     = 7
 }
 
 variable "maintenance_window_day" {
@@ -108,7 +108,7 @@ variable "grant_secret_accessor_to_app" {
 variable "enable_public_ip" {
   description = "Whether to allocate a public IPv4 address for the instance (prod should generally set false)"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "authorized_networks" {
