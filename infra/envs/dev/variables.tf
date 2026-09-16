@@ -60,7 +60,7 @@ variable "db_password_secret_id" {
 variable "tier" {
   description = "Machine tier for Cloud SQL"
   type        = string
-  default     = "db-custom-1-3840"
+  default     = "db-f1-micro"
 }
 
 variable "activation_policy" {

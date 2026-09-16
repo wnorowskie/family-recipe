@@ -24,6 +24,7 @@ Dev is Eric's personal sandbox. Writes are fair game; the script cleans up after
 | Recipe importer Cloud Run | `recipe-importer-dev` → `https://recipe-importer-dev-894181878182.us-east1.run.app` |
 | FastAPI Cloud Run         | `family-recipe-api-dev` → `https://family-recipe-api-dev-ibom73tcdq-ue.a.run.app`   |
 | Cloud SQL instance        | `family-recipe-dev` (`family-recipe-dev:us-east1:family-recipe-dev`)                |
+| Cloud SQL tier            | `db-f1-micro` (always-on; #331 — `max_connections` is 25, not 100)                  |
 | Runtime SA                | `family-recipe-runner@family-recipe-dev.iam.gserviceaccount.com`                    |
 | Deployer SA               | `family-recipe-deployer@family-recipe-dev.iam.gserviceaccount.com`                  |
 
@@ -71,9 +72,9 @@ curl -sS -o /dev/null -w 'HTTP %{http_code}\n' \
 
 If you get 403, the tokenCreator grant from step 1 hasn't propagated yet — wait 30s and retry.
 
-## Start / stop the dev Postgres instance
+## Start the dev Postgres instance (if stopped)
 
-The Cloud SQL instance is declared `activation_policy = ALWAYS` in Terraform, so it normally stays running. Stop it manually to cut cost during long breaks; start it before a smoke run.
+The Cloud SQL instance is `db-f1-micro`, declared `activation_policy = ALWAYS` in Terraform, so the default posture is always-on. Manually stopping it no longer saves meaningful money — a stopped instance keeps its public IP, which alone costs ≈ $10.70/mo, within $0.37/mo of just leaving `db-f1-micro` running (#331) — so there's no cost reason to stop it. This section only covers recovering from a stopped state, since `/release-testing`'s pre-flight still checks for one and needs the instance running before a smoke run.
 
 ```bash
 # Check current state
@@ -82,13 +83,7 @@ gcloud sql instances describe family-recipe-dev \
   --format='value(state,settings.activationPolicy)'
 # → RUNNABLE ALWAYS (running) or STOPPED NEVER (stopped)
 
-# Stop (idle savings)
-gcloud sql instances patch family-recipe-dev \
-  --project family-recipe-dev \
-  --activation-policy=NEVER --quiet
-# Patch returns in ~15s; state becomes STOPPED NEVER.
-
-# Start
+# Start (if stopped)
 gcloud sql instances patch family-recipe-dev \
   --project family-recipe-dev \
   --activation-policy=ALWAYS --quiet
