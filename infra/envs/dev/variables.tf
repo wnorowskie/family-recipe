@@ -153,6 +153,12 @@ variable "artifact_registry_repo_id" {
   default     = "family-recipe-dev"
 }
 
+variable "cleanup_policy_dry_run" {
+  description = "If true, Artifact Registry cleanup policies (keep 3 most recent, delete older than 30d) are evaluated but nothing is deleted, across all three repos. Flip to false only after confirming a dry-run plan touches just the three repository resources (#332)."
+  type        = bool
+  default     = true
+}
+
 variable "cloud_sql_instances" {
   description = "List of Cloud SQL instance connection names for Cloud Run connector"
   type        = list(string)

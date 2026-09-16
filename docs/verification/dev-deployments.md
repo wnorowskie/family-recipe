@@ -200,6 +200,8 @@ gcloud run services describe family-recipe-dev \
 
 The deploy workflow uses a canary pattern (`gcloud run deploy --no-traffic --tag=candidate`, smoke against the candidate URL, then `gcloud run services update-traffic --to-latest --remove-tags=candidate` on success). The `--to-latest` step is what unpins the service after a previous rollback — without it, a single `--to-revisions=X=100` rollback would freeze the service on a stale revision forever, and every subsequent green deploy would build a new revision at 0% traffic while still reporting `success` (#158). If the columns above don't match, check `gh run list --workflow=deploy-dev.yml -L 1` for the most recent deploy and inspect the "Promote candidate to LATEST" step.
 
+Artifact Registry's cleanup policy keeps only the 3 most recent images per repo (#332), which bounds how far back a revision rollback can reach — see [rollback-phase4.md](../rollback-phase4.md#level-1--roll-back-the-fastapi-revision-fast-path).
+
 To unpin manually (if the pin survives somehow):
 
 ```bash

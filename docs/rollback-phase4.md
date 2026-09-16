@@ -81,6 +81,11 @@ Use this when the FastAPI service itself is healthy but the **currently promoted
 revision** is bad. No code change; you are re-pointing traffic at a known-good
 image that is still in Cloud Run.
 
+> Rollback depth is bounded: Artifact Registry's cleanup policy keeps only the
+> 3 most recent images per repo (#332), so this only works for revisions
+> deployed within the last 3 pushes — a revision pinned to a purged digest
+> can no longer scale from zero.
+
 1. List recent revisions for the API service and find the last healthy one:
 
    ```bash
