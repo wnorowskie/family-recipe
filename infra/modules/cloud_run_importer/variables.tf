@@ -20,6 +20,12 @@ variable "artifact_registry_repo_id" {
   default     = "recipe-importer-dev"
 }
 
+variable "cleanup_policy_dry_run" {
+  description = "If true, the repository's cleanup policies are evaluated but nothing is deleted. Flip to false only after confirming a dry-run plan touches just the repository resource."
+  type        = bool
+  default     = true
+}
+
 variable "runtime_service_account_email" {
   description = "Service account email for Cloud Run runtime (reuse existing)"
   type        = string

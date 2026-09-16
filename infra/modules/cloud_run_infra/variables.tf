@@ -25,6 +25,12 @@ variable "artifact_registry_repo_id" {
   type        = string
 }
 
+variable "cleanup_policy_dry_run" {
+  description = "If true, the repository's cleanup policies are evaluated but nothing is deleted. Flip to false only after confirming a dry-run plan touches just the repository resource."
+  type        = bool
+  default     = true
+}
+
 variable "cloud_sql_instances" {
   description = "List of Cloud SQL instance connection names for Cloud SQL connector"
   type        = list(string)
