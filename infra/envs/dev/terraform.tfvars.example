@@ -10,7 +10,7 @@ db_name                 = "family_recipe_dev"
 db_user                 = "family_app"
 db_password             = "REPLACE_ME" # store real value outside git; consider using Secret Manager and adding versions manually
 db_password_secret_id   = "family-recipe-dev-db-password"
-tier                    = "db-custom-1-3840"
+tier                    = "db-f1-micro"
 disk_size_gb            = 20
 backup_retention_days   = 7
 maintenance_window_day  = 7  # Sunday (GCP expects 1-7; Sunday=7)
