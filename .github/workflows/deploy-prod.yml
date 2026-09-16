@@ -3,6 +3,20 @@ name: Deploy Prod (Cloud Run)
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'prisma/**'
+      - 'types/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'next.config.mjs'
+      - 'tsconfig.json'
+      - 'tailwind.config.js'
+      - 'postcss.config.js'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/deploy-prod.yml'
   workflow_dispatch:
 
 concurrency:

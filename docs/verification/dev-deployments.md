@@ -185,7 +185,7 @@ Prerequisites: the one-time setup above (`roles/iam.serviceAccountTokenCreator`,
 
 ## Confirming the deploy actually flipped traffic
 
-A successful `deploy-dev.yml` run does not, on its own, mean the dev URL is serving the new revision. Always confirm with:
+`deploy-dev.yml` only runs when a push to `develop` touches a path it's scoped to (`src/**`, `prisma/**`, `Dockerfile`, etc. — see the `paths:` block in the workflow, #344); a docs-only or `infra/**`-only merge is expected to produce no run at all, and the previous revision keeps serving. `gh run list --workflow=deploy-dev.yml -L 1` tells you whether a run happened; the check below tells you whether a run that _did_ happen actually flipped traffic — that's a different question, and a successful run does not, on its own, mean the dev URL is serving the new revision. Always confirm with:
 
 ```bash
 gcloud run services describe family-recipe-dev \

@@ -109,7 +109,7 @@ gcloud run revisions describe "$REV" \
 # The image tag is the commit SHA; compare to `git rev-parse origin/develop`.
 ```
 
-If the SHAs don't match, the deploy workflow is still running or failed — check `gh run list --workflow=deploy-dev.yml -L 5` before continuing.
+If the SHAs don't match, first check whether `deploy-dev.yml`'s `paths:` filter (#344) actually matched this range — `git diff --name-only <prev-develop-sha>..origin/develop` against the filter in [.github/workflows/deploy-dev.yml](../../../.github/workflows/deploy-dev.yml). A range with no `src/**`/`prisma/**`/config/`Dockerfile` changes (docs-only, `infra/**`-only, an importer-only workflow edit) legitimately produces **no new deploy run** — the serving revision still reflects the last app-touching commit, not `origin/develop` HEAD. That's expected: report it as a **skip**, not a HOLD (`gh run list --workflow=deploy-dev.yml -L 5` will show no run for the release range, versus a run that's still in progress or failed). Only treat a SHA mismatch as a HOLD when the diff _does_ touch a filtered path and no matching deploy run shows up.
 
 ### 4. Confirm infrastructure state
 
@@ -260,7 +260,7 @@ _(or paste the failure line + stderr if any step failed)_
 ### Infrastructure
 
 - Dev Postgres state: `RUNNABLE ALWAYS` ✅
-- Deployed revision matches `develop` HEAD: ✅ / ❌ (`<revision-sha>` vs `<develop-sha>`)
+- Deployed revision matches `develop` HEAD: ✅ / ❌ (`<revision-sha>` vs `<develop-sha>`) / ⏭️ skipped — range touched no `deploy-dev.yml` path filter, prior revision still serving as expected
 - Deploy workflow (`deploy-dev.yml`) modified in this range: yes → inspected diff / no
 
 ### Could not verify
