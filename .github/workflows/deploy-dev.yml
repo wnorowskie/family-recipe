@@ -3,6 +3,24 @@ name: Deploy Dev (Cloud Run)
 on:
   push:
     branches: [develop]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'prisma/**'
+      - 'types/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'next.config.mjs'
+      - 'tsconfig.json'
+      - 'tailwind.config.js'
+      - 'postcss.config.js'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/deploy-dev.yml'
+      # The post-deploy @smoke job runs from these — a change here needs a
+      # real deploy to prove itself even with no src/** changes.
+      - 'e2e/**'
+      - 'scripts/dev-auth-proxy.ts'
   workflow_dispatch:
 
 jobs:
