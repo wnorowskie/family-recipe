@@ -39,3 +39,8 @@ wif_pool_id                = "github-pool"
 wif_provider_id            = "github-provider"
 github_repository          = "wnorowskie/family-recipe"
 github_ref                 = "refs/heads/main"
+
+# Billing budget (account-scoped; applied from prod — see infra/README.md)
+billing_account_id  = "0157B9-5A2A78-C9DEB7"
+dev_project_number  = "894181878182"
+prod_project_number = "655258509134"

@@ -52,6 +52,14 @@ FAMILY_NAME="Family Recipe" FAMILY_MASTER_KEY="actual-master-key" \
 npm run db:seed
 ```
 
+## Billing budget
+
+`infra/envs/prod/billing.tf` defines a single `google_billing_budget` covering both dev and prod project spend ($50/mo, alerts at 50/90/100% actual + 100% forecast, notifying the same channel as the monitoring alerts). It's declared in the prod env because prod is the "real" environment, even though `google_billing_budget` is account-scoped, not project-scoped — dev's Terraform doesn't touch it.
+
+The Cloud Billing Budget API bills its quota to whichever project you pass as the request's quota project, and the default `google` provider has no such override — applying with it 403s. `billing.tf` declares a second, aliased `google` provider with `billing_project = var.project_id` and `user_project_override = true` for this one resource. Run `gcloud services enable billingbudgets.googleapis.com --project family-recipe-prod` once before the first apply (or in an ADC-less CI context, if that's ever wired up).
+
+`google_billing_budget.monthly` references `module.monitoring.notification_channel_id` for its alert channel, and the `monitoring` module block has `depends_on = [module.cloud_run_infra]` — so a plan scoped with `terraform plan -target=google_billing_budget.monthly` will also surface any undeployed drift on `module.cloud_run_infra`'s resources (Cloud Run service, Artifact Registry repo), not just the budget. That's expected, not a bug in this config: apply the budget as part of a full-env apply (which reconciles that drift too) rather than trying to isolate it with `-target`, or you'll either apply more than you intended or have to fight the dependency graph.
+
 ## Notes
 
 - Backups: enabled, 7-day retention; maintenance window: Sunday 05:00 UTC.
