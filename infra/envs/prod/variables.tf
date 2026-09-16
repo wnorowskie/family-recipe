@@ -273,6 +273,22 @@ variable "alert_notification_email" {
   type        = string
 }
 
+# Billing budget (account-scoped, applied from prod)
+variable "billing_account_id" {
+  description = "GCP billing account ID (family-recipe-billing) that the monthly budget is attached to"
+  type        = string
+}
+
+variable "dev_project_number" {
+  description = "Project number for family-recipe-dev, used to scope the billing budget filter"
+  type        = string
+}
+
+variable "prod_project_number" {
+  description = "Project number for family-recipe-prod, used to scope the billing budget filter"
+  type        = string
+}
+
 # Recipe Importer integration (for main app to call importer)
 variable "recipe_importer_url" {
   description = "URL of the Recipe Importer Cloud Run service"
