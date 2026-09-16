@@ -103,13 +103,14 @@ If both columns match and `latestRevision=True`, confirm the deployed image SHA 
 REV=$(gcloud run services describe family-recipe-dev \
   --project family-recipe-dev --region us-east1 \
   --format='value(status.traffic[0].revisionName)')
-gcloud run revisions describe "$REV" \
+DEPLOYED_SHA=$(gcloud run revisions describe "$REV" \
   --project family-recipe-dev --region us-east1 \
-  --format='value(spec.containers[0].image)'
+  --format='value(spec.containers[0].image)' | sed 's/.*://')
 # The image tag is the commit SHA; compare to `git rev-parse origin/develop`.
+echo "$DEPLOYED_SHA"
 ```
 
-If the SHAs don't match, first check whether `deploy-dev.yml`'s `paths:` filter (#344) actually matched this range — `git diff --name-only <prev-develop-sha>..origin/develop` against the filter in [.github/workflows/deploy-dev.yml](../../../.github/workflows/deploy-dev.yml). A range with no `src/**`/`prisma/**`/config/`Dockerfile` changes (docs-only, `infra/**`-only, an importer-only workflow edit) legitimately produces **no new deploy run** — the serving revision still reflects the last app-touching commit, not `origin/develop` HEAD. That's expected: report it as a **skip**, not a HOLD (`gh run list --workflow=deploy-dev.yml -L 5` will show no run for the release range, versus a run that's still in progress or failed). Only treat a SHA mismatch as a HOLD when the diff _does_ touch a filtered path and no matching deploy run shows up.
+If the SHAs don't match, first check whether `deploy-dev.yml`'s `paths:` filter (#344) actually matched the commits in between — `git diff --name-only $DEPLOYED_SHA..origin/develop` against the filter in [.github/workflows/deploy-dev.yml](../../../.github/workflows/deploy-dev.yml). `$DEPLOYED_SHA` is the last commit that actually triggered a deploy, so this is the same range GitHub evaluated the `paths:` filter against. A range with no `src/**`/`prisma/**`/config/`Dockerfile` changes (docs-only, `infra/**`-only, an importer-only workflow edit) legitimately produces **no new deploy run** — the serving revision still reflects `$DEPLOYED_SHA`, not `origin/develop` HEAD. That's expected: report it as a **skip**, not a HOLD (`gh run list --workflow=deploy-dev.yml -L 5` will show no run for the release range, versus a run that's still in progress or failed). Only treat a SHA mismatch as a HOLD when the diff _does_ touch a filtered path and no matching deploy run shows up.
 
 ### 4. Confirm infrastructure state
 
