@@ -595,7 +595,7 @@ _Original design:_
 - ~~**Staging**: enable auth first, then data endpoints~~ (no staging environment exists; `develop` → dev, `main` → prod)
 - ~~**Prod**: canary rollout (5% → 25% → 50% → 100%)~~
 
-**What replaces it.** Safety now comes from a _revision-level_ canary rather than a session-level one. Both `deploy-dev.yml` and `deploy-prod.yml` (and the API workflows) deploy with `--no-traffic --tag candidate`, probe the tagged revision directly, and only then `--to-latest`. A failed probe pins traffic back to the previous revision, which never stopped serving. The unit of rollback is a revision, not a flag.
+**What replaces it.** Safety now comes from a _revision-level_ canary rather than a session-level one. `deploy-dev.yml`, `deploy-prod.yml`, the API workflows, and (since #328) the recipe-url-importer workflows all deploy with `--no-traffic --tag candidate`, probe the tagged revision directly, and only then `--to-latest`. A failed probe pins traffic back to the previous revision, which never stopped serving. The unit of rollback is a revision, not a flag.
 
 ### Deploy Topology (post #241)
 

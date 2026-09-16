@@ -210,7 +210,7 @@ gcloud run services update-traffic family-recipe-dev \
   --to-latest --remove-tags=candidate --quiet
 ```
 
-The same canary pattern lives in `deploy-prod.yml` — confirm prod the same way before assuming a prod release shipped.
+The same canary pattern lives in `deploy-prod.yml`, the API workflows, and (since #328) `deploy-recipe-url-importer.yml`/`deploy-recipe-url-importer-prod.yml` — confirm prod the same way before assuming a prod release shipped.
 
 ## Gotchas
 
