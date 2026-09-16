@@ -61,6 +61,7 @@ module "cloud_run_infra" {
   runtime_sa_id               = var.runtime_sa_id
   deployer_sa_id              = var.deployer_sa_id
   artifact_registry_repo_id   = var.artifact_registry_repo_id
+  cleanup_policy_dry_run      = var.cleanup_policy_dry_run
   cloud_sql_instances         = [module.sql_instance.instance_connection_name]
   cloud_run_service_name      = var.cloud_run_service_name
   min_instance_count          = var.min_instance_count
@@ -89,6 +90,7 @@ module "cloud_run_api" {
   region                        = var.region
   service_name                  = var.api_service_name
   artifact_registry_repo_id     = var.api_artifact_registry_repo_id
+  cleanup_policy_dry_run        = var.cleanup_policy_dry_run
   runtime_service_account_email = module.cloud_run_infra.runtime_service_account_email
   cloud_sql_instances           = [module.sql_instance.instance_connection_name]
   min_instance_count            = var.api_min_instance_count
@@ -122,6 +124,7 @@ module "cloud_run_importer" {
   region                        = var.region
   service_name                  = var.importer_service_name
   artifact_registry_repo_id     = var.importer_artifact_registry_repo_id
+  cleanup_policy_dry_run        = var.cleanup_policy_dry_run
   runtime_service_account_email = module.cloud_run_infra.runtime_service_account_email
   invoker_members               = ["serviceAccount:${module.cloud_run_infra.runtime_service_account_email}"]
   min_instance_count            = var.importer_min_instance_count

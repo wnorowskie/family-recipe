@@ -60,7 +60,7 @@ variable "db_password_secret_id" {
 variable "tier" {
   description = "Machine tier for Cloud SQL"
   type        = string
-  default     = "db-custom-1-3840"
+  default     = "db-f1-micro"
 }
 
 variable "activation_policy" {
@@ -151,6 +151,12 @@ variable "artifact_registry_repo_id" {
   description = "Artifact Registry repository ID for app images"
   type        = string
   default     = "family-recipe-dev"
+}
+
+variable "cleanup_policy_dry_run" {
+  description = "If true, Artifact Registry cleanup policies (keep 3 most recent, delete older than 30d) are evaluated but nothing is deleted, across all three repos. Flip to false only after confirming a dry-run plan touches just the three repository resources (#332)."
+  type        = bool
+  default     = true
 }
 
 variable "cloud_sql_instances" {

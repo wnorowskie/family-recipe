@@ -5,6 +5,23 @@ resource "google_artifact_registry_repository" "api" {
   repository_id = var.artifact_registry_repo_id
   description   = "FastAPI backend service images"
   format        = "DOCKER"
+
+  cleanup_policy_dry_run = var.cleanup_policy_dry_run
+  cleanup_policies {
+    id     = "keep-3-most-recent"
+    action = "KEEP"
+    most_recent_versions {
+      keep_count = 3
+    }
+  }
+  cleanup_policies {
+    id     = "delete-older-than-30d"
+    action = "DELETE"
+    condition {
+      tag_state  = "ANY"
+      older_than = "2592000s"
+    }
+  }
 }
 
 # Cloud Run service for the FastAPI backend (apps/api).
@@ -165,6 +182,11 @@ resource "google_cloud_run_v2_service" "api" {
           cpu    = var.cpu_limit
           memory = var.memory_limit
         }
+        # Request-based billing: FastAPI has no post-response work
+        # (no BackgroundTasks, no scheduled jobs), so CPU need not stay
+        # allocated between requests. See #333.
+        cpu_idle          = true
+        startup_cpu_boost = true
       }
 
       volume_mounts {

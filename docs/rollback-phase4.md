@@ -10,7 +10,9 @@ unhealthy in an environment. This is the procedure the
 > the FastAPI stack, so treat a Level 2 escalation as a user-visible outage
 > window. Prod resources: services `family-recipe-prod` (Next) and
 > `family-recipe-api-prod` (FastAPI), project `family-recipe-prod`, region
-> `us-east1`.
+> `us-east1`. Current prod state: release #308 (2026-09-15, merge `8150f87`)
+> plus Next-only hotfix #326 (`aadd162`) for the #324 login-theme bug — `main`
+> is `aadd162`.
 
 > **The important thing to know:** the migration is done and **the feature flags
 > are gone**. Before Phase 4.4 you could roll back by flipping
@@ -34,10 +36,24 @@ bad API deploy) in minutes; Level 2 is the last resort.
 
 ### When to roll back (criteria)
 
-> **⚠️ Nothing pages you on these.** The thresholds below are not wired to any
-> alert: `Service Down (dev|prod)` is inverted and fires when the service is
-> _healthy_ (#284), and the FastAPI service has no monitoring coverage at all
-> (#32). You must evaluate these by hand:
+> **⚠️ `Service Down` alone isn't enough — evaluate the criteria below by hand.**
+> `Service Down (dev|prod)` ran backwards from 2025-12-24 (fired when healthy,
+> silent when down) until #284 fixed it; both environments have run the
+> correct polarity (`COMPARISON_GT`, fires after 2 failed checks) live since
+> 2026-08-24, applied by a local `terraform apply`, not through `main`. So a
+> real outage now does page — but that alert only watches the Next service's
+> `/api/health` uptime check. It is **not** wired to the auth-failure-rate,
+> refresh-loop, or 401/403-spike criteria below, and the FastAPI service has
+> no monitoring coverage of its own at all (#32, open). Confirm the live
+> policy rather than trusting a branch:
+>
+> ```bash
+> gcloud alpha monitoring policies list --project family-recipe-prod --format=json \
+>   | jq -r '.[] | select(.displayName=="Service Down (prod)") | .conditions[0].conditionThreshold | "\(.comparison) \(.thresholdValue)"'
+> # → COMPARISON_GT 2.0 means the fix is live; COMPARISON_LT 1 means it isn't.
+> ```
+>
+> Evaluate the rollback criteria by hand:
 >
 > ```bash
 > gcloud logging read 'resource.type=cloud_run_revision AND severity>=ERROR' \
@@ -64,6 +80,11 @@ migration plan's Rollback Criteria):
 Use this when the FastAPI service itself is healthy but the **currently promoted
 revision** is bad. No code change; you are re-pointing traffic at a known-good
 image that is still in Cloud Run.
+
+> Rollback depth is bounded: Artifact Registry's cleanup policy keeps only the
+> 3 most recent images per repo (#332), so this only works for revisions
+> deployed within the last 3 pushes — a revision pinned to a purged digest
+> can no longer scale from zero.
 
 1. List recent revisions for the API service and find the last healthy one:
 

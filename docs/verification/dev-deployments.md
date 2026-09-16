@@ -24,6 +24,7 @@ Dev is Eric's personal sandbox. Writes are fair game; the script cleans up after
 | Recipe importer Cloud Run | `recipe-importer-dev` → `https://recipe-importer-dev-894181878182.us-east1.run.app` |
 | FastAPI Cloud Run         | `family-recipe-api-dev` → `https://family-recipe-api-dev-ibom73tcdq-ue.a.run.app`   |
 | Cloud SQL instance        | `family-recipe-dev` (`family-recipe-dev:us-east1:family-recipe-dev`)                |
+| Cloud SQL tier            | `db-f1-micro` (always-on; #331 — `max_connections` is 25, not 100)                  |
 | Runtime SA                | `family-recipe-runner@family-recipe-dev.iam.gserviceaccount.com`                    |
 | Deployer SA               | `family-recipe-deployer@family-recipe-dev.iam.gserviceaccount.com`                  |
 
@@ -71,9 +72,9 @@ curl -sS -o /dev/null -w 'HTTP %{http_code}\n' \
 
 If you get 403, the tokenCreator grant from step 1 hasn't propagated yet — wait 30s and retry.
 
-## Start / stop the dev Postgres instance
+## Start the dev Postgres instance (if stopped)
 
-The Cloud SQL instance is declared `activation_policy = ALWAYS` in Terraform, so it normally stays running. Stop it manually to cut cost during long breaks; start it before a smoke run.
+The Cloud SQL instance is `db-f1-micro`, declared `activation_policy = ALWAYS` in Terraform, so the default posture is always-on. Manually stopping it no longer saves meaningful money — a stopped instance keeps its public IP, which alone costs ≈ $10.70/mo, within $0.37/mo of just leaving `db-f1-micro` running (#331) — so there's no cost reason to stop it. This section only covers recovering from a stopped state, since `/release-testing`'s pre-flight still checks for one and needs the instance running before a smoke run.
 
 ```bash
 # Check current state
@@ -82,13 +83,7 @@ gcloud sql instances describe family-recipe-dev \
   --format='value(state,settings.activationPolicy)'
 # → RUNNABLE ALWAYS (running) or STOPPED NEVER (stopped)
 
-# Stop (idle savings)
-gcloud sql instances patch family-recipe-dev \
-  --project family-recipe-dev \
-  --activation-policy=NEVER --quiet
-# Patch returns in ~15s; state becomes STOPPED NEVER.
-
-# Start
+# Start (if stopped)
 gcloud sql instances patch family-recipe-dev \
   --project family-recipe-dev \
   --activation-policy=ALWAYS --quiet
@@ -205,6 +200,8 @@ gcloud run services describe family-recipe-dev \
 
 The deploy workflow uses a canary pattern (`gcloud run deploy --no-traffic --tag=candidate`, smoke against the candidate URL, then `gcloud run services update-traffic --to-latest --remove-tags=candidate` on success). The `--to-latest` step is what unpins the service after a previous rollback — without it, a single `--to-revisions=X=100` rollback would freeze the service on a stale revision forever, and every subsequent green deploy would build a new revision at 0% traffic while still reporting `success` (#158). If the columns above don't match, check `gh run list --workflow=deploy-dev.yml -L 1` for the most recent deploy and inspect the "Promote candidate to LATEST" step.
 
+Artifact Registry's cleanup policy keeps only the 3 most recent images per repo (#332), which bounds how far back a revision rollback can reach — see [rollback-phase4.md](../rollback-phase4.md#level-1--roll-back-the-fastapi-revision-fast-path).
+
 To unpin manually (if the pin survives somehow):
 
 ```bash
@@ -213,7 +210,7 @@ gcloud run services update-traffic family-recipe-dev \
   --to-latest --remove-tags=candidate --quiet
 ```
 
-The same canary pattern lives in `deploy-prod.yml` — confirm prod the same way before assuming a prod release shipped.
+The same canary pattern lives in `deploy-prod.yml`, the API workflows, and (since #328) `deploy-recipe-url-importer.yml`/`deploy-recipe-url-importer-prod.yml` — confirm prod the same way before assuming a prod release shipped.
 
 ## Gotchas
 

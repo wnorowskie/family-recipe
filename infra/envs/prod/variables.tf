@@ -72,7 +72,7 @@ variable "disk_size_gb" {
 variable "backup_retention_days" {
   description = "Automated backup retention (days)"
   type        = number
-  default     = 14
+  default     = 7
 }
 
 variable "maintenance_window_day" {
@@ -108,7 +108,7 @@ variable "grant_secret_accessor_to_app" {
 variable "enable_public_ip" {
   description = "Whether to allocate a public IPv4 address for the instance (prod should generally set false)"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "authorized_networks" {
@@ -139,6 +139,12 @@ variable "artifact_registry_repo_id" {
   description = "Artifact Registry repository ID for app images"
   type        = string
   default     = "family-recipe-prod"
+}
+
+variable "cleanup_policy_dry_run" {
+  description = "If true, Artifact Registry cleanup policies (keep 3 most recent, delete older than 30d) are evaluated but nothing is deleted, across all three repos. Flip to false only after confirming a dry-run plan touches just the three repository resources (#332)."
+  type        = bool
+  default     = true
 }
 
 variable "cloud_run_service_name" {
@@ -264,6 +270,22 @@ variable "github_ref" {
 # Monitoring
 variable "alert_notification_email" {
   description = "Email address for monitoring alert notifications"
+  type        = string
+}
+
+# Billing budget (account-scoped, applied from prod)
+variable "billing_account_id" {
+  description = "GCP billing account ID (family-recipe-billing) that the monthly budget is attached to"
+  type        = string
+}
+
+variable "dev_project_number" {
+  description = "Project number for family-recipe-dev, used to scope the billing budget filter"
+  type        = string
+}
+
+variable "prod_project_number" {
+  description = "Project number for family-recipe-prod, used to scope the billing budget filter"
   type        = string
 }
 

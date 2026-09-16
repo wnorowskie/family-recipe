@@ -10,7 +10,7 @@ db_name                   = "family_recipe_prod"
 db_user                   = "family_app"
 db_password               = "REPLACE_ME"
 db_password_secret_id     = "family-recipe-prod-db-password"
-tier                      = "db-custom-1-3840"
+tier                      = "db-f1-micro"
 disk_size_gb              = 20
 backup_retention_days     = 7  # PG log retention max is 7
 maintenance_window_day    = 7  # Sunday (GCP expects 1-7; Sunday=7)
@@ -27,7 +27,7 @@ runtime_sa_id              = "family-recipe-runner"
 deployer_sa_id             = "family-recipe-deployer"
 artifact_registry_repo_id  = "family-recipe-prod"
 cloud_run_service_name     = "family-recipe-prod"
-min_instance_count         = 1
+min_instance_count         = 0
 max_instance_count         = 5
 uploads_bucket_name        = "family-recipe-prod-uploads"
 uploads_base_url           = "https://storage.googleapis.com/family-recipe-prod-uploads"
@@ -39,3 +39,8 @@ wif_pool_id                = "github-pool"
 wif_provider_id            = "github-provider"
 github_repository          = "wnorowskie/family-recipe"
 github_ref                 = "refs/heads/main"
+
+# Billing budget (account-scoped; applied from prod — see infra/README.md)
+billing_account_id  = "0157B9-5A2A78-C9DEB7"
+dev_project_number  = "894181878182"
+prod_project_number = "655258509134"

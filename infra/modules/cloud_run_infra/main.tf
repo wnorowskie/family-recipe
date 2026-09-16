@@ -106,6 +106,23 @@ resource "google_artifact_registry_repository" "app" {
   repository_id = var.artifact_registry_repo_id
   description   = "Family Recipe app images"
   format        = "DOCKER"
+
+  cleanup_policy_dry_run = var.cleanup_policy_dry_run
+  cleanup_policies {
+    id     = "keep-3-most-recent"
+    action = "KEEP"
+    most_recent_versions {
+      keep_count = 3
+    }
+  }
+  cleanup_policies {
+    id     = "delete-older-than-30d"
+    action = "DELETE"
+    condition {
+      tag_state  = "ANY"
+      older_than = "2592000s"
+    }
+  }
 }
 
 resource "google_storage_bucket" "uploads" {
