@@ -187,6 +187,18 @@ resource "google_cloud_run_v2_service" "app" {
   ingress = "INGRESS_TRAFFIC_ALL"
 
   lifecycle {
+    # `template[0].revision` is deliberately NOT ignored here (it was from
+    # #285 to 2026-09, see git blame). `revision` is Optional but not
+    # Computed in the provider schema, and Update PATCHes the whole
+    # `template` object with no field mask — so ignoring it meant every
+    # apply resent whatever revision name a refresh last saw live, and any
+    # apply that also changed another template field 409'd trying to
+    # redefine that (already-created, immutable) revision under a new spec.
+    # Leaving it out of config lets Cloud Run auto-assign a fresh name
+    # whenever the effective template actually differs, at the cost of a
+    # perpetual harmless `revision -> null` line in every plan (nothing to
+    # chase — same class as the dashboard/AR drift noted in
+    # infra/README.md). See #345.
     ignore_changes = [
       # CI/CD updates the image; keep Terraform from rolling it back.
       template[0].containers[0].image,
@@ -195,9 +207,6 @@ resource "google_cloud_run_v2_service" "app" {
       # every plan only for the next deploy to write them back. See #89.
       client,
       client_version,
-      # Same class as client/client_version above: `gcloud run deploy` stamps
-      # the revision name on every deploy, which TF doesn't model. See #285.
-      template[0].revision,
       # deploy-dev.yml/deploy-prod.yml re-assert every container env var via
       # --set-env-vars/--set-secrets on every deploy (a superset of what TF
       # declares here, including the API_INTERNAL_* vars TF has never
