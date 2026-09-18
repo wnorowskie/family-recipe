@@ -7,6 +7,9 @@
  * `RootLayout` is an async server component; calling it directly returns
  * the constructed React element tree without needing a DOM renderer,
  * mirroring the pattern in app-page-auth-redirect.test.ts.
+ *
+ * The same cookie drives the `theme-color` meta via `generateViewport`
+ * (#349), so both are covered here.
  */
 
 jest.mock('next/font/local', () => () => ({ variable: '--font-display' }));
@@ -18,7 +21,8 @@ jest.mock('next/headers', () => ({
 }));
 
 import { cookies } from 'next/headers';
-import RootLayout from '@/app/layout';
+import RootLayout, { generateViewport, metadata } from '@/app/layout';
+import { PAGE_THEME_COLOR } from '@/lib/theme';
 
 const mockCookies = cookies as jest.MockedFunction<typeof cookies>;
 
@@ -68,5 +72,43 @@ describe('RootLayout theme cookie', () => {
     };
 
     expect(element.props['data-theme']).toBeUndefined();
+  });
+});
+
+describe('generateViewport theme-color (#349)', () => {
+  it('uses the warm page background when the cookie is warm', async () => {
+    mockThemeCookie('warm');
+    expect(await generateViewport()).toEqual({
+      themeColor: PAGE_THEME_COLOR.warm,
+    });
+  });
+
+  it.each([
+    ['grayscale', 'grayscale'],
+    ['absent (logged out)', undefined],
+    ['tampered', 'sepia'],
+  ])(
+    'uses the default page background when the cookie is %s',
+    async (_, value) => {
+      mockThemeCookie(value);
+      expect(await generateViewport()).toEqual({
+        themeColor: PAGE_THEME_COLOR.default,
+      });
+    }
+  );
+});
+
+describe('installed-app metadata (#349)', () => {
+  it('declares the iOS standalone meta through the metadata API', () => {
+    expect(metadata.appleWebApp).toEqual({
+      capable: true,
+      statusBarStyle: 'default',
+      title: 'Family Recipe',
+    });
+    // Next emits `mobile-web-app-capable` for `capable`; iOS < 17.4 only
+    // honours the Apple-prefixed tag, so that one is set explicitly.
+    expect(metadata.other).toMatchObject({
+      'apple-mobile-web-app-capable': 'yes',
+    });
   });
 });

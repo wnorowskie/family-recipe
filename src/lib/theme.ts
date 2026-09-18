@@ -21,3 +21,22 @@ export function applyThemeToDocument(theme: string | null | undefined): void {
     document.documentElement.removeAttribute('data-theme');
   }
 }
+
+/**
+ * Server-side mirror of the same rule, for the `theme-color` meta (#349).
+ *
+ * The browser/OS chrome around an installed PWA (iOS status bar, Android
+ * task switcher) is painted from `<meta name="theme-color">`, which can't
+ * read a CSS custom property — so the page background token
+ * (`--bg-page` → `--color-gray-50`) is duplicated here as the sRGB hex of
+ * each theme's OKLCH value in src/app/globals.css. If either token changes,
+ * update both.
+ */
+export const PAGE_THEME_COLOR = {
+  default: '#f9fafb', // oklch(0.985 0.002 247.839) — Tailwind gray-50
+  warm: '#f9f4ec', // oklch(0.97 0.012 80) — unbleached cream
+} as const;
+
+export function pageThemeColor(theme: string | null | undefined): string {
+  return theme === 'warm' ? PAGE_THEME_COLOR.warm : PAGE_THEME_COLOR.default;
+}

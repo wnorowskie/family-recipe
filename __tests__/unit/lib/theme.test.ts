@@ -1,7 +1,11 @@
 /**
  * @jest-environment jsdom
  */
-import { applyThemeToDocument } from '@/lib/theme';
+import {
+  PAGE_THEME_COLOR,
+  applyThemeToDocument,
+  pageThemeColor,
+} from '@/lib/theme';
 
 beforeEach(() => {
   document.documentElement.removeAttribute('data-theme');
@@ -27,4 +31,23 @@ describe('applyThemeToDocument', () => {
       expect(document.documentElement.getAttribute('data-theme')).toBeNull();
     }
   );
+});
+
+describe('pageThemeColor', () => {
+  it('returns the warm page background for the literal warm value', () => {
+    expect(pageThemeColor('warm')).toBe(PAGE_THEME_COLOR.warm);
+  });
+
+  it.each([undefined, null, '', 'grayscale', 'WARM', 'neon'])(
+    'treats %p as the default palette (mirrors RootLayout)',
+    (value) => {
+      expect(pageThemeColor(value)).toBe(PAGE_THEME_COLOR.default);
+    }
+  );
+
+  it('uses distinct sRGB hex values for the two palettes', () => {
+    expect(PAGE_THEME_COLOR.default).toMatch(/^#[0-9a-f]{6}$/);
+    expect(PAGE_THEME_COLOR.warm).toMatch(/^#[0-9a-f]{6}$/);
+    expect(PAGE_THEME_COLOR.warm).not.toBe(PAGE_THEME_COLOR.default);
+  });
 });
