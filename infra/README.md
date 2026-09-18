@@ -75,22 +75,24 @@ Read the plan body before applying, not just the add/change/destroy summary — 
 
 ### If the apply 409s on a Cloud Run service
 
-As of #345, the three Cloud Run modules no longer put `template[0].revision` in `lifecycle.ignore_changes`, which should prevent this. If you hit it anyway (e.g. before that fix, or if it regresses), it looks like:
+Any apply that changes a Cloud Run service's `template` (scaling, CPU, resources, ports…) while state already carries a live revision name for that service — from a recent `gcloud run deploy`, or from a prior `terraform apply` — can fail partway through with:
 
 ```
 Error 409: Revision named '<service>-000NN-xxx' with different configuration already exists.
 ```
 
-Cause: with `template[0].revision` ignored, Terraform pins the _state_ value at whatever a refresh last saw live and resends it on every apply — the provider's Update PATCHes the whole `template` object with no field mask, so any apply that also changes another template field resends that already-created revision name alongside a different spec, and Cloud Run refuses to redefine an immutable revision under that name. This isn't specific to a `gcloud run deploy` having just run; it can happen on any apply where state already carries a live revision name for that service, gcloud-deployed or Terraform-created.
+Cause: `cloud_run_infra`, `cloud_run_api`, and `cloud_run_importer` all carry `template[0].revision` in `lifecycle.ignore_changes` (#285) so Terraform doesn't fight the revision name `gcloud run deploy` stamps on every deploy. `ignore_changes` pins the _state_ value at whatever a refresh last saw live — so the next plan that touches the same service's template resends that exact (already-used) revision name alongside the new template, and Cloud Run refuses to redefine an immutable revision under that name.
+
+**#345 investigated dropping the ignore permanently and ruled it out.** `revision` is Optional but not Computed in the provider schema, so an unset config value diffs against it on every plan, and the provider's Update PATCHes the whole `template` object with no field mask. Confirmed live on dev (2026-09-17): applying with the ignore removed and nothing else changed still spun a brand-new revision (`family-recipe-dev-00300-dak` → `family-recipe-dev-00185-n8q`, identical image digest) — not the no-op the field's docs implied. That trades one problem for a worse one (a revision on every single apply, forever), so the ignore stays, and the manual per-apply workaround below is the sanctioned process until upstream fixes [hashicorp/terraform-provider-google#14569](https://github.com/hashicorp/terraform-provider-google/issues/14569).
 
 This halts a full-env apply partway through and leaves everything after the failed resource in the graph unapplied — for prod, that includes the budget, dashboard, and (via `depends_on = [module.cloud_run_infra]`) the API and importer modules. Retry with the workaround below rather than assuming a partial apply is safe to leave as-is.
 
 Workaround, one apply at a time:
 
-1. In all three files — `infra/modules/cloud_run_infra/main.tf`, `infra/modules/cloud_run_api/main.tf`, `infra/modules/cloud_run_importer/main.tf` — add `template[0].revision,` back into `lifecycle.ignore_changes`.
+1. In all three files — `infra/modules/cloud_run_infra/main.tf`, `infra/modules/cloud_run_api/main.tf`, `infra/modules/cloud_run_importer/main.tf` — comment out the `template[0].revision,` line inside `lifecycle.ignore_changes` (leave the rest of the block alone).
 2. Re-plan. The affected service(s) should now show `- revision = "<live-revision-name>" -> null` in the `template` block, on top of whatever real change you were applying — nothing else should move. If `env`, `image`, or `scaling` also show up as diffs here, stop and investigate before applying; that's not this issue.
-3. Apply.
-4. Restore the three files: `git checkout -- infra/modules` (uncommitted local edit only — never commit the re-added ignore).
+3. Apply. Expect it to create one extra revision beyond the change you intended (see the #345 finding above) — that's the accepted cost of doing this per-apply rather than permanently.
+4. Restore the three files: `git checkout -- infra/modules` (uncommitted local edit only — never commit the comment-out).
 5. Re-run `terraform plan`; it should come back clean (aside from the known cosmetic drift noted below).
 
 Terraform-created revisions use a separate generation counter from `gcloud run deploy`'s — e.g. prod Next went from `family-recipe-prod-00020-xec` (last `gcloud run deploy`) to `family-recipe-prod-00016-bzp` (next `terraform apply`) even though the latter came second. Don't read Cloud Run revision numbers as a chronological timeline once both tools have touched a service; use `gcloud run revisions list --service=<service> --sort-by=~createTime` instead.
@@ -108,4 +110,4 @@ The Cloud Billing Budget API bills its quota to whichever project you pass as th
 - Backups: enabled, 7-day retention; maintenance window: Sunday 05:00 UTC.
 - Public IP only for now (simpler for local/Vercel). Private IP + VPC connector can be added later if moving to Cloud Run.
 - Secrets (DB password, optional family master key) should live in Secret Manager or local tfvars (not committed). I initially had to create a place holder in local tfvars, and then I updated the secret value manually in Secret Manager to avoid storing it in Terraform state. Now it is set to be ignored so that any future changes won't be stored in state.
-- Cosmetic drift: `terraform plan` on either env routinely shows `module.monitoring.google_monitoring_dashboard.main` as changed (an `etag` and per-tile `targetAxis`/`xPos` reshuffle the API adds on read, not anything this config declares) plus, until each env's cleanup-policy apply has actually run, the two Artifact Registry repos' `cleanup_policy_dry_run`. Neither reflects real drift; don't chase either to a "clean" plan. As of #345, expect a similar `- revision = "<name>" -> null` line on whichever Cloud Run service has a live revision, on every plan, permanently — `revision` is Optional but not Computed in the provider schema, so an unset config value diffs against any real name forever. That's believed to be a harmless no-op apply (Cloud Run only creates a new revision when the effective template actually differs), but that belief is unverified against live traffic as of this writing — see the dev verification steps on issue #345 before trusting it blindly on a prod apply.
+- Cosmetic drift: `terraform plan` on either env routinely shows `module.monitoring.google_monitoring_dashboard.main` as changed (an `etag` and per-tile `targetAxis`/`xPos` reshuffle the API adds on read, not anything this config declares) plus, until each env's cleanup-policy apply has actually run, the two Artifact Registry repos' `cleanup_policy_dry_run`. Neither reflects real drift; don't chase either to a "clean" plan.

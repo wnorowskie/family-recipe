@@ -32,18 +32,6 @@ resource "google_cloud_run_v2_service" "importer" {
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   lifecycle {
-    # `template[0].revision` is deliberately NOT ignored here (it was from
-    # #285 to 2026-09, see git blame). `revision` is Optional but not
-    # Computed in the provider schema, and Update PATCHes the whole
-    # `template` object with no field mask — so ignoring it meant every
-    # apply resent whatever revision name a refresh last saw live, and any
-    # apply that also changed another template field 409'd trying to
-    # redefine that (already-created, immutable) revision under a new spec.
-    # Leaving it out of config lets Cloud Run auto-assign a fresh name
-    # whenever the effective template actually differs, at the cost of a
-    # perpetual harmless `revision -> null` line in every plan (nothing to
-    # chase — same class as the dashboard/AR drift noted in
-    # infra/README.md). See #345.
     ignore_changes = [
       # CI/CD updates the image; keep Terraform from rolling it back.
       template[0].containers[0].image,
@@ -52,6 +40,20 @@ resource "google_cloud_run_v2_service" "importer" {
       # every plan only for the next deploy to write them back. See #89.
       client,
       client_version,
+      # Same class as client/client_version above: `gcloud run deploy` stamps
+      # the revision name on every deploy, which TF doesn't model. See #285.
+      # #345 tried dropping this: `revision` is Optional but not Computed in
+      # the provider schema, so an unset config value diffs against it on
+      # every plan, and Update PATCHes the whole `template` with no field
+      # mask — but confirmed live on dev (2026-09-17, family-recipe-dev
+      # 00300-dak -> 00185-n8q, identical image digest, nothing else in the
+      # template changed) that clearing it creates a brand-new revision on
+      # every single apply, not the no-op the field's docs implied. That's
+      # worse than the 409 it was meant to fix (same "rolls a revision on
+      # every apply" class the ticket ruled out for -replace/null_resource),
+      # so the ignore stays; use the one-apply-at-a-time workaround in
+      # infra/README.md instead. Upstream: hashicorp/terraform-provider-google#14569.
+      template[0].revision,
       # A top-level `scaling` block (manual_instance_count/min/max) the
       # provider now surfaces as live drift alongside the `template.scaling`
       # block this module actually declares; not something TF ever set. See #285.
