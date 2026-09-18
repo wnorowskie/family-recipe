@@ -52,6 +52,17 @@ resource "google_cloud_run_v2_service" "api" {
       client_version,
       # Same class as client/client_version above: `gcloud run deploy` stamps
       # the revision name on every deploy, which TF doesn't model. See #285.
+      # #345 tried dropping this: `revision` is Optional but not Computed in
+      # the provider schema, so an unset config value diffs against it on
+      # every plan, and Update PATCHes the whole `template` with no field
+      # mask — but confirmed live on dev (2026-09-17, family-recipe-dev
+      # 00300-dak -> 00185-n8q, identical image digest, nothing else in the
+      # template changed) that clearing it creates a brand-new revision on
+      # every single apply, not the no-op the field's docs implied. That's
+      # worse than the 409 it was meant to fix (same "rolls a revision on
+      # every apply" class the ticket ruled out for -replace/null_resource),
+      # so the ignore stays; use the one-apply-at-a-time workaround in
+      # infra/README.md instead. Upstream: hashicorp/terraform-provider-google#14569.
       template[0].revision,
       # A top-level `scaling` block (manual_instance_count/min/max) the
       # provider now surfaces as live drift alongside the `template.scaling`
