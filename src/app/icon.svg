@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    Source glyph for every app icon (#348). Regenerate the PNG set with
+    `node scripts/generate-icons.mjs` — see public/icons/README.md.
+
+    Colours are the hex renderings of the default-theme tokens in globals.css:
+    background = bg-primary (gray-800), glyph = bg-page (gray-50). The
+    background is full-bleed and the glyph sits inside the central 80% circle
+    so one file works as the favicon, apple-touch-icon and Android maskable icon.
+  -->
+  <rect width="512" height="512" fill="#1f2937"/>
+  <g transform="translate(256 260) scale(1.2) translate(-256 -260)">
+  <g fill="none" stroke="#f9fafb" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <!-- steam -->
+    <path d="M204 230c0-24 22-24 22-48s-22-24-22-48"/>
+    <path d="M256 230c0-28 24-28 24-56s-24-28-24-56"/>
+    <path d="M308 230c0-24 22-24 22-48s-22-24-22-48"/>
+  </g>
+  <!-- bowl -->
+  <path d="M124 272h264a132 132 0 0 1-264 0z" fill="#f9fafb"/>
+  <rect x="218" y="392" width="76" height="20" rx="10" fill="#f9fafb"/>
+  </g>
+</svg>
