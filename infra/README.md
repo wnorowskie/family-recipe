@@ -87,7 +87,7 @@ Cause: `cloud_run_infra`, `cloud_run_api`, and `cloud_run_importer` all carry `t
 
 This halts a full-env apply partway through — Terraform stops scheduling new resources once one fails, so everything downstream of the failed service in the graph is left unapplied. For prod that's the `cloud_run_api` and `cloud_run_importer` modules (`depends_on = [module.cloud_run_infra]`) and the `monitoring` module (same `depends_on`, gating the dashboard); the billing budget in turn references `module.monitoring.notification_channel_id`, so it goes unapplied too even though it has no `depends_on` of its own. Retry with the workaround below rather than assuming a partial apply is safe to leave as-is.
 
-Workaround, one apply at a time — commands below assume the repo root; adjust if you're still in `infra/envs/prod` from the block above:
+Workaround, one apply at a time:
 
 1. In all three files — `infra/modules/cloud_run_infra/main.tf`, `infra/modules/cloud_run_api/main.tf`, `infra/modules/cloud_run_importer/main.tf` — comment out the `template[0].revision,` line inside `lifecycle.ignore_changes` (leave the rest of the block alone).
 2. Re-plan (from `infra/envs/prod`). The affected service(s) should now show `- revision = "<live-revision-name>" -> null` in the `template` block, on top of whatever real change you were applying — nothing else should move. If `env`, `image`, or `scaling` also show up as diffs here, stop and investigate before applying; that's not this issue.
