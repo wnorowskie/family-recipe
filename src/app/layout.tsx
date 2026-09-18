@@ -1,8 +1,9 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import { cookies } from 'next/headers';
 import './globals.css';
 import FeedbackWidget from '@/components/feedback/FeedbackWidget';
+import { pageThemeColor } from '@/lib/theme';
 
 const fraunces = localFont({
   src: [
@@ -24,7 +25,29 @@ const fraunces = localFont({
 export const metadata: Metadata = {
   title: 'Family Recipe',
   description: 'Share and preserve family recipes',
+  // Installed-PWA chrome on iOS (#349). Next's `appleWebApp.capable` emits
+  // the standard `mobile-web-app-capable`; the Apple-prefixed twin is what
+  // iOS < 17.4 reads, so it goes through `other`.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Family Recipe',
+  },
+  other: {
+    'apple-mobile-web-app-capable': 'yes',
+  },
 };
+
+/**
+ * `theme-color` follows the active theme (#349) using the same synchronous
+ * cookie read as `RootLayout` below — not a FastAPI call — for the same
+ * rate-limit reason. Next keeps its default `width=device-width,
+ * initial-scale=1` viewport alongside whatever is returned here.
+ */
+export async function generateViewport(): Promise<Viewport> {
+  const cookieStore = await cookies();
+  return { themeColor: pageThemeColor(cookieStore.get('theme')?.value) };
+}
 
 export default async function RootLayout({
   children,
